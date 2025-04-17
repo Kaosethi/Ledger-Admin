@@ -1,11 +1,11 @@
 // src/components/QRCodeCanvas.tsx
 import React, { useRef, useEffect } from 'react';
-import QRCode from 'qrcode';
+import QRCode, { QRCodeRenderersOptions } from 'qrcode';
 
 interface QRCodeCanvasProps {
   data: string | null | undefined; // Data to encode
   width?: number; // Canvas width
-  options?: QRCode.QRCodeToCanvasOptions; // Pass through QR code options
+  options?: QRCodeRenderersOptions; // Pass through QR code options
   onError?: (error: any) => void; // Callback for errors
   onSuccess?: (canvas: HTMLCanvasElement) => void; // Callback on success
 }
@@ -22,7 +22,7 @@ const QRCodeCanvas: React.FC<QRCodeCanvasProps> = ({
   useEffect(() => {
     if (canvasRef.current && data) {
       const canvasElement = canvasRef.current;
-      const qrOptions: QRCode.QRCodeToCanvasOptions = {
+      const qrOptions: QRCodeRenderersOptions = {
         errorCorrectionLevel: 'H',
         margin: 1,
         width: width,
