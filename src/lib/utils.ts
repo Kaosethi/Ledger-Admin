@@ -1,38 +1,34 @@
 // src/lib/utils.ts
+import React from 'react';
+import type { Account, Merchant } from './mockData'; // Import types needed
 
-export function formatCurrency(amount: number | null | undefined): string {
-    return '$' + (amount != null ? amount.toFixed(2) : '0.00');
-}
+export const formatCurrency = (amount: number | null | undefined): string => {
+  return '$' + (amount != null ? amount.toFixed(2) : '0.00');
+};
 
-export function formatDate(dateString: string | null | undefined): string {
-    if (!dateString) return 'N/A';
-    try {
-        const date = new Date(dateString);
-        if (isNaN(date.getTime())) return 'Invalid Date'; // Check if date is valid
-        // Format: DD/MM/YYYY HH:MM (24-hour)
-        const day = date.getDate().toString().padStart(2, '0');
-        const month = (date.getMonth() + 1).toString().padStart(2, '0'); // Month is 0-indexed
-        const year = date.getFullYear();
-        const hours = date.getHours().toString().padStart(2, '0');
-        const minutes = date.getMinutes().toString().padStart(2, '0');
-        return `${day}/${month}/${year} ${hours}:${minutes}`;
-    } catch (e) {
-        console.error("formatDate Error:", e);
-        return 'Date Error';
-    }
-}
+export const formatDate = (dateString: string | null | undefined): string => {
+  if (!dateString) return 'N/A';
+  try {
+    const date = new Date(dateString);
+    // Basic locale string is often good enough and handles timezones better
+    return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleString();
+  } catch (e) {
+    console.error("formatDate Error:", e, "Input:", dateString);
+    return 'Date Error'; // <<< Ensure a string is returned on error
+  }
+};
 
-export function getDateInputString(dateString: string | null | undefined): string | null {
-    if (!dateString) return null;
-    try {
-        const date = new Date(dateString);
-        if (isNaN(date.getTime())) return null; // Check if date is valid
-        return date.toISOString().split('T')[0]; // Format as YYYY-MM-DD
-    } catch (e) {
-        console.error("getDateInputString Error:", e);
-        return null;
-    }
-}
+// Render Status Badge component/function (can also be a separate component)
+export const renderStatusBadge = (
+    status: Account['status'] | Merchant['status'] | string | undefined,
+    type: 'account' | 'merchant' // Add type to potentially differentiate styling later if needed
+    ): React.ReactNode => { // Return type is ReactNode
+    const statusText = (status || 'Unknown').replace(/_/g, ' ');
+    let statusClass = `status-${(status || 'unknown').toLowerCase().replace(/_/g, '-')}`;
 
-// We will create StatusBadge as a component instead
-// export function renderStatusBadge(status: string | null | undefined): string { ... }
+    // You can add more specific checks if needed, otherwise rely on the CSS classes
+    // e.g., if (type === 'account' && status === 'Inactive') statusClass = 'status-inactive';
+
+    // Use custom CSS class .status-badge and status-specific class
+    return React.createElement('span', { className: `status-badge ${statusClass}` }, statusText);
+};

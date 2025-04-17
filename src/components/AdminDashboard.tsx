@@ -1,60 +1,57 @@
-// src/components/AdminDashboard.tsx
+// src/app/components/AdminDashboard.tsx
 import React, { useState, useEffect } from 'react';
-import Navbar from './Navbar'; // Assumes src/app/components/Navbar.tsx exists and exports default
+
+// Component Imports
+import Navbar from './Navbar'; // Assuming src/app/components/Navbar.tsx
 import DashboardTab from './tabs/DashboardTab';
 import OnboardingTab from './tabs/OnboardingTab';
 import AccountsTab from './tabs/AccountsTab';
 import TransactionsTab from './tabs/TransactionsTab';
 import MerchantsTab from './tabs/MerchantsTab';
 import ActivityLogTab from './tabs/ActivityLogTab';
-import mockDataInstance from '@/lib/mockData';
-// Ensure ALL needed types are imported
-import type { Account, Merchant, Transaction, AdminLog, AppData } from '@/lib/mockData'; // AppData potentially defined here too?
 
-// Define component props
+// Data and Type Imports
+import mockDataInstance from '@/lib/mockData'; // Import the instance
+// Import ALL needed types, including AppData if defined in mockData.ts
+import type { Account, Merchant, Transaction, AdminLog, AppData } from '@/lib/mockData';
+// Import utility functions if used
+import { formatDate, formatCurrency } from '@/lib/utils';
+
+// --- Props Interface ---
 interface AdminDashboardProps {
-  onLogout: () => void;
-  adminEmail: string;
+  onLogout: () => void; // Function to call when logout happens (passed from page.tsx)
+  adminEmail: string;  // Logged-in admin's email (passed from page.tsx)
 }
 
-// AppData type definition - MOVED TO mockData.ts for better organization is recommended
-// If not moved, keep it here. If moved, remove this and import it from '@/lib/mockData'
-/*
-export interface AppData {
-    accounts: Account[];
-    merchants: Merchant[];
-    transactions: Transaction[];
-    adminActivityLog: AdminLog[];
-}
-*/
-
+// --- Main Component ---
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, adminEmail }) => {
-  const [activeTab, setActiveTab] = useState<string>('dashboard-tab');
+  // State for the currently active tab ID
+  const [activeTab, setActiveTab] = useState<string>('dashboard-tab'); // Default tab
+
+  // State to hold ALL application data (accounts, merchants, etc.)
+  // Initialize safely from the imported mock data instance
   const [appData, setAppData] = useState<AppData>(() => {
-      // Use mockDataInstance directly if it's structured like AppData, otherwise adapt
-       // Using JSON.parse/stringify for deep copy is fine for simple mock data
-      try {
-          // Make sure mockDataInstance actually HAS all keys of AppData
-          const initialData = JSON.parse(JSON.stringify(mockDataInstance));
-          // Ensure all required keys exist, provide defaults if necessary
-          return {
-              accounts: initialData.accounts || [],
-              merchants: initialData.merchants || [],
-              transactions: initialData.transactions || [],
-              adminActivityLog: initialData.adminLogs || [], // Make sure key matches mockData
-          };
-      } catch (e) {
-          console.error("Failed to parse mock data:", e);
-          // Provide a safe default structure if parsing fails
-          return {
-              accounts: [],
-              merchants: [],
-              transactions: [],
-              adminActivityLog: [],
-          };
-      }
+    try {
+      // Basic deep copy for mock data; consider Immer or structuredClone for complex state
+      const initialData = JSON.parse(JSON.stringify(mockDataInstance));
+      // Ensure all keys expected by AppData exist, provide defaults if missing in mock data
+      return {
+        accounts: initialData.accounts || [],
+        merchants: initialData.merchants || [],
+        transactions: initialData.transactions || [],
+        // Ensure key matches AppData definition (e.g., adminActivityLog vs adminLogs)
+        adminActivityLog: initialData.adminActivityLog || initialData.adminLogs || [],
+      };
+    } catch (e) {
+      console.error("Failed to initialize appData from mockDataInstance:", e);
+      // Provide a safe empty structure if mock data fails
+      return { accounts: [], merchants: [], transactions: [], adminActivityLog: [] };
+    }
   });
 
+  // --- Helper Functions ---
+
+  // Generic function to update a specific part of the app data state
   const updateAppData = <K extends keyof AppData>(key: K, data: AppData[K]) => {
     setAppData(prevData => ({
       ...prevData,
@@ -62,106 +59,139 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout, adminEmail })
     }));
   };
 
-   // Function to add a new log entry - FIXED
-   const logAdminActivity = (
-       action: string,          // Added explicit type
-       targetType: string,      // Added explicit type
-       targetId: string,        // Added explicit type
-       details: string          // Added explicit type
-     ) => {
-       const newLog: AdminLog = {
-         // FIX: Use 'id' consistent with other interfaces (assuming AdminLog has 'id')
-         id: `LOG-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-         timestamp: new Date().toISOString(),
-         // FIX: Use 'adminEmail' consistent with interface (assuming AdminLog has 'adminEmail')
-         adminEmail: adminEmail || 'Unknown Admin', // Use the prop directly
-         action: action,
-         // --- Add these to AdminLog interface in mockData.ts if needed ---
-         targetType: targetType,
-         targetId: targetId,
-         // --- End Add ---
-         details: details
-       };
-       const updatedLogs = [...appData.adminActivityLog, newLog];
-       updateAppData('adminActivityLog', updatedLogs);
-     };
-
-    useEffect(() => {
-        const recentLogs = appData.adminActivityLog.slice(-5);
-        // FIX: Check against 'adminEmail' property
-        const hasRecentLogin = recentLogs.some(log => log.action === "Login" && log.adminEmail === adminEmail);
-        if (!hasRecentLogin) {
-           // Login logging commented out as per original code's reasoning
-        }
-        // Dependency array is okay for now, but might need adjustment if logAdminActivity was used here
-    }, [adminEmail, appData.adminActivityLog]); // Added dependency
-
-  const handleLogout = () => {
-    logAdminActivity("Logout", "System", "-", "Admin logged out.");
-    onLogout();
+  // Function to add a new log entry to the state
+  const logAdminActivity = (
+    action: string,
+    targetType: string = 'System', // Default targetType
+    targetId: string = '-',     // Default targetId
+    details: string = ''        // Default details
+  ): void => { // Explicit return type void
+    const newLog: AdminLog = {
+      id: `LOG-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`, // Unique ID
+      timestamp: new Date().toISOString(),
+      adminEmail: adminEmail || 'Unknown Admin', // Use logged-in admin email
+      action: action,
+      targetType: targetType,
+      targetId: targetId,
+      details: details
+    };
+    // Create a new array with the new log added
+    // Ensure the key here matches the state property name ('adminActivityLog')
+    const updatedLogs = [...appData.adminActivityLog, newLog];
+    // Update the state
+    updateAppData('adminActivityLog', updatedLogs);
   };
 
+  // Handler passed to Navbar for logout action
+  const handleLogout = () => {
+    logAdminActivity("Logout", "System", "-", "Admin logged out.");
+    onLogout(); // Call the function passed from the parent (page.tsx)
+  };
+
+  // --- Example Handlers for Tabs (Implement actual logic) ---
+
+  const handleAccountAdd = (newAccount: Account) => {
+    // Add validation if needed
+    const updatedAccounts = [...appData.accounts, newAccount];
+    updateAppData('accounts', updatedAccounts);
+    // Logging is likely already done within the OnboardingTab where the action originates
+  };
+
+  const handleAccountsUpdate = (updatedAccounts: Account[]) => {
+    // Add validation if needed
+    updateAppData('accounts', updatedAccounts);
+    // Logging is likely done within AccountsTab where the action originates
+  };
+
+   const handleMerchantsUpdate = (updatedMerchants: Merchant[]) => {
+    // Add validation if needed
+    updateAppData('merchants', updatedMerchants);
+    // Logging is likely done within MerchantsTab where the action originates
+  };
+
+
+  // --- Render Active Tab Content ---
   const renderTabContent = () => {
     switch (activeTab) {
       case 'dashboard-tab':
-        // Ensure DashboardTab accepts or ignores these props
         return <DashboardTab
-                    accounts={appData.accounts}
-                    merchants={appData.merchants}
-                    transactions={appData.transactions}
-                 />;
+                  accounts={appData.accounts}
+                  merchants={appData.merchants}
+                  transactions={appData.transactions}
+                  // Pass date filter state/handlers if managed here
+               />;
       case 'onboarding-tab':
-         // Ensure OnboardingTab accepts these props
         return <OnboardingTab
-                    accounts={appData.accounts}
-                    // FIX: Add type to inline function parameter
-                    onAccountAdd={(newAccount: Account) => updateAppData('accounts', [...appData.accounts, newAccount])}
-                    logAdminActivity={logAdminActivity}
-                />;
+                  // Pass necessary props based on OnboardingTab's interface
+                  // Example:
+                  // onAccountAdd={handleAccountAdd}
+                  // logAdminActivity={logAdminActivity}
+               />;
       case 'accounts-tab':
-        // Ensure AccountsTab accepts these props
         return <AccountsTab
-                    accounts={appData.accounts}
-                    // FIX: Add type to inline function parameter
-                    onAccountsUpdate={(updatedAccounts: Account[]) => updateAppData('accounts', updatedAccounts)}
-                    logAdminActivity={logAdminActivity}
-                 />;
+                  accounts={appData.accounts}
+                  // Pass necessary props based on AccountsTab's interface
+                  // Example:
+                  // onAccountsUpdate={handleAccountsUpdate}
+                  // logAdminActivity={logAdminActivity}
+                  // openAccountModal={(id) => console.log("Open modal for", id)} // Placeholder
+               />;
       case 'transactions-tab':
-        // Ensure TransactionsTab accepts these props
         return <TransactionsTab
-                    transactions={appData.transactions}
-                    merchants={appData.merchants}
-                 />;
+                  transactions={appData.transactions}
+                  merchants={appData.merchants} // Needed for filter dropdown
+                  // Pass necessary props based on TransactionsTab's interface
+                  // Example:
+                  // openTransactionModal={(id) => console.log("Open modal for", id)} // Placeholder
+               />;
       case 'merchants-tab':
-        // Ensure MerchantsTab accepts these props
         return <MerchantsTab
-                    merchants={appData.merchants}
-                    transactions={appData.transactions}
-                    // FIX: Add type to inline function parameter
-                    onMerchantsUpdate={(updatedMerchants: Merchant[]) => updateAppData('merchants', updatedMerchants)}
-                    logAdminActivity={logAdminActivity}
-                 />;
+                  merchants={appData.merchants}
+                  transactions={appData.transactions} // Needed for counts
+                   // Pass necessary props based on MerchantsTab's interface
+                   // Example:
+                  // onMerchantsUpdate={handleMerchantsUpdate}
+                  // logAdminActivity={logAdminActivity}
+                  // openMerchantModal={(id) => console.log("Open modal for", id)} // Placeholder
+               />;
       case 'activity-log-tab':
-        // Ensure ActivityLogTab accepts this prop
-        return <ActivityLogTab logs={appData.adminActivityLog} />;
+        // Implement session grouping logic here or pass raw logs
+        // const sessions = groupLogsBySession(appData.adminActivityLog); // Example
+        return <ActivityLogTab
+                  sessions={[]} // Replace with grouped sessions or pass raw logs: logs={appData.adminActivityLog}
+                  // Pass necessary props based on ActivityLogTab's interface
+                  // Example:
+                  // openLogDetailsModal={(id) => console.log("Open modal for", id)} // Placeholder
+               />;
       default:
-        return <div>Select a tab</div>;
+        // Fallback content if no tab matches
+        return <div className="p-6 text-center text-gray-500">Select a tab from the navigation above.</div>;
     }
   };
 
+  // --- Component Render ---
   return (
-    <div>
-      {/* Ensure Navbar accepts these props */}
+    // Use a fragment or a main div if needed for overall dashboard layout/padding
+    <>
+      {/* Render Navbar, passing state and handlers */}
       <Navbar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        adminName={adminEmail} // Ensure Navbar expects 'adminName' not 'adminEmail' if used for display
-        onLogout={handleLogout}
+        setActiveTab={setActiveTab} // Pass the state setter function
+        adminName={adminEmail}    // Pass the admin's email for display
+        onLogout={handleLogout}   // Pass the logout handler
       />
+
+      {/* Render the content area for the active tab */}
+      {/* Added margin-top like in Admin.txt structure */}
       <div className="mt-6">
         {renderTabContent()}
       </div>
-    </div>
+
+      {/* Modals would be rendered here, conditionally based on state */}
+      {/* Example:
+        {isAccountModalOpen && <AccountDetailsModal accountId={selectedAccountId} onClose={() => setIsAccountModalOpen(false)} />}
+      */}
+    </>
   );
 };
 
