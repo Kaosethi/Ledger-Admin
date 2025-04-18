@@ -1,5 +1,5 @@
 // src/app/components/tabs/ActivityLogTab.tsx
-import React, { useState } from 'react'; // <-- Added useState
+import React from 'react'; // <-- Added useState
 import type { AdminLog } from '@/lib/mockData';
 import { formatDate } from '@/lib/utils';
 
