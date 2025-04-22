@@ -12,53 +12,69 @@ tasks:
 
   dev:
     cmds:
-      - npm run dev
+      - bun run dev
     env:
       NODE_ENV: "{{.NODE_ENV}}"
     desc: Run the development server
 
   install:
     cmds:
-      - npm install
+      - bun install
     desc: Install project dependencies
 
   build:
     cmds:
-      - npm run build
+      - bun run build
     desc: Build the application for production
 
   start:
     cmds:
-      - npm start
+      - bun run start
     desc: Start the production server
 
   lint:
     cmds:
-      - npm run lint
+      - bun run lint
     desc: Run ESLint to check code quality
 
   format:
     cmds:
-      - npm run format
+      - bun run format
     desc: Format code using Prettier
 
   clean:
     cmds:
-      - rm -rf .next
       - rm -rf node_modules
+      - rm -rf .next
+      - rm -rf dist
     desc: Clean build artifacts and dependencies
 
   db:generate:
     cmds:
-      - npm run db:generate
+      - bun run db:generate
     desc: Generate database migrations using Drizzle
 
   db:push:
     cmds:
-      - npm run db:push
+      - bun run db:push
     desc: Push schema changes to the database
 
   db:studio:
     cmds:
-      - npm run db:studio
+      - bun run db:studio
     desc: Open Drizzle Studio to manage database
+
+  docker:build:
+    desc: Build the Docker image
+    cmds:
+      - docker build -t ledger-admin .
+
+  docker:run:
+    desc: Run the Docker container
+    cmds:
+      - docker run -p 3000:3000 --env-file .env ledger-admin
+
+  docker:compose:
+    desc: Start the database and application using docker-compose
+    cmds:
+      - docker-compose up -d

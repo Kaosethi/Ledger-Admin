@@ -63,6 +63,28 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 ## Database Setup
 
+This project uses PostgreSQL as its database. A Docker Compose configuration is provided for local development.
+
+### Local Development Database
+
+1. Start the PostgreSQL database:
+
+```bash
+docker-compose up -d
+```
+
+2. The database will be available with the following connection string:
+
+```
+postgresql://username:password@localhost:5432/database?sslmode=require
+```
+
+3. To stop the database:
+
+```bash
+docker-compose down
+```
+
 This project uses [Drizzle ORM](https://orm.drizzle.team/) with PostgreSQL for database management.
 
 ### Schema
