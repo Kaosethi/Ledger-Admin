@@ -15,7 +15,6 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
   isOpen,
   onClose,
   transaction,
-  merchants = [],
 }) => {
   if (!isOpen || !transaction) return null;
 
