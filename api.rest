@@ -5,17 +5,132 @@
 @baseUrl = http://localhost:3000/api
 @contentType = application/json
 
-### Get all users
-GET {{baseUrl}}/users
+### Authentication
+# Login as administrator
+POST {{baseUrl}}/auth/login
 Content-Type: {{contentType}}
 
-### Create a new user
-POST {{baseUrl}}/users
+{
+  "email": "admin@example.com",
+  "password": "password123"
+}
+
+### Administrators
+# Get all administrators
+GET {{baseUrl}}/administrators
+
+# Create new administrator
+POST {{baseUrl}}/administrators
+Content-Type: {{contentType}}
+
+{
+  "email": "newadmin@example.com",
+  "password": "password123"
+}
+
+# Get specific administrator
+GET {{baseUrl}}/administrators/1
+
+# Update administrator
+PATCH {{baseUrl}}/administrators/1
+Content-Type: {{contentType}}
+
+{
+  "email": "updated@example.com"
+}
+
+# Delete administrator
+DELETE {{baseUrl}}/administrators/1
+
+### Accounts
+# Get all accounts
+GET {{baseUrl}}/accounts
+
+# Create new account
+POST {{baseUrl}}/accounts
 Content-Type: {{contentType}}
 
 {
   "name": "John Doe",
-  "email": "john@example.com",
-  "password": "password123",
-  "role": "user"
+  "guardianName": "Jane Doe",
+  "status": "Active",
+  "hashedPin": "1234"
+}
+
+# Get specific account
+GET {{baseUrl}}/accounts/ACC1234567890
+
+# Update account
+PATCH {{baseUrl}}/accounts/ACC1234567890
+Content-Type: {{contentType}}
+
+{
+  "name": "John Updated",
+  "status": "Inactive"
+}
+
+# Delete account
+DELETE {{baseUrl}}/accounts/ACC1234567890
+
+### Merchants
+# Get all merchants
+GET {{baseUrl}}/merchants
+
+# Create new merchant
+POST {{baseUrl}}/merchants
+Content-Type: {{contentType}}
+
+{
+  "businessName": "Example Store",
+  "contactPerson": "Store Owner",
+  "contactEmail": "store@example.com",
+  "contactPhone": "1234567890",
+  "storeAddress": "123 Main St",
+  "password": "password123"
+}
+
+# Get specific merchant
+GET {{baseUrl}}/merchants/MERCH1234567890
+
+# Update merchant
+PATCH {{baseUrl}}/merchants/MERCH1234567890
+Content-Type: {{contentType}}
+
+{
+  "businessName": "Updated Store",
+  "status": "active"
+}
+
+### Transactions
+# Get all transactions
+GET {{baseUrl}}/transactions
+
+# Get transactions filtered by account
+GET {{baseUrl}}/transactions?accountId=ACC1234567890
+
+# Get transactions filtered by merchant
+GET {{baseUrl}}/transactions?merchantId=MERCH1234567890
+
+# Create new transaction
+POST {{baseUrl}}/transactions
+Content-Type: {{contentType}}
+
+{
+  "amount": "100.00",
+  "type": "Debit",
+  "accountId": "ACC1234567890",
+  "merchantId": "MERCH1234567890",
+  "status": "Approved"
+}
+
+# Get specific transaction
+GET {{baseUrl}}/transactions/TXN1234567890
+
+# Update transaction
+PATCH {{baseUrl}}/transactions/TXN1234567890
+Content-Type: {{contentType}}
+
+{
+  "status": "Declined",
+  "declineReason": "Insufficient funds"
 }
