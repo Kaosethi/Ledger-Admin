@@ -6,6 +6,7 @@ import Navbar from "./Navbar";
 import DashboardTab from "./tabs/DashboardTab";
 import OnboardingTab from "./tabs/OnboardingTab";
 import AccountsTab from "./tabs/AccountsTab";
+import AccountsTab from "./tabs/AccountsTab";
 import TransactionsTab from "./tabs/TransactionsTab";
 import MerchantsTab from "./tabs/MerchantsTab";
 import ActivityLogTab from "./tabs/ActivityLogTab";
@@ -65,7 +66,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }));
   };
 
-  const handleLogout = () => { logAdminActivity("Logout", "System", "-", "Admin logged out."); onLogout(); };
+  const handleLogout = () => {
+    logAdminActivity("Logout", "System", "-", "Admin logged out.");
+    onLogout();
+  };
+  const handleLogout = () => {
+    logAdminActivity("Logout", "System", "-", "Admin logged out.");
+    onLogout();
+  };
 
   // --- Data Update Handlers ---
   const handleAccountAdd = (newAccount: Account) => {
@@ -96,7 +104,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     // console.log("AdminDashboard: Rendering tab:", activeTab);
     switch (activeTab) {
       case "dashboard-tab":
-        return <DashboardTab accounts={appData.accounts} merchants={appData.merchants} transactions={appData.transactions} />;
+        return (
+          <DashboardTab
+            accounts={appData.accounts}
+            merchants={appData.merchants}
+            transactions={appData.transactions}
+          />
+        );
+        return (
+          <DashboardTab
+            accounts={appData.accounts}
+            merchants={appData.merchants}
+            transactions={appData.transactions}
+          />
+        );
       case "onboarding-tab":
         return (
           <OnboardingTab
@@ -135,6 +156,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         );
       case "activity-log-tab":
         return <ActivityLogTab logs={appData.adminActivityLog} />;
+        return <ActivityLogTab logs={appData.adminActivityLog} />;
       default:
         return (
           <div className="p-6 text-center text-gray-500">
@@ -148,7 +170,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // --- Component Render ---
   return (
     <>
-      <Navbar activeTab={activeTab} setActiveTab={setActiveTab} adminName={adminEmail} onLogout={handleLogout} />
+      <Navbar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        adminName={adminEmail}
+        onLogout={handleLogout}
+      />
+      <Navbar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        adminName={adminEmail}
+        onLogout={handleLogout}
+      />
       <div className="mt-6">{renderTabContent()}</div>
     </>
   );

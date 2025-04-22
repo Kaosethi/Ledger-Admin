@@ -18,6 +18,7 @@ interface EditAccountModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (updatedAccount: Account) => void;
+  onSave: (updatedAccount: Account) => void;
   account: Account | null;
   allTransactions: Transaction[];
   merchants: Merchant[];
@@ -34,6 +35,7 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
   // State for editable fields
   const [balanceStr, setBalanceStr] = useState("");
   const [newPin, setNewPin] = useState("");
+  const [newPin, setNewPin] = useState("");
   const [qrCodeValue, setQrCodeValue] = useState("");
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [confirmActionDetails, setConfirmActionDetails] = useState<{
@@ -47,6 +49,7 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
   useEffect(() => {
     if (account && isOpen) {
       setBalanceStr(account.balance?.toString() || "0");
+      setNewPin("");
       setNewPin("");
       setQrCodeValue(`${account.id}?v=${Date.now()}`);
       setIsConfirmModalOpen(false);
@@ -67,6 +70,7 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
 
   // Print QR Handler
   const handlePrintQr = useReactToPrint({
+    content: () => qrCodePrintRef.current,
     content: () => qrCodePrintRef.current,
     documentTitle: `QR-Code-${account?.id || "Account"}`,
     removeAfterPrint: true,
@@ -141,9 +145,7 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
   }
 
   const isActive = account.status === "Active";
-  const toggleStatusButtonText = isActive
-    ? "Suspend Account"
-    : "Reactivate Account";
+  const toggleStatusButtonText = isActive ? "Suspend Account" : "Reactivate Account";
   const toggleStatusButtonClass = isActive
     ? "w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
     : "w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500";

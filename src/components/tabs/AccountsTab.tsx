@@ -6,6 +6,7 @@ import type { BulkUpdatePayload } from "../modals/BulkEditModal";
 import { formatCurrency, formatDate, renderStatusBadge } from "@/lib/utils";
 import BulkEditModal from "../modals/BulkEditModal";
 import EditAccountModal from "../modals/EditAccountModal";
+import EditAccountModal from "../modals/EditAccountModal";
 import { useReactToPrint } from "react-to-print";
 import BulkQrPrintView from "../print/BulkQrPrintView";
 
