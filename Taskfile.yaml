@@ -1,0 +1,64 @@
+version: "3"
+
+vars:
+  NODE_ENV: development
+
+tasks:
+  default:
+    cmds:
+      - task --list-all
+    silent: true
+    desc: Lists all available tasks
+
+  dev:
+    cmds:
+      - npm run dev
+    env:
+      NODE_ENV: "{{.NODE_ENV}}"
+    desc: Run the development server
+
+  install:
+    cmds:
+      - npm install
+    desc: Install project dependencies
+
+  build:
+    cmds:
+      - npm run build
+    desc: Build the application for production
+
+  start:
+    cmds:
+      - npm start
+    desc: Start the production server
+
+  lint:
+    cmds:
+      - npm run lint
+    desc: Run ESLint to check code quality
+
+  format:
+    cmds:
+      - npm run format
+    desc: Format code using Prettier
+
+  clean:
+    cmds:
+      - rm -rf .next
+      - rm -rf node_modules
+    desc: Clean build artifacts and dependencies
+
+  db:generate:
+    cmds:
+      - npm run db:generate
+    desc: Generate database migrations using Drizzle
+
+  db:push:
+    cmds:
+      - npm run db:push
+    desc: Push schema changes to the database
+
+  db:studio:
+    cmds:
+      - npm run db:studio
+    desc: Open Drizzle Studio to manage database
