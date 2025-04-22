@@ -66,35 +66,39 @@ export const renderStatusBadge = (
     status: Account['status'] | Merchant['status'] | string | undefined,
     type: 'account' | 'merchant' // Add type to potentially differentiate styling later if needed
     ): React.ReactNode => { // Return type is ReactNode
-    const statusText = (status || 'Unknown').replace(/_/g, ' ');
-    // Generate a generic class name based on status text
-    const statusClassName = `status-${statusText.toLowerCase().replace(/\s+/g, '-')}`;
+
+    // MODIFIED: Standardize status text handling
+    let displayStatus = 'Unknown';
+    if (typeof status === 'string') {
+        displayStatus = status.replace(/_/g, ' '); // Replace underscores globally
+        displayStatus = displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1); // Capitalize first letter
+    }
 
     // Define specific Tailwind classes based on known statuses
     let bgColor = 'bg-gray-100';
     let textColor = 'text-gray-800';
 
-    switch (status?.toLowerCase()) {
-        case 'active':
-        case 'approved':
-            bgColor = 'bg-green-100';
-            textColor = 'text-green-800';
-            break;
-        case 'suspended':
-        case 'declined':
-        case 'inactive':
-            bgColor = 'bg-red-100';
-            textColor = 'text-red-800';
-            break;
-        case 'pending':
-             bgColor = 'bg-yellow-100';
-             textColor = 'text-yellow-800';
-             break;
-        // Add more cases as needed
+    // Use a Map for cleaner status-to-style mapping
+    const statusStyles = new Map([
+        ['active', { bg: 'bg-green-100', text: 'text-green-800' }],
+        ['approved', { bg: 'bg-green-100', text: 'text-green-800' }],
+        ['suspended', { bg: 'bg-red-100', text: 'text-red-800' }],
+        ['declined', { bg: 'bg-red-100', text: 'text-red-800' }],
+        ['inactive', { bg: 'bg-red-100', text: 'text-red-800' }],
+        ['rejected', { bg: 'bg-red-100', text: 'text-red-800' }], // ADDED: Explicit rejected style
+        ['pending', { bg: 'bg-yellow-100', text: 'text-yellow-800' }],
+        ['pending_approval', { bg: 'bg-yellow-100', text: 'text-yellow-800' }], // ADDED: Explicit pending_approval style
+    ]);
+
+    const lowerCaseStatus = typeof status === 'string' ? status.toLowerCase() : '';
+    if (statusStyles.has(lowerCaseStatus)) {
+        const styles = statusStyles.get(lowerCaseStatus)!;
+        bgColor = styles.bg;
+        textColor = styles.text;
     }
 
     // Use Tailwind classes directly
     return React.createElement('span', {
-        className: `inline-block px-2 py-1 text-xs font-medium rounded-full ${bgColor} ${textColor}`
-    }, statusText);
+        className: `inline-block px-2 py-1 text-xs font-medium rounded-full capitalize ${bgColor} ${textColor}` // ADDED: capitalize class
+    }, displayStatus); // Use processed displayStatus
 };
