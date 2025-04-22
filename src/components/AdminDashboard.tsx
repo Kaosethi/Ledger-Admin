@@ -65,10 +65,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }));
   };
 
-  const handleLogout = () => {
-    logAdminActivity("Logout", "System", "-", "Admin logged out.");
-    onLogout();
-  };
+  const handleLogout = () => { logAdminActivity("Logout", "System", "-", "Admin logged out."); onLogout(); };
 
   // --- Data Update Handlers ---
   const handleAccountAdd = (newAccount: Account) => {
@@ -96,15 +93,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // --- Render Active Tab Content ---
   const renderTabContent = () => {
     // console.log("AdminDashboard: Rendering tab:", activeTab);
+    // console.log("AdminDashboard: Rendering tab:", activeTab);
     switch (activeTab) {
       case "dashboard-tab":
-        return (
-          <DashboardTab
-            accounts={appData.accounts}
-            merchants={appData.merchants}
-            transactions={appData.transactions}
-          />
-        );
+        return <DashboardTab accounts={appData.accounts} merchants={appData.merchants} transactions={appData.transactions} />;
       case "onboarding-tab":
         return (
           <OnboardingTab
@@ -114,6 +106,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           />
         );
       case "accounts-tab":
+        // MODIFIED: Pass transactions and merchants down to AccountsTab
         // MODIFIED: Pass transactions and merchants down to AccountsTab
         return (
           <AccountsTab
@@ -155,12 +148,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // --- Component Render ---
   return (
     <>
-      <Navbar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        adminName={adminEmail}
-        onLogout={handleLogout}
-      />
+      <Navbar activeTab={activeTab} setActiveTab={setActiveTab} adminName={adminEmail} onLogout={handleLogout} />
       <div className="mt-6">{renderTabContent()}</div>
     </>
   );

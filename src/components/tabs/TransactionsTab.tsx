@@ -1,4 +1,3 @@
-// src/components/tabs/TransactionsTab.tsx
 import React, { useState, useMemo } from "react";
 import type { Transaction, Merchant } from "@/lib/mockData";
 import { formatCurrency, formatDdMmYyyy, formatTime } from "@/lib/utils"; // Correctly import formatters
@@ -9,6 +8,7 @@ interface TransactionsTabProps {
   transactions: Transaction[];
   merchants: Merchant[];
 }
+
 
 
 const TransactionsTab: React.FC<TransactionsTabProps> = ({
@@ -111,6 +111,11 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
           <div> <label htmlFor="merchant-id-filter" className="text-xs font-medium text-gray-500 mr-1 block mb-1"> Merchant ID: </label> <input type="text" id="merchant-id-filter" className="block w-auto px-3 py-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary text-sm text-gray-900 placeholder-gray-400" placeholder="Filter by Merchant ID" value={merchantIdSearchTerm} onChange={handleMerchantIdSearchChange} /> </div>
           <div> <label htmlFor="account-filter" className="text-xs font-medium text-gray-500 mr-1 block mb-1"> Account ID: </label> <input type="text" id="account-filter" className="block w-auto px-3 py-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary text-sm text-gray-900 placeholder-gray-400" placeholder="Filter by Account ID" value={accountIdSearchTerm} onChange={handleAccountIdSearchChange} /> </div>
           <button id="export-transactions-btn" className="py-1 px-3 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary self-end mb-[1px]" onClick={handleExport} disabled={filteredTransactions.length === 0} > Export ({filteredTransactions.length}) </button>
+          <div> <label htmlFor="tx-start-date-filter" className="text-xs font-medium text-gray-500 mr-1 block mb-1"> From: </label> <input type="date" id="tx-start-date-filter" className="block w-auto px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary text-sm text-gray-900 placeholder-gray-400" value={startDate} onChange={handleStartDateChange} /> </div>
+          <div> <label htmlFor="tx-end-date-filter" className="text-xs font-medium text-gray-500 mr-1 block mb-1"> To: </label> <input type="date" id="tx-end-date-filter" className="block w-auto px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary text-sm text-gray-900 placeholder-gray-400" value={endDate} onChange={handleEndDateChange} min={startDate} /> </div>
+          <div> <label htmlFor="merchant-id-filter" className="text-xs font-medium text-gray-500 mr-1 block mb-1"> Merchant ID: </label> <input type="text" id="merchant-id-filter" className="block w-auto px-3 py-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary text-sm text-gray-900 placeholder-gray-400" placeholder="Filter by Merchant ID" value={merchantIdSearchTerm} onChange={handleMerchantIdSearchChange} /> </div>
+          <div> <label htmlFor="account-filter" className="text-xs font-medium text-gray-500 mr-1 block mb-1"> Account ID: </label> <input type="text" id="account-filter" className="block w-auto px-3 py-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary text-sm text-gray-900 placeholder-gray-400" placeholder="Filter by Account ID" value={accountIdSearchTerm} onChange={handleAccountIdSearchChange} /> </div>
+          <button id="export-transactions-btn" className="py-1 px-3 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary self-end mb-[1px]" onClick={handleExport} disabled={filteredTransactions.length === 0} > Export ({filteredTransactions.length}) </button>
         </div>
       </div>
 
@@ -167,6 +172,8 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
 
       {/* Pagination Section (JSX unchanged) */}
       <div className="flex items-center justify-between mt-4">
+        <div className="text-sm text-gray-700"> Showing <span id="tx-pagination-start">{filteredTransactions.length > 0 ? 1 : 0}</span> to{" "} <span id="tx-pagination-end">{Math.min(10, filteredTransactions.length)}</span> of{" "} <span id="tx-pagination-total">{filteredTransactions.length}</span> transactions {(startDate || endDate || merchantIdSearchTerm || accountIdSearchTerm) && ` (filtered from ${transactions.length} total)`} </div>
+        <div className="flex space-x-2"> <button disabled={true} className="py-1 px-3 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"> Previous </button> <button disabled={true} className="py-1 px-3 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"> Next </button> </div>
         <div className="text-sm text-gray-700"> Showing <span id="tx-pagination-start">{filteredTransactions.length > 0 ? 1 : 0}</span> to{" "} <span id="tx-pagination-end">{Math.min(10, filteredTransactions.length)}</span> of{" "} <span id="tx-pagination-total">{filteredTransactions.length}</span> transactions {(startDate || endDate || merchantIdSearchTerm || accountIdSearchTerm) && ` (filtered from ${transactions.length} total)`} </div>
         <div className="flex space-x-2"> <button disabled={true} className="py-1 px-3 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"> Previous </button> <button disabled={true} className="py-1 px-3 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"> Next </button> </div>
       </div>
