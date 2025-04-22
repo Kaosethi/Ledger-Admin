@@ -1,6 +1,3 @@
-// src/components/tabs/MerchantsTab.tsx
-import React, { useState, useMemo } from "react";
-// src/components/tabs/MerchantsTab.tsx
 import React, { useState, useMemo } from "react";
 import type { Merchant, Transaction } from "@/lib/mockData";
 import { formatDate, renderStatusBadge } from "@/lib/utils";
@@ -12,7 +9,6 @@ import ConfirmActionModal from "../modals/ConfirmActionModal";
 interface MerchantsTabProps {
   merchants: Merchant[];
   transactions: Transaction[];
-  onMerchantsUpdate?: (updatedMerchants: Merchant[]) => void;
   onMerchantsUpdate?: (updatedMerchants: Merchant[]) => void;
   logAdminActivity?: (
     action: string,

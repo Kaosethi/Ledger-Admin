@@ -6,7 +6,6 @@ import Navbar from "./Navbar";
 import DashboardTab from "./tabs/DashboardTab";
 import OnboardingTab from "./tabs/OnboardingTab";
 import AccountsTab from "./tabs/AccountsTab";
-import AccountsTab from "./tabs/AccountsTab";
 import TransactionsTab from "./tabs/TransactionsTab";
 import MerchantsTab from "./tabs/MerchantsTab";
 import ActivityLogTab from "./tabs/ActivityLogTab";
@@ -66,10 +65,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }));
   };
 
-  const handleLogout = () => {
-    logAdminActivity("Logout", "System", "-", "Admin logged out.");
-    onLogout();
-  };
   const handleLogout = () => {
     logAdminActivity("Logout", "System", "-", "Admin logged out.");
     onLogout();

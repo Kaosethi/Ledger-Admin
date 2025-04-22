@@ -18,7 +18,6 @@ interface EditAccountModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (updatedAccount: Account) => void;
-  onSave: (updatedAccount: Account) => void;
   account: Account | null;
   allTransactions: Transaction[];
   merchants: Merchant[];
@@ -34,7 +33,6 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
 }) => {
   // State for editable fields
   const [balanceStr, setBalanceStr] = useState("");
-  const [newPin, setNewPin] = useState("");
   const [newPin, setNewPin] = useState("");
   const [qrCodeValue, setQrCodeValue] = useState("");
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -70,7 +68,6 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
 
   // Print QR Handler
   const handlePrintQr = useReactToPrint({
-    content: () => qrCodePrintRef.current,
     content: () => qrCodePrintRef.current,
     documentTitle: `QR-Code-${account?.id || "Account"}`,
     removeAfterPrint: true,
