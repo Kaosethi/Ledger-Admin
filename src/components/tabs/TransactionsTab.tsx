@@ -16,8 +16,8 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
   merchants = [],
 }) => {
   // --- State (Unchanged) ---
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [startDate, setStartDate] = useState(""); // Expects YYYY-MM-DD
+  const [endDate, setEndDate] = useState("");     // Expects YYYY-MM-DD
   const [merchantIdSearchTerm, setMerchantIdSearchTerm] = useState("");
   const [accountIdSearchTerm, setAccountIdSearchTerm] = useState("");
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -28,7 +28,6 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
   const filteredTransactions = useMemo(() => {
     const lowerCaseAccountIdSearch = accountIdSearchTerm.trim().toLowerCase();
     const lowerCaseMerchantIdSearch = merchantIdSearchTerm.trim().toLowerCase();
-
     return transactions.filter(tx => {
       const txDate = tx.timestamp.substring(0, 10);
       if (startDate && txDate < startDate) return false;
@@ -40,16 +39,19 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
   }, [transactions, startDate, endDate, merchantIdSearchTerm, accountIdSearchTerm]);
 
 
-  // --- Event Handlers (Unchanged) ---
+  // --- Event Handlers (Unchanged, except handleExport) ---
   const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => { setStartDate(e.target.value); };
   const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => { setEndDate(e.target.value); };
   const handleMerchantIdSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => { setMerchantIdSearchTerm(e.target.value); };
   const handleAccountIdSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => { setAccountIdSearchTerm(e.target.value); };
   const handleViewDetailsClick = (transaction: Transaction) => { setSelectedTransaction(transaction); setIsDetailModalOpen(true); };
   const handleCloseDetailModal = () => { setIsDetailModalOpen(false); setSelectedTransaction(null); };
+
+  // MODIFIED: handleExport function to change filename logic
   const handleExport = () => {
     if (filteredTransactions.length === 0) { alert("No transactions to export based on current filters."); return; }
     console.log(`Exporting ${filteredTransactions.length} filtered transactions...`);
+
     const csvData = filteredTransactions.map(tx => {
       const merchant = merchants.find(m => m.id === tx.merchantId);
       const merchantName = merchant ? merchant.businessName : 'Unknown/Inactive';
@@ -58,17 +60,53 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
       };
     });
     const csvHeaders = [ 'Date', 'Time', 'Merchant Name', 'Merchant ID', 'Account ID', 'Transaction ID', 'Amount', 'Status' ];
+
+    // --- MODIFIED: Filename Generation Logic ---
+    const formatDateForFilename = (dateString: string): string => {
+        // Assumes input is YYYY-MM-DD, removes dashes
+        if (!dateString) return '';
+        return dateString.replace(/-/g, '');
+    };
+
+    let filenamePart = "transactions";
+    const formattedStartDate = formatDateForFilename(startDate);
+    const formattedEndDate = formatDateForFilename(endDate);
+
+    if (formattedStartDate && formattedEndDate) {
+        filenamePart += `_${formattedStartDate}_to_${formattedEndDate}`;
+    } else if (formattedStartDate) {
+        filenamePart += `_from_${formattedStartDate}`;
+    } else if (formattedEndDate) {
+        filenamePart += `_until_${formattedEndDate}`;
+    } else {
+        // No dates selected, use current date as identifier
+        const today = new Date().toISOString().substring(0, 10).replace(/-/g, '');
+        filenamePart += `_all_time_${today}`;
+    }
+    const filename = `${filenamePart}.csv`;
+    // --- End Filename Generation Logic ---
+
     try {
         const csvString = unparse(csvData, { header: true, columns: csvHeaders });
         const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a"); const url = URL.createObjectURL(blob); link.setAttribute("href", url); const timestamp = new Date().toISOString().substring(0, 10); link.setAttribute("download", `transactions_export_${timestamp}.csv`); link.style.visibility = 'hidden'; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url); console.log("CSV export successful.");
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        // MODIFIED: Use the dynamically generated filename
+        link.setAttribute("download", filename);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        console.log(`CSV export successful: ${filename}`); // Log the actual filename
     } catch (error) { console.error("Error generating CSV:", error); alert("An error occurred while generating the CSV file."); }
   };
 
-  // --- Component Render ---
+  // --- Component Render (Unchanged) ---
   return (
     <div className="bg-white p-6 rounded-lg shadow-md">
-      {/* Header & Filters Section (Unchanged) */}
+      {/* Header & Filters Section */}
        <div className="flex flex-col md:flex-row md:items-start md:justify-between mb-6 space-y-3 md:space-y-0">
         <h2 className="text-xl font-semibold text-gray-800"> Transaction History </h2>
         <div className="flex flex-wrap items-end gap-2">
@@ -86,13 +124,9 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
           <thead className="bg-gray-50"><tr>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"> Date </th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"> Time </th>
-            {/* MODIFIED: Added text-center */}
             <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"> Merchant Name </th>
-            {/* MODIFIED: Added text-center */}
             <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"> Merchant ID </th>
-            {/* MODIFIED: Added text-center */}
             <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"> Account ID </th>
-            {/* MODIFIED: Added text-center */}
             <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"> Transaction ID </th>
             <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"> Amount </th>
             <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"> Status </th>
@@ -110,13 +144,9 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
                   <tr key={transaction.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{formatDdMmYyyy(transaction.timestamp)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{formatTime(transaction.timestamp)}</td>
-                    {/* MODIFIED: Added text-center */}
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center">{merchantName}</td>
-                    {/* MODIFIED: Added text-center */}
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-mono text-center">{transaction.merchantId || 'N/A'}</td>
-                    {/* MODIFIED: Added text-center */}
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center">{transaction.accountId}</td>
-                    {/* MODIFIED: Added text-center */}
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900 text-center">{transaction.id}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center">{formatCurrency(transaction.amount)}</td>
                     <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium text-center ${statusClass}`}>{transaction.status}</td>
@@ -129,13 +159,13 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
         </table>
       </div>
 
-      {/* Pagination Section (Unchanged) */}
+      {/* Pagination Section */}
       <div className="flex items-center justify-between mt-4">
         <div className="text-sm text-gray-700"> Showing <span id="tx-pagination-start">{filteredTransactions.length > 0 ? 1 : 0}</span> to{" "} <span id="tx-pagination-end">{Math.min(10, filteredTransactions.length)}</span> of{" "} <span id="tx-pagination-total">{filteredTransactions.length}</span> transactions {(startDate || endDate || merchantIdSearchTerm || accountIdSearchTerm) && ` (filtered from ${transactions.length} total)`} </div>
         <div className="flex space-x-2"> <button disabled={true} className="py-1 px-3 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"> Previous </button> <button disabled={true} className="py-1 px-3 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"> Next </button> </div>
       </div>
 
-      {/* Transaction Detail Modal (Unchanged) */}
+      {/* Transaction Detail Modal */}
       <TransactionDetailModal isOpen={isDetailModalOpen} onClose={handleCloseDetailModal} transaction={selectedTransaction} merchants={merchants} />
     </div>
   );
