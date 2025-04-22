@@ -142,7 +142,9 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
   }
 
   const isActive = account.status === "Active";
-  const toggleStatusButtonText = isActive ? "Suspend Account" : "Reactivate Account";
+  const toggleStatusButtonText = isActive
+    ? "Suspend Account"
+    : "Reactivate Account";
   const toggleStatusButtonClass = isActive
     ? "w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
     : "w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500";
@@ -153,14 +155,14 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
         {/* Modal Header */}
         <div className="flex justify-between items-center mb-4 pb-3 border-b">
           <h3 className="text-lg font-semibold text-gray-900">
-            {" "}
-            Account Details{" "}
+            {}
+            Account Details{}
           </h3>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600"
           >
-            {" "}
+            {}
             <svg
               className="w-6 h-6"
               fill="none"
@@ -168,14 +170,16 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
               viewBox="0 0 24 24"
               xmlns="http://www.w3.org/2000/svg"
             >
-              {" "}
+              {}
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth="2"
                 d="M6 18L18 6M6 6l12 12"
-              ></path>{" "}
-            </svg>{" "}
+              ></path>
+              {}
+            </svg>
+            {}
           </button>
         </div>
         {/* MODIFIED: Main Body Grid - 2 Columns (1/3 width + 2/3 width) */}
@@ -185,8 +189,8 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
             {/* Beneficiary Info Section */}
             <div>
               <h4 className="text-md font-semibold text-gray-700 mb-2">
-                {" "}
-                Beneficiary Information{" "}
+                {}
+                Beneficiary Information{}
               </h4>
               <dl className="divide-y divide-gray-100 border border-gray-200 rounded-md p-4">
                 <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
@@ -230,8 +234,8 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
             {/* Account Management Section (Now under Beneficiary Info) */}
             <div className="p-4 border rounded-md">
               <h4 className="text-md font-semibold text-gray-700 mb-3">
-                {" "}
-                Account Management{" "}
+                {}
+                Account Management{}
               </h4>
               <div className="space-y-4">
                 <div>
@@ -239,8 +243,8 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
                     htmlFor="edit-balance"
                     className="block text-sm font-medium text-gray-700"
                   >
-                    {" "}
-                    Balance{" "}
+                    {}
+                    Balance{}
                   </label>
                   <div className="mt-1 relative rounded-md shadow-sm">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -267,11 +271,12 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
                     htmlFor="reset-pin"
                     className="block text-sm font-medium text-gray-700"
                   >
-                    {" "}
-                    Reset PIN{" "}
+                    {}
+                    Reset PIN{}
                     <span className="text-xs text-gray-500">
                       (Leave blank to keep current)
-                    </span>{" "}
+                    </span>
+                    {}
                   </label>
                   <input
                     type="password"
@@ -286,16 +291,17 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {" "}
-                    Account Status Actions{" "}
+                    {}
+                    Account Status Actions{}
                   </label>
                   <button
                     type="button"
                     onClick={handleToggleStatus}
                     className={toggleStatusButtonClass}
                   >
-                    {" "}
-                    {toggleStatusButtonText}{" "}
+                    {}
+                    {toggleStatusButtonText}
+                    {}
                   </button>
                 </div>
               </div>
@@ -303,8 +309,8 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
             {/* QR Code Section (Now under Account Management) */}
             <div className="p-4 border rounded-md">
               <h4 className="text-md font-semibold text-gray-700 mb-3">
-                {" "}
-                Account QR Code{" "}
+                {}
+                Account QR Code{}
               </h4>
               <div
                 ref={qrCodePrintRef}
@@ -325,13 +331,13 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
                   onClick={() => handlePrintQr()}
                   className="py-1 px-3 border border-gray-300 rounded-md shadow-sm text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
                 >
-                  {" "}
-                  Print QR{" "}
+                  {}
+                  Print QR{}
                 </button>
               </div>
               <p className="mt-2 text-xs text-gray-500 text-center">
-                {" "}
-                Use regenerate if card lost/stolen. Print for replacement.{" "}
+                {}
+                Use regenerate if card lost/stolen. Print for replacement.{}
               </p>
             </div>
           </div>
@@ -339,8 +345,8 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
           {/* MODIFIED: Right Column (Transaction History) - Takes 2/3 width */}
           <div className="md:col-span-2 space-y-3">
             <h4 className="text-md font-semibold text-gray-700 mb-2">
-              {" "}
-              Transaction History{" "}
+              {}
+              Transaction History{}
             </h4>
             <div className="border rounded-md shadow-sm">
               {accountTransactions.length === 0 ? (
@@ -451,8 +457,8 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
             onClick={onClose}
             className="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300"
           >
-            {" "}
-            Cancel{" "}
+            {}
+            Cancel{}
           </button>
         </div>
       </div>

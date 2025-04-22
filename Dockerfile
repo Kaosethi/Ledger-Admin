@@ -1,32 +1,47 @@
-FROM oven/bun:1.2.10-slim AS build
+# Build stage
+FROM oven/bun:1.2.10-slim AS builder
 
 WORKDIR /app
 
+# Install dependencies
 COPY package.json bun.lock ./
-# COPY .env.example .env.local
-
 RUN bun install
 
-COPY tsconfig.json next.config.ts postcss.config.mjs tailwind.config.js ./
-
+# Copy source files
+COPY tsconfig.json next.config.ts ./
 COPY src/ ./src/
 COPY public/ ./public/
 
-ENV NODE_ENV=production
+# Set environment variables for build
+ARG NODE_ENV
+ARG DATABASE_URL
+ENV NODE_ENV=${NODE_ENV}
+ENV DATABASE_URL=${DATABASE_URL}
+
+# Build the application
 RUN bun run build
 
-# RUN rm .env.local
-
+# Production stage
 FROM oven/bun:1.2.10-slim
 
 WORKDIR /app
 
-ENV NODE_ENV=production
+# Copy built application from builder
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/bun.lock ./bun.lock
+COPY --from=builder /app/node_modules ./node_modules
 
-COPY --from=build /app/.next/standalone ./
-COPY --from=build /app/.next/static ./.next/static
-COPY --from=build /app/public ./public
+# Set environment variables
+ARG NODE_ENV
+ARG DATABASE_URL
+ENV NODE_ENV=${NODE_ENV}
+ENV PORT=3000
+ENV DATABASE_URL=${DATABASE_URL}
 
+# Expose the port the app runs on
 EXPOSE 3000
 
-CMD ["bun", "server.js"]
+# Start the application
+CMD ["bun", "run", "start"]

@@ -153,14 +153,16 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
           title: "Confirm Rejection",
           message: (
             <>
-              {" "}
+              {}
               <p className="mb-2">
                 Are you sure you want to reject the application for &ldquo;
                 {merchant.businessName}&rdquo;?
-              </p>{" "}
+              </p>
+              {}
               <p className="font-semibold text-red-700">
                 This action cannot be undone.
-              </p>{" "}
+              </p>
+              {}
             </>
           ),
           confirmButtonText: "Reject Application",

@@ -155,8 +155,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       default:
         return (
           <div className="p-6 text-center text-gray-500">
-            {" "}
-            Select a tab from the navigation above.{" "}
+            {}
+            Select a tab from the navigation above.{}
           </div>
         );
     }
@@ -164,21 +164,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // --- Component Render ---
   return (
-    <>
+    <div className="flex flex-col min-h-screen">
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         adminName={adminEmail}
         onLogout={handleLogout}
       />
-      <Navbar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        adminName={adminEmail}
-        onLogout={handleLogout}
-      />
-      <div className="mt-6">{renderTabContent()}</div>
-    </>
+      <div className="flex-1 p-6">{renderTabContent()}</div>
+    </div>
   );
 };
 

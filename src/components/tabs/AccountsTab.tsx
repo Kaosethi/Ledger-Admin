@@ -303,14 +303,13 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
     <div className="bg-white p-6 rounded-lg shadow-md">
       {/* Header Section (JSX unchanged) */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 space-y-3 md:space-y-0">
-        {" "}
-        <h2 className="text-xl font-semibold text-gray-800">
-          Manage Accounts
-        </h2>{" "}
+        {}
+        <h2 className="text-xl font-semibold text-gray-800">Manage Accounts</h2>
+        {}
         <div className="flex flex-wrap gap-2">
-          {" "}
+          {}
           <div className="relative rounded-md shadow-sm">
-            {" "}
+            {}
             <input
               type="text"
               id="account-search"
@@ -318,9 +317,10 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
               placeholder="Search by ID or name"
               value={searchTerm}
               onChange={handleSearchChange}
-            />{" "}
+            />
+            {}
             <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-              {" "}
+              {}
               <svg
                 className="h-5 w-5 text-gray-400"
                 xmlns="http://www.w3.org/2000/svg"
@@ -328,52 +328,60 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
                 fill="currentColor"
                 aria-hidden="true"
               >
-                {" "}
+                {}
                 <path
                   fillRule="evenodd"
                   d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
                   clipRule="evenodd"
-                />{" "}
-              </svg>{" "}
-            </div>{" "}
-          </div>{" "}
+                />
+                {}
+              </svg>
+              {}
+            </div>
+            {}
+          </div>
+          {}
           <button
             id="bulk-update-btn"
             className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
             onClick={handleOpenBulkUpdateModal}
             disabled={selectedAccountIds.size === 0}
           >
-            {" "}
-            Bulk Update ({selectedAccountIds.size}){" "}
-          </button>{" "}
+            {}
+            Bulk Update ({selectedAccountIds.size}){}
+          </button>
+          {}
           <button
             id="bulk-print-qr-btn"
             className="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
             onClick={handleBulkPrintClick}
             disabled={selectedAccountIds.size === 0}
           >
-            {" "}
-            Bulk Print QR ({selectedAccountIds.size}){" "}
-          </button>{" "}
-        </div>{" "}
+            {}
+            Bulk Print QR ({selectedAccountIds.size}){}
+          </button>
+          {}
+        </div>
+        {}
       </div>
       {/* Table Section (JSX unchanged) */}
       <div className="overflow-x-auto">
-        {" "}
+        {}
         <table className="min-w-full divide-y divide-gray-200">
-          {" "}
+          {}
           <thead className="bg-gray-50">
-            {" "}
+            {}
             <tr>
-              {" "}
+              {}
               <th
                 scope="col"
                 className="px-4 py-3 w-12 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
               >
-                {" "}
+                {}
                 <label htmlFor="select-all-header" className="sr-only">
                   Select all visible accounts
-                </label>{" "}
+                </label>
+                {}
                 <input
                   id="select-all-header"
                   type="checkbox"
@@ -382,69 +390,82 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
                   ref={selectAllCheckboxRef}
                   onChange={handleSelectAllChange}
                   disabled={filteredAccounts.length === 0}
-                />{" "}
-              </th>{" "}
+                />
+                {}
+              </th>
+              {}
               <th
                 scope="col"
                 className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
               >
                 Account ID
-              </th>{" "}
+              </th>
+              {}
               <th
                 scope="col"
                 className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
               >
                 Child Name
-              </th>{" "}
+              </th>
+              {}
               <th
                 scope="col"
                 className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
               >
                 Guardian Name
-              </th>{" "}
+              </th>
+              {}
               <th
                 scope="col"
                 className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
               >
                 Balance
-              </th>{" "}
+              </th>
+              {}
               <th
                 scope="col"
                 className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
               >
                 Status
-              </th>{" "}
+              </th>
+              {}
               <th
                 scope="col"
                 className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
               >
                 Last Transaction
-              </th>{" "}
+              </th>
+              {}
               <th
                 scope="col"
                 className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
               >
                 Actions
-              </th>{" "}
-            </tr>{" "}
-          </thead>{" "}
+              </th>
+              {}
+            </tr>
+            {}
+          </thead>
+          {}
           <tbody
             id="accounts-table-body"
             className="bg-white divide-y divide-gray-200"
           >
-            {" "}
+            {}
             {filteredAccounts.length === 0 ? (
               <tr>
-                {" "}
+                {}
                 <td
                   colSpan={8}
                   className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center"
                 >
-                  {" "}
+                  {}
                   {searchTerm
                     ? "No accounts match your search."
-                    : "No accounts found."}{" "}
-                </td>{" "}
+                    : "No accounts found."}
+                  {}
+                </td>
+                {}
               </tr>
             ) : (
               filteredAccounts.map((account) => (
@@ -456,15 +477,16 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
                       : "hover:bg-gray-50"
                   }
                 >
-                  {" "}
+                  {}
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                    {" "}
+                    {}
                     <label
                       htmlFor={`select-row-${account.id}`}
                       className="sr-only"
                     >
                       Select account {account.id}
-                    </label>{" "}
+                    </label>
+                    {}
                     <input
                       id={`select-row-${account.id}`}
                       type="checkbox"
@@ -473,75 +495,96 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
                       onChange={(e) =>
                         handleRowSelectChange(account.id, e.target.checked)
                       }
-                    />{" "}
-                  </td>{" "}
+                    />
+                    {}
+                  </td>
+                  {}
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
                     {account.id}
-                  </td>{" "}
+                  </td>
+                  {}
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                     {account.name}
-                  </td>{" "}
+                  </td>
+                  {}
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                     {account.guardianName || "N/A"}
-                  </td>{" "}
+                  </td>
+                  {}
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center">
                     {formatCurrency(account.balance)}
-                  </td>{" "}
+                  </td>
+                  {}
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-center">
                     {renderStatusBadge(account.status, "account")}
-                  </td>{" "}
+                  </td>
+                  {}
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                     {formatDate(account.lastTransactionAt)}
-                  </td>{" "}
+                  </td>
+                  {}
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-center actions">
-                    {" "}
+                    {}
                     <button
                       className="text-primary hover:text-secondary focus:outline-none focus:underline"
                       onClick={() => handleViewEditClick(account)}
                     >
-                      {" "}
-                      View/Edit{" "}
-                    </button>{" "}
-                  </td>{" "}
+                      {}
+                      View/Edit{}
+                    </button>
+                    {}
+                  </td>
+                  {}
                 </tr>
               ))
-            )}{" "}
-          </tbody>{" "}
-        </table>{" "}
+            )}
+            {}
+          </tbody>
+          {}
+        </table>
+        {}
       </div>
       {/* Pagination Section (JSX unchanged) */}
       <div className="flex items-center justify-between mt-4 px-1">
-        {" "}
+        {}
         <div className="text-sm text-gray-700">
-          {" "}
-          Showing{" "}
+          {}
+          Showing{}
           <span id="pagination-start">
             {filteredAccounts.length > 0 ? 1 : 0}
-          </span>{" "}
-          to{" "}
+          </span>
+          {}
+          to{}
           <span id="pagination-end">
             {Math.min(10, filteredAccounts.length)}
-          </span>{" "}
-          of <span id="pagination-total">{filteredAccounts.length}</span>{" "}
-          accounts {searchTerm && ` (filtered from ${accounts.length} total)`}{" "}
-        </div>{" "}
+          </span>
+          {}
+          of <span id="pagination-total">{filteredAccounts.length}</span>
+          {}
+          accounts {searchTerm && ` (filtered from ${accounts.length} total)`}
+          {}
+        </div>
+        {}
         <div className="flex space-x-2">
-          {" "}
+          {}
           <button
             disabled={true}
             className="py-1 px-3 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
           >
-            {" "}
-            Previous{" "}
-          </button>{" "}
+            {}
+            Previous{}
+          </button>
+          {}
           <button
             disabled={true}
             className="py-1 px-3 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
           >
-            {" "}
-            Next{" "}
-          </button>{" "}
-        </div>{" "}
+            {}
+            Next{}
+          </button>
+          {}
+        </div>
+        {}
       </div>
 
       {/* Render the Modals */}
@@ -566,11 +609,12 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
 
       {/* Hidden print view */}
       <div style={{ display: "none" }}>
-        {" "}
+        {}
         <BulkQrPrintView
           ref={printComponentRef}
           accountsToPrint={selectedAccountsToPrint}
-        />{" "}
+        />
+        {}
       </div>
     </div>
   );

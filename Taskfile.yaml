@@ -2,6 +2,7 @@ version: "3"
 
 vars:
   NODE_ENV: development
+  DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/ledger"
 
 tasks:
   default:
@@ -15,6 +16,7 @@ tasks:
       - bun run dev
     env:
       NODE_ENV: "{{.NODE_ENV}}"
+      DATABASE_URL: "{{.DATABASE_URL}}"
     desc: Run the development server
 
   install:
@@ -25,11 +27,17 @@ tasks:
   build:
     cmds:
       - bun run build
+    env:
+      NODE_ENV: production
+      DATABASE_URL: "{{.DATABASE_URL}}"
     desc: Build the application for production
 
   start:
     cmds:
       - bun run start
+    env:
+      NODE_ENV: production
+      DATABASE_URL: "{{.DATABASE_URL}}"
     desc: Start the production server
 
   lint:
@@ -52,22 +60,28 @@ tasks:
   db:generate:
     cmds:
       - bun run db:generate
+    env:
+      DATABASE_URL: "{{.DATABASE_URL}}"
     desc: Generate database migrations using Drizzle
 
   db:push:
     cmds:
       - bun run db:push
+    env:
+      DATABASE_URL: "{{.DATABASE_URL}}"
     desc: Push schema changes to the database
 
   db:studio:
     cmds:
       - bun run db:studio
+    env:
+      DATABASE_URL: "{{.DATABASE_URL}}"
     desc: Open Drizzle Studio to manage database
 
   docker:build:
-    desc: Build the Docker image
+    desc: Build the Docker image with environment variables
     cmds:
-      - docker build -t ledger-admin .
+      - docker build --build-arg NODE_ENV=production --build-arg DATABASE_URL="{{.DATABASE_URL}}" -t ledger-admin .
 
   docker:run:
     desc: Run the Docker container
