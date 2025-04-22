@@ -2,7 +2,6 @@
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react'; // Import the QR code component
 import type { Account } from '@/lib/mockData';
-import { formatCurrency } from '@/lib/utils'; // Optional: if you want to show balance
 
 interface BulkQrPrintViewProps {
   accountsToPrint: Account[];
