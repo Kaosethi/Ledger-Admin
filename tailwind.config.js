@@ -1,6 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 import aspectRatio from "@tailwindcss/aspect-ratio";
 import forms from "@tailwindcss/forms";
+import colors from "tailwindcss/colors";
 
 module.exports = {
   content: [
@@ -11,6 +12,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        ...colors,
         primary: "#5D5CDE",
         secondary: "#6366F1",
         accent: "#818CF8",
@@ -25,8 +27,5 @@ module.exports = {
       },
     },
   },
-  plugins: [
-    aspectRatio,
-    forms,
-  ],
+  plugins: [aspectRatio, forms],
 };

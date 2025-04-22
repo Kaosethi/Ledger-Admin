@@ -1,10 +1,10 @@
 // src/app/page.tsx
-'use client'; // Keep this for client-side interactivity (useState, useEffect)
+"use client"; // Keep this for client-side interactivity (useState, useEffect)
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 // Imports from the 'components' folder, relative to 'src/app'
-import Login from '../components/Login';
-import AdminDashboard from '../components/AdminDashboard';
+import Login from "../components/Login";
+import AdminDashboard from "../components/AdminDashboard";
 
 // Define the main page component
 export default function HomePage() {
@@ -44,19 +44,24 @@ export default function HomePage() {
 
   // Show loading indicator while checking auth status
   if (isLoading) {
-    return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        Loading...
+      </div>
+    );
   }
 
   // Render Login or Dashboard based on login state
   return (
-    <main className="bg-gray-50 min-h-screen">
-      <div className="max-w-screen-xl mx-auto px-4 py-2">
-        {!isLoggedIn ? (
-          <Login onLoginSuccess={handleLoginSuccess} />
-        ) : (
-          <AdminDashboard onLogout={handleLogout} adminEmail={adminEmail || 'Admin User'} />
-        )}
-      </div>
-    </main>
+    <div className="max-w-screen-xl mx-auto px-4 py-2">
+      {!isLoggedIn ? (
+        <Login onLoginSuccess={handleLoginSuccess} />
+      ) : (
+        <AdminDashboard
+          onLogout={handleLogout}
+          adminEmail={adminEmail || "Admin User"}
+        />
+      )}
+    </div>
   );
 }

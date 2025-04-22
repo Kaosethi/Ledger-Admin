@@ -1,0 +1,21 @@
+###
+# Ledger Admin API Tests
+###
+
+@baseUrl = http://localhost:3000/api
+@contentType = application/json
+
+### Get all users
+GET {{baseUrl}}/users
+Content-Type: {{contentType}}
+
+### Create a new user
+POST {{baseUrl}}/users
+Content-Type: {{contentType}}
+
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "password": "password123",
+  "role": "user"
+}

@@ -1,36 +1,211 @@
+# Ledger Admin
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+
+## Prerequisites
+
+- Node.js (v18 or later)
+- npm, yarn, pnpm, or bun
+- PostgreSQL database
+- [Task](https://taskfile.dev/) (optional but recommended)
 
 ## Getting Started
 
-First, run the development server:
+1. Clone the repository:
 
 ```bash
+git clone [repository-url]
+cd Ledger-Admin
+```
+
+2. Install dependencies:
+
+```bash
+# Using npm
+npm install
+
+# Using Task (recommended)
+task install
+```
+
+3. Set up environment variables:
+
+   - Copy `.env.example` to `.env`
+   - Update the database connection URL in `.env` with your credentials:
+
+   ```
+   DATABASE_URL="postgresql://username:password@host:port/database?sslmode=require"
+   ```
+
+4. Run database migrations:
+
+```bash
+# Using npm
+npm run db:generate  # Generate migration files
+npm run db:push      # Apply migrations to the database
+
+# Using Task (recommended)
+task db:generate
+task db:push
+```
+
+5. Run the development server:
+
+```bash
+# Using npm
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+
+# Using Task (recommended)
+task dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Database Setup
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+This project uses PostgreSQL as its database. A Docker Compose configuration is provided for local development.
+
+### Local Development Database
+
+1. Start the PostgreSQL database:
+
+```bash
+docker-compose up -d
+```
+
+2. The database will be available with the following connection string:
+
+```
+postgresql://username:password@localhost:5432/database?sslmode=require
+```
+
+3. To stop the database:
+
+```bash
+docker-compose down
+```
+
+This project uses [Drizzle ORM](https://orm.drizzle.team/) with PostgreSQL for database management.
+
+### Schema
+
+The database schema is defined in `src/lib/db/schema.ts`:
+
+- **Users**: Stores user information with roles and authentication details
+- **Transactions**: Records transactions linked to users
+
+### Working with Migrations
+
+#### Creating a New Migration
+
+When you make changes to your database schema in `src/lib/db/schema.ts`:
+
+1. Generate migration files:
+
+   ```bash
+   task db:generate
+   ```
+
+   This creates SQL migration files in `src/lib/db/migrations/`.
+
+2. Review the generated SQL files in the migrations directory.
+
+3. Apply the migrations to your database:
+   ```bash
+   task db:push
+   ```
+
+#### Adding a New Table or Column
+
+1. Edit `src/lib/db/schema.ts` to add your new table or column:
+
+   ```typescript
+   // Example: Adding a new table
+   export const products = pgTable("products", {
+     id: serial("id").primaryKey(),
+     name: varchar("name", { length: 255 }).notNull(),
+     price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+     description: text("description"),
+     createdAt: timestamp("created_at").defaultNow().notNull(),
+   });
+
+   // Example: Adding relations for the new table
+   export const productsRelations = relations(products, ({ many }) => ({
+     // Define relationships here
+   }));
+   ```
+
+2. Generate and apply migrations as described above.
+
+#### Viewing Database Content
+
+You can use Drizzle Studio to view and manage your database content:
+
+```bash
+task db:studio
+```
+
+This opens a web interface where you can browse tables, run queries, and modify data.
+
+### Database Commands
+
+- `task db:generate` - Generate SQL migration files from schema changes
+- `task db:push` - Apply migrations to the database
+- `task db:studio` - Open Drizzle Studio to manage database content visually
+
+### API Routes
+
+The following API endpoints are available:
+
+- **GET /api/users** - Fetch all users
+- **POST /api/users** - Create a new user
+- **GET /api/transactions** - Fetch all transactions
+- **POST /api/transactions** - Create a new transaction
+
+## Development Tasks
+
+This project uses [Task](https://taskfile.dev/) for common development tasks. Here are the available commands:
+
+- `task dev` - Run the development server
+- `task install` - Install project dependencies
+- `task build` - Build the application for production
+- `task start` - Start the production server
+- `task lint` - Run ESLint to check code quality
+- `task format` - Format code using Prettier
+- `task clean` - Clean build artifacts and dependencies
+
+To see all available tasks:
+
+```bash
+task --list
+```
+
+## Project Structure
+
+- `src/` - Source code directory
+  - `app/` - Next.js app directory
+  - `components/` - Reusable React components
+  - `lib/` - Utility functions and shared code
+    - `db/` - Database schema and client
+    - `config.ts` - Environment configuration
+  - `types/` - TypeScript type definitions
+
+## Development
+
+- The project uses TypeScript for type safety
+- Tailwind CSS for styling
+- ESLint for code linting
+- Prettier for code formatting
 
 ## Learn More
 
-To learn more about Next.js, take a look at the following resources:
+To learn more about the technologies used in this project:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Drizzle ORM Documentation](https://orm.drizzle.team/docs/overview)
+- [Tailwind CSS Documentation](https://tailwindcss.com/docs)
+- [PostgreSQL Documentation](https://www.postgresql.org/docs/)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deployment
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+For production deployment, ensure all environment variables are properly configured in your deployment platform.

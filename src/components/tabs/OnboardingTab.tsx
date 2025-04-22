@@ -354,8 +354,8 @@ const OnboardingTab: React.FC<OnboardingTabProps> = ({
                   className="inline-flex items-center px-4 py-2 border border-l-0 border-gray-300 rounded-r-md bg-gray-50 text-gray-600 hover:bg-gray-100 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-primary"
                   onClick={handleGenerateId}
                 >
-                  {" "}
-                  Generate{" "}
+                  {}
+                  Generate{}
                 </button>
               </div>
               <p className="mt-1 text-xs text-gray-500">
@@ -472,25 +472,25 @@ const OnboardingTab: React.FC<OnboardingTabProps> = ({
                   </div>
                   <div className="space-y-1 text-center mt-3">
                     <p className="text-sm text-gray-600">
-                      Account ID:{" "}
+                      Account ID:{}
                       <span className="font-medium text-gray-800 break-all">
                         {accountId}
                       </span>
                     </p>
                     <p className="text-sm text-gray-600">
-                      Child&apos;s Name:{" "}
+                      Child&apos;s Name:{}
                       <span className="font-medium text-gray-800">
                         {childName || "N/A"}
                       </span>
                     </p>
                     <p className="text-sm text-gray-600">
-                      Guardian:{" "}
+                      Guardian:{}
                       <span className="font-medium text-gray-800">
                         {guardianName || "N/A"}
                       </span>
                     </p>
                     <p className="text-sm text-gray-600">
-                      Initial Balance:{" "}
+                      Initial Balance:{}
                       <span className="font-medium text-gray-800">
                         $
                         {(initialBalanceStr === ""
