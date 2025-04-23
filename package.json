@@ -32,6 +32,7 @@
     "react-to-print": "^3.0.6",
     "recharts": "^2.15.3",
     "tailwind-merge": "^3.2.0",
+    "uuid": "^11.1.0",
     "zod": "^3.24.3"
   },
   "devDependencies": {
@@ -46,6 +47,7 @@
     "@types/qrcode.react": "^1.0.5",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@types/uuid": "^10.0.0",
     "autoprefixer": "^10.4.21",
     "drizzle-kit": "^0.31.0",
     "eslint": "^9.0.0",

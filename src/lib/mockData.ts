@@ -1,71 +1,70 @@
 // src/lib/mockData.ts
+// *** ONLY MODIFYING THE INTERFACE ***
 
+import { v4 as uuidv4 } from 'uuid';
+
+// Data Interfaces
 export interface Account {
-  id: string;
-  name: string; // Child's Name
-  email?: string; // Optional email if collected
-  guardianName?: string;
-  status: 'Active' | 'Inactive' | 'Pending' | 'Suspended';
-  balance: number;
-  pin?: string; // Hashed PIN in a real app
-  createdAt?: string;
-  lastTransactionAt?: string | null;
-  updatedAt?: string | null;
+    id: string;
+    guardianName: string;
+    childName: string;
+    balance: number;
+    status: 'Active' | 'Inactive' | 'Suspended';
+    createdAt: string; // ISO 8601 date string
+    lastActivity: string; // ISO 8601 date string
+    pin?: string; // Optional: Store securely (hashed) in real DB
+    qrCodeUrl?: string; // URL to the generated QR code image
+    // Optional fields based on pending registration
+    guardianDob?: string;
+    guardianContact?: string;
+    address?: string;
 }
 
 export interface Merchant {
-  id: string;
-  businessName: string;
-  contactEmail: string;
-  contactPerson?: string;
-  contactPhone?: string;
-  storeAddress?: string;
-  password?: string; // Hashed password in a real app
-  status: 'active' | 'pending_approval' | 'suspended' | 'rejected';
-  submittedAt?: string;
-  updatedAt?: string | null;
+    id: string;
+    name: string;
+    location: string;
+    category: string; // e.g., 'Groceries', 'School Supplies', 'Healthcare'
+    isActive: boolean;
+    joinedDate: string; // ISO 8601 date string
 }
 
 export interface Transaction {
-  id: string;
-  timestamp: string; // Or Date
-  type: string;
-  amount: number;
-  accountId?: string;
-  merchantId?: string;
-  status: 'Approved' | 'Declined';
-  description?: string;
-  previousBalance?: number;
-  newBalance?: number;
-  pinVerified?: boolean;
+    id: string;
+    accountId: string;
+    merchantId?: string; // Optional: Transactions might not involve a merchant (e.g., admin adjustment)
+    type: 'Credit' | 'Debit' | 'Adjustment';
+    amount: number;
+    timestamp: string; // ISO 8601 date string
+    description: string;
+    status: 'Completed' | 'Pending' | 'Failed' | 'Declined'; // Added Declined
+    declineReason?: string; // Optional reason for decline
 }
 
 export interface AdminLog {
-  id: string;
-  timestamp: string;
-  adminEmail: string;
-  action: string;
-  targetType?: string;
-  targetId?: string;
-  details?: string;
+    id: string;
+    timestamp: string; // ISO 8601 date string
+    adminUsername: string; // Or Admin ID
+    action: string; // e.g., "Approved Registration", "Updated Account Status", "Rejected Transaction"
+    targetId?: string; // ID of the account, transaction, merchant, etc. affected
+    details?: string; // Optional additional details
 }
 
-// Interface for pending remote registrations
 export interface PendingRegistration {
-    id: string; // Unique ID for the pending request itself
+    id: string;
     guardianName: string;
-    guardianDob: string; // Store as string for simplicity from form input
+    guardianDob: string; // Store as string (YYYY-MM-DD) or Date
     guardianContact: string;
     address: string;
     childName: string;
-    pin: string;
-    submittedAt: string; // ISO string format recommended
-    status: 'Pending' | 'Approved' | 'Rejected'; // Status of the registration request
-    rejectionReason?: string; // Optional reason if rejected
+    pin: string; // Store securely in a real app (e.g., hashed)
+    submittedAt: string; // ISO 8601 date string
+    status: 'Pending' | 'Approved' | 'Rejected'; // Add more statuses if needed
+    submissionLanguage?: 'en' | 'th'; // ADDED: Track language used for submission
 }
 
 
-// AppData interface to include pendingRegistrations
+// Combined App Data Interface
 export interface AppData {
     accounts: Account[];
     merchants: Merchant[];
@@ -74,75 +73,254 @@ export interface AppData {
     pendingRegistrations: PendingRegistration[];
 }
 
-// --- Mock Data Instance ---
-const mockDataInstance: AppData = {
-  accounts: [
-    // Existing accounts...
-    { id: 'STC-2023-0001', name: "John Doe", guardianName: "Alice Doe", balance: 150.00, createdAt: "2023-01-15T09:30:00Z", lastTransactionAt: "2024-03-20T14:45:00Z", pin: "1234", status: "Active", updatedAt: "2024-03-20T14:45:00Z", email: "john.doe@example.com" },
-    { id: 'STC-2023-0002', name: "Jane Smith", guardianName: "Bob Smith", balance: 75.50, createdAt: "2023-02-10T11:00:00Z", lastTransactionAt: "2024-03-18T08:20:00Z", pin: "5678", status: "Active", updatedAt: "2024-03-18T08:20:00Z", email: "jane.s@example.com" },
-    { id: 'STC-2023-0003', name: "Michael Chen", guardianName: "Emily Chen", balance: 0.00, createdAt: "2023-05-22T16:15:00Z", lastTransactionAt: null, pin: "1122", status: "Active", updatedAt: "2023-05-22T16:15:00Z", email: undefined },
-    { id: 'STC-2024-0004', name: "Sarah Davis", guardianName: "David Davis", balance: 210.75, createdAt: "2024-01-30T10:00:00Z", lastTransactionAt: "2024-03-25T11:55:00Z", pin: "3344", status: "Suspended", updatedAt: "2024-02-15T14:00:00Z", email: "sarah.d@example.com" },
-    { id: 'STC-2024-0005', name: "Omar Garcia", guardianName: "Maria Garcia", balance: 500.00, createdAt: "2024-03-01T09:00:00Z", lastTransactionAt: "2024-03-10T12:00:00Z", pin: "9876", status: "Active", updatedAt: "2024-03-10T12:00:00Z", email: "omar.g@example.com" }
-  ] as Account[],
-  merchants: [
-    // Existing merchants...
-    { id: "M-001", contactEmail: "store1@example.com", businessName: "Food Market", password: "password", contactPerson: "Dave Grocer", contactPhone: "555-1111", storeAddress: "10 Market Plaza", status: 'active', submittedAt: "2023-01-09T10:00:00Z", updatedAt: "2023-01-10T08:00:00Z" },
-    { id: "M-003", contactEmail: "newstore@example.com", businessName: "General Goods", password: "password", contactPerson: "Peter Trader", contactPhone: "555-3333", storeAddress: "30 Commerce Way", status: 'pending_approval', submittedAt: "2024-03-25T15:00:00Z", updatedAt: "2024-03-25T15:00:00Z" },
-  ] as Merchant[],
-  transactions: [
-    // Existing transactions...
-     { id: "TX-2023-0001", accountId: "STC-2023-0001", merchantId: "M-001", amount: 15.00, timestamp: "2024-03-20T14:45:00Z", pinVerified: true, status: "Approved", description: "Food Aid", previousBalance: 165.00, newBalance: 150.00, type: 'Debit' },
-     { id: "TX-2024-0002", accountId: "STC-2023-0002", merchantId: "M-001", amount: 24.50, timestamp: "2024-03-18T08:20:00Z", pinVerified: true, status: "Approved", description: "Groceries", previousBalance: 100.00, newBalance: 75.50, type: 'Debit' },
-     { id: "TX-2024-0003", accountId: "STC-2024-0004", merchantId: "M-001", amount: 10.25, timestamp: "2024-03-25T11:55:00Z", pinVerified: true, status: "Approved", description: "Supplies", previousBalance: 221.00, newBalance: 210.75, type: 'Debit' },
-     { id: "TX-2024-0004", accountId: "STC-2024-0005", amount: 500.00, timestamp: "2024-03-01T09:00:00Z", pinVerified: false, status: "Approved", description: "Initial Deposit", previousBalance: 0.00, newBalance: 500.00, type: 'Credit' },
-     { id: "TX-2024-0005", accountId: "STC-2024-0005", merchantId: "M-001", amount: 50.00, timestamp: "2024-03-10T12:00:00Z", pinVerified: true, status: "Approved", description: "Clothing", previousBalance: 550.00, newBalance: 500.00, type: 'Debit' },
-  ] as Transaction[],
-  adminActivityLog: [
-    // Existing logs...
-     { id: "LOG-000", timestamp: "2024-03-26T09:55:00Z", adminEmail: "admin@example.com", action: "Login", targetType: "System", targetId: "-", details: "Admin logged in successfully." },
-     { id: "LOG-001", timestamp: "2023-02-10T11:00:00Z", adminEmail: "onboarding@example.com", action: "Onboard Account", targetType: "Account", targetId: "STC-2023-0002", details: "Registered Jane Smith (Guardian: Bob Smith) with initial balance $100.00" },
-     { id: "LOG-002", timestamp: "2023-05-22T16:15:00Z", adminEmail: "onboarding@example.com", action: "Onboard Account", targetType: "Account", targetId: "STC-2023-0003", details: "Registered Michael Chen (Guardian: Emily Chen) with initial balance $0.00" },
-     { id: "LOG-003", timestamp: "2024-01-30T10:00:00Z", adminEmail: "onboarding@example.com", action: "Onboard Account", targetType: "Account", targetId: "STC-2024-0004", details: "Registered Sarah Davis (Guardian: David Davis) with initial balance $221.00" },
-     { id: "LOG-004", timestamp: "2024-02-15T14:00:00Z", adminEmail: "admin@example.com", action: "Update Account Status", targetType: "Account", targetId: "STC-2024-0004", details: "Changed status from Active to Suspended" },
-     { id: "LOG-005", timestamp: "2024-03-01T09:00:00Z", adminEmail: "onboarding@example.com", action: "Onboard Account", targetType: "Account", targetId: "STC-2024-0005", details: "Registered Omar Garcia (Guardian: Maria Garcia) with initial balance $550.00" },
-  ] as AdminLog[],
+// Function to generate mock QR code URLs (replace with actual generation/storage later)
+const generateMockQrCodeUrl = (accountId: string): string => {
+    // In a real app, this would involve generating a QR code image (e.g., using qrcode library)
+    // and storing it, then returning the URL. For now, just a placeholder.
+    // Using a placeholder image service that includes the ID in the URL for differentiation.
+    return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`account-id:${accountId}`)}`;
+};
 
-  // MODIFIED: Initialize pendingRegistrations with sample data
-  pendingRegistrations: [
-      {
-          id: `PEN-${Date.now() - 86400000}`, // Submitted yesterday
-          guardianName: "Aisha Khan",
-          guardianDob: "1985-06-15",
-          guardianContact: "555-123-4567",
-          address: "123 Oasis Lane, Metropolis",
-          childName: "Samir Khan",
-          pin: "1111", // Remember security!
-          submittedAt: new Date(Date.now() - 86400000).toISOString(), // Yesterday
-          status: 'Pending',
-      },
-      {
-          id: `PEN-${Date.now() - 3600000}`, // Submitted an hour ago
-          guardianName: "Ben Carter",
-          guardianDob: "1990-11-22",
-          guardianContact: "555-987-6543",
-          address: "456 River Road, Gotham",
-          childName: "Chloe Carter",
-          pin: "2222",
-          submittedAt: new Date(Date.now() - 3600000).toISOString(), // An hour ago
-          status: 'Pending',
-      },
-      {
-          id: `PEN-${Date.now() - 600000}`, // Submitted 10 mins ago
-          guardianName: "Elena Rodriguez",
-          guardianDob: "1978-03-01",
-          guardianContact: "555-555-5555",
-          address: "789 Mountain View, Star City",
-          childName: "Mateo Rodriguez",
-          pin: "3333",
-          submittedAt: new Date(Date.now() - 600000).toISOString(), // 10 mins ago
-          status: 'Pending',
-      }
-  ] as PendingRegistration[],
+// Mock Data Instance
+const mockDataInstance: AppData = {
+    accounts: [
+        {
+            id: 'ACC-001',
+            guardianName: 'Alice Wonderland',
+            childName: 'Caterpillar Jr.',
+            balance: 150.75,
+            status: 'Active',
+            createdAt: '2023-01-15T10:30:00Z',
+            lastActivity: '2024-03-10T14:00:00Z',
+            pin: '1234', // Example - Hash in real DB
+            qrCodeUrl: generateMockQrCodeUrl('ACC-001'),
+            guardianDob: '1985-05-20',
+            guardianContact: '555-1234',
+            address: '123 Rabbit Hole Lane, Wonderland',
+        },
+        {
+            id: 'ACC-002',
+            guardianName: 'Bob The Builder',
+            childName: 'Wendy Tool',
+            balance: 320.00,
+            status: 'Active',
+            createdAt: '2023-02-20T09:00:00Z',
+            lastActivity: '2024-03-11T11:25:00Z',
+            pin: '5678',
+            qrCodeUrl: generateMockQrCodeUrl('ACC-002'),
+            guardianDob: '1978-11-30',
+            guardianContact: '555-5678',
+            address: '456 Construction Way, Builderville',
+        },
+        {
+            id: 'ACC-003',
+            guardianName: 'Charlie Chaplin',
+            childName: 'Little Tramp',
+            balance: 0.00,
+            status: 'Inactive',
+            createdAt: '2023-03-01T11:00:00Z',
+            lastActivity: '2023-09-01T11:00:00Z',
+            pin: '9012',
+            qrCodeUrl: generateMockQrCodeUrl('ACC-003'),
+            guardianDob: '1980-01-01',
+            guardianContact: '555-9012',
+            address: '789 Silent Film St, Hollywood',
+        },
+         {
+            id: 'ACC-004',
+            guardianName: 'Diana Prince',
+            childName: 'Steve Trevor Jr.',
+            balance: 500.50,
+            status: 'Active',
+            createdAt: '2023-04-10T08:15:00Z',
+            lastActivity: '2024-03-09T16:45:00Z',
+            pin: '3456',
+            qrCodeUrl: generateMockQrCodeUrl('ACC-004'),
+            guardianDob: '1975-03-08',
+            guardianContact: '555-3456',
+            address: '1 Wonder Way, Themyscira',
+        },
+         {
+            id: 'ACC-005',
+            guardianName: 'Ethan Hunt',
+            childName: 'Benji Dunn', // Just for fun
+            balance: 10.00,
+            status: 'Suspended',
+            createdAt: '2023-05-22T13:00:00Z',
+            lastActivity: '2024-01-15T10:00:00Z',
+            pin: '7890',
+            qrCodeUrl: generateMockQrCodeUrl('ACC-005'),
+            guardianDob: '1982-07-18',
+            guardianContact: '555-7890',
+            address: '1 Impossible Mission Ln, Langley',
+        }
+    ],
+    merchants: [
+        {
+            id: 'MER-001',
+            name: 'General Groceries',
+            location: 'Main Street Plaza',
+            category: 'Groceries',
+            isActive: true,
+            joinedDate: '2022-11-01T00:00:00Z',
+        },
+        {
+            id: 'MER-002',
+            name: 'School Supply Station',
+            location: 'Near Central School',
+            category: 'School Supplies',
+            isActive: true,
+            joinedDate: '2023-01-10T00:00:00Z',
+        },
+        {
+            id: 'MER-003',
+            name: 'Healthy Habits Clinic',
+            location: 'Community Health Center',
+            category: 'Healthcare',
+            isActive: true,
+            joinedDate: '2023-03-15T00:00:00Z',
+        },
+        {
+            id: 'MER-004',
+            name: 'Corner Store',
+            location: 'Oak Street Corner',
+            category: 'Groceries',
+            isActive: false, // Example of inactive merchant
+            joinedDate: '2022-12-01T00:00:00Z',
+        },
+    ],
+    transactions: [
+        {
+            id: 'TX-2024-0001',
+            accountId: 'ACC-001',
+            merchantId: 'MER-001',
+            type: 'Debit',
+            amount: 50.25,
+            timestamp: '2024-03-10T14:00:00Z',
+            description: 'Grocery purchase',
+            status: 'Completed',
+        },
+        {
+            id: 'TX-2024-0002',
+            accountId: 'ACC-002',
+            merchantId: 'MER-002',
+            type: 'Debit',
+            amount: 25.00,
+            timestamp: '2024-03-11T11:25:00Z',
+            description: 'Notebooks and pens',
+            status: 'Completed',
+        },
+        {
+            id: 'TX-2024-0003',
+            accountId: 'ACC-001',
+            type: 'Credit', // Example Credit
+            amount: 100.00,
+            timestamp: '2024-03-01T09:00:00Z',
+            description: 'Monthly Top-up',
+            status: 'Completed',
+        },
+         {
+            id: 'TX-2024-0004',
+            accountId: 'ACC-004',
+            merchantId: 'MER-003', // Corrected: Needs a valid merchantId
+            type: 'Debit',
+            amount: 75.00,
+            timestamp: '2024-03-09T16:45:00Z',
+            description: 'Clinic Visit Co-pay',
+            status: 'Completed',
+        },
+        {
+            id: 'TX-2024-0005',
+            accountId: 'ACC-002',
+            merchantId: 'MER-001',
+            type: 'Debit',
+            amount: 15.50,
+            timestamp: '2024-03-12T10:00:00Z',
+            description: 'Snacks',
+            status: 'Pending', // Example Pending
+        },
+        {
+            id: 'TX-2024-0006',
+            accountId: 'ACC-005', // Suspended account
+            merchantId: 'MER-001',
+            type: 'Debit',
+            amount: 30.00,
+            timestamp: '2024-03-12T11:00:00Z',
+            description: 'Attempted grocery purchase',
+            status: 'Failed', // Example Failed
+            declineReason: 'Account Suspended',
+        },
+         {
+            id: 'TX-2024-0007',
+            accountId: 'ACC-001',
+            merchantId: 'MER-004', // Inactive Merchant
+            type: 'Debit',
+            amount: 12.00,
+            timestamp: '2024-03-12T12:00:00Z',
+            description: 'Beverage purchase',
+            status: 'Declined', // Example Declined
+            declineReason: 'Merchant Inactive',
+        },
+        {
+            id: 'TX-2024-0008',
+            accountId: 'ACC-002',
+            type: 'Adjustment', // Example Adjustment
+            amount: -10.00, // Negative for deduction
+            timestamp: '2024-03-12T15:00:00Z',
+            description: 'Admin correction for previous error',
+            status: 'Completed',
+        },
+    ],
+    adminActivityLog: [
+        {
+            id: uuidv4(),
+            timestamp: '2024-03-11T09:00:00Z',
+            adminUsername: 'admin_user',
+            action: 'Logged In',
+        },
+        {
+            id: uuidv4(),
+            timestamp: '2024-03-12T15:00:10Z',
+            adminUsername: 'admin_user',
+            action: 'Performed Adjustment',
+            targetId: 'TX-2024-0008',
+            details: 'Corrected amount for TX-2024-0005, reduced balance by 10.00',
+        },
+         {
+            id: uuidv4(),
+            timestamp: '2024-03-12T16:00:00Z',
+            adminUsername: 'supervisor_jane',
+            action: 'Updated Account Status',
+            targetId: 'ACC-005',
+            details: 'Changed status from Active to Suspended due to policy violation.',
+        }
+    ],
+    pendingRegistrations: [
+        {
+            id: 'PEN-1700000000000-abc12',
+            guardianName: 'Fiona Shrek',
+            guardianDob: '1988-08-15',
+            guardianContact: '555-1111',
+            address: 'The Swamp, Far Far Away',
+            childName: 'Fergus Ogre',
+            pin: '1111', // Store hashed
+            submittedAt: '2024-03-10T08:00:00Z',
+            status: 'Pending',
+            submissionLanguage: 'en',
+        },
+        {
+            id: 'PEN-1710000000000-def34',
+            guardianName: 'สมชาย ใจดี', // Example Thai Name
+            guardianDob: '1990-02-20',
+            guardianContact: '081-234-5678',
+            address: '123 ถนนสุขุมวิท กรุงเทพฯ 10110', // Example Thai Address
+            childName: 'สมหญิง ตามมา', // Example Thai Name
+            pin: '2222', // Store hashed
+            submittedAt: '2024-03-11T10:30:00Z',
+            status: 'Pending',
+            submissionLanguage: 'th',
+        },
+    ],
 };
 
 export default mockDataInstance;

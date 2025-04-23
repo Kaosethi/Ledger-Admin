@@ -4,6 +4,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import mockDataInstance, { PendingRegistration } from '@/lib/mockData';
+import { TranslationStrings } from '@/lib/translations'; // ADDED: Import TranslationStrings type
 
 interface FormData {
     guardianName: string;
@@ -13,7 +14,14 @@ interface FormData {
     childName: string;
 }
 
-const RemoteRegistrationForm: React.FC = () => {
+// ADDED: Props interface to accept language and translations
+interface RemoteRegistrationFormProps {
+    language: 'en' | 'th';
+    t: TranslationStrings; // t stands for translations
+}
+
+// MODIFIED: Update component signature to accept props
+const RemoteRegistrationForm: React.FC<RemoteRegistrationFormProps> = ({ language, t }) => {
     const router = useRouter();
 
     const [formData, setFormData] = useState<FormData>({
@@ -59,15 +67,15 @@ const RemoteRegistrationForm: React.FC = () => {
         setIsSubmitting(true);
         setSubmitError(null);
 
-        // --- ADDED: Required Field Validation ---
+        // MODIFIED: Use translated labels for required field validation
         const requiredFields: { key: keyof FormData | 'pin' | 'confirmPin'; label: string }[] = [
-            { key: 'guardianName', label: "Guardian's Full Name" },
-            { key: 'guardianDob', label: "Guardian's Date of Birth" },
-            { key: 'guardianContact', label: "Guardian's Contact Number" },
-            { key: 'address', label: 'Address' },
-            { key: 'childName', label: "Child's Full Name" },
-            { key: 'pin', label: 'PIN' },
-            { key: 'confirmPin', label: 'Confirm PIN' },
+            { key: 'guardianName', label: t.guardianNameLabel },
+            { key: 'guardianDob', label: t.guardianDobLabel },
+            { key: 'guardianContact', label: t.guardianContactLabel },
+            { key: 'address', label: t.addressLabel },
+            { key: 'childName', label: t.childNameLabel },
+            { key: 'pin', label: t.pinLabel },
+            { key: 'confirmPin', label: t.confirmPinLabel },
         ];
 
         for (const field of requiredFields) {
@@ -83,7 +91,8 @@ const RemoteRegistrationForm: React.FC = () => {
 
             // Check if value is empty or just whitespace (for string fields)
             if (!value || (typeof value === 'string' && value.trim() === '')) {
-                 setSubmitError(`${field.label} is required.`);
+                 // MODIFIED: Use translated error message function
+                 setSubmitError(t.requiredField(field.label));
                  setIsSubmitting(false);
                  // Focus the first invalid field for better UX
                  const inputElement = document.getElementById(field.key);
@@ -97,20 +106,21 @@ const RemoteRegistrationForm: React.FC = () => {
 
 
         // --- PIN Format/Match Validation (Existing) ---
+        // MODIFIED: Use translated PIN validation messages
         if (pin.length !== 4) {
-            setSubmitError("PIN must be exactly 4 digits.");
+            setSubmitError(t.pinMustBe4Digits);
             setIsSubmitting(false);
             document.getElementById('pin')?.focus();
             return;
         }
         if (!/^\d{4}$/.test(pin)) { // Should be redundant due to input handling, but good safeguard
-            setSubmitError("PIN must contain only digits.");
+            setSubmitError(t.pinMustContainDigits);
             setIsSubmitting(false);
             document.getElementById('pin')?.focus();
             return;
         }
         if (pin !== confirmPin) {
-            setSubmitError("PINs do not match.");
+            setSubmitError(t.pinsDoNotMatch);
             setIsSubmitting(false);
             document.getElementById('confirmPin')?.focus();
             return;
@@ -120,6 +130,7 @@ const RemoteRegistrationForm: React.FC = () => {
         console.log("Form Data Submitted:", { ...formData, pin });
 
         try {
+            // Simulate network delay
             await new Promise(resolve => setTimeout(resolve, 1000));
 
             // Trim string values before saving
@@ -137,18 +148,23 @@ const RemoteRegistrationForm: React.FC = () => {
                 pin: pin, // PIN is already validated
                 submittedAt: new Date().toISOString(),
                 status: 'Pending',
+                // ADDED: Store the language used for submission
+                submissionLanguage: language,
             };
 
+            // Directly modify the imported instance (for mock setup)
             mockDataInstance.pendingRegistrations.push(newPendingRegistration);
             console.log("Added to mockDataInstance.pendingRegistrations:", newPendingRegistration);
             console.log("Current mockDataInstance.pendingRegistrations:", mockDataInstance.pendingRegistrations);
 
+            // Redirect to success page
             router.push('/register/success');
 
         } catch (error) {
              console.error("Submission failed:", error);
-             const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-             setSubmitError(`Submission failed: ${errorMessage}. Please try again later.`);
+             const errorMessage = error instanceof Error ? error.message : t.submissionFailedGeneric; // MODIFIED: Use translated generic error
+             // MODIFIED: Use translated error prefix
+             setSubmitError(`${t.submissionFailedError} ${errorMessage}. Please try again later.`); // Added generic advice back
              setIsSubmitting(false);
         }
     };
@@ -157,24 +173,28 @@ const RemoteRegistrationForm: React.FC = () => {
         <form onSubmit={handleSubmit} className="space-y-8" noValidate>
             {/* Guardian's Information Section */}
             <div className="p-6 border border-gray-200 rounded-lg shadow-sm bg-white">
-                 <h2 className="text-xl font-semibold mb-4 text-gray-700">Guardian's Information</h2>
+                 {/* MODIFIED: Use translated section title */}
+                 <h2 className="text-xl font-semibold mb-4 text-gray-700">{t.guardianInfoTitle}</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                      <div>
+                         {/* MODIFIED: Use translated label */}
                         <label htmlFor="guardianName" className="block text-sm font-medium text-gray-700 mb-1">
-                            Guardian's Full Name <span className="text-red-500">*</span>
+                            {t.guardianNameLabel} <span className="text-red-500">{t.requiredIndicator}</span>
                         </label>
                         <input
                             type="text" id="guardianName" name="guardianName"
                             value={formData.guardianName} onChange={handleChange}
                             // Removed 'required' as we handle it in JS now
                             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                            placeholder="Enter Guardian's Full Name"
+                            // MODIFIED: Use translated placeholder
+                            placeholder={t.guardianNamePlaceholder}
                             aria-required="true" // Keep for accessibility
                         />
                     </div>
                     <div>
+                         {/* MODIFIED: Use translated label */}
                         <label htmlFor="guardianDob" className="block text-sm font-medium text-gray-700 mb-1">
-                            Guardian's Date of Birth <span className="text-red-500">*</span>
+                            {t.guardianDobLabel} <span className="text-red-500">{t.requiredIndicator}</span>
                         </label>
                         <input
                             type="date" id="guardianDob" name="guardianDob"
@@ -185,27 +205,31 @@ const RemoteRegistrationForm: React.FC = () => {
                         />
                     </div>
                      <div>
+                         {/* MODIFIED: Use translated label */}
                         <label htmlFor="guardianContact" className="block text-sm font-medium text-gray-700 mb-1">
-                            Guardian's Contact Number <span className="text-red-500">*</span>
+                            {t.guardianContactLabel} <span className="text-red-500">{t.requiredIndicator}</span>
                         </label>
                         <input
                             type="tel" id="guardianContact" name="guardianContact"
                             value={formData.guardianContact} onChange={handleChange}
                             pattern="[0-9\s\-\+]+" title="Please enter a valid phone number"
                             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                            placeholder="Enter Contact Number"
+                            // MODIFIED: Use translated placeholder
+                            placeholder={t.guardianContactPlaceholder}
                              aria-required="true"
                         />
                     </div>
                      <div className="md:col-span-2">
+                         {/* MODIFIED: Use translated label */}
                         <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">
-                            Address <span className="text-red-500">*</span>
+                            {t.addressLabel} <span className="text-red-500">{t.requiredIndicator}</span>
                         </label>
                         <textarea
                             id="address" name="address" rows={3}
                             value={formData.address} onChange={handleChange}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                            placeholder="Enter Full Address"
+                            // MODIFIED: Use translated placeholder
+                            placeholder={t.addressPlaceholder}
                             aria-required="true"
                         />
                     </div>
@@ -214,16 +238,19 @@ const RemoteRegistrationForm: React.FC = () => {
 
              {/* Child's Information Section */}
             <div className="p-6 border border-gray-200 rounded-lg shadow-sm bg-white">
-                <h2 className="text-xl font-semibold mb-4 text-gray-700">Child's Information</h2>
+                 {/* MODIFIED: Use translated section title */}
+                <h2 className="text-xl font-semibold mb-4 text-gray-700">{t.childInfoTitle}</h2>
                 <div>
+                     {/* MODIFIED: Use translated label */}
                     <label htmlFor="childName" className="block text-sm font-medium text-gray-700 mb-1">
-                        Child's Full Name <span className="text-red-500">*</span>
+                        {t.childNameLabel} <span className="text-red-500">{t.requiredIndicator}</span>
                     </label>
                     <input
                         type="text" id="childName" name="childName"
                         value={formData.childName} onChange={handleChange}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                        placeholder="Enter Child's Full Name"
+                        // MODIFIED: Use translated placeholder
+                        placeholder={t.childNamePlaceholder}
                          aria-required="true"
                     />
                 </div>
@@ -231,33 +258,38 @@ const RemoteRegistrationForm: React.FC = () => {
 
             {/* Account Security Section (PIN) */}
             <div className="p-6 border border-gray-200 rounded-lg shadow-sm bg-white">
-                <h2 className="text-xl font-semibold mb-4 text-gray-700">Account Security</h2>
+                 {/* MODIFIED: Use translated section title */}
+                <h2 className="text-xl font-semibold mb-4 text-gray-700">{t.securityTitle}</h2>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
+                         {/* MODIFIED: Use translated label */}
                         <label htmlFor="pin" className="block text-sm font-medium text-gray-700 mb-1">
-                            Create 4-Digit PIN <span className="text-red-500">*</span>
+                            {t.pinLabel} <span className="text-red-500">{t.requiredIndicator}</span>
                         </label>
                         <input
                             type="password" id="pin" name="pin"
                             value={pin} onChange={handleChange}
                             maxLength={4} pattern="\d{4}"
-                            title="PIN must be exactly 4 digits"
+                            title="PIN must be exactly 4 digits" // Title attribute not easily translatable without more complex setup
                             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                            placeholder="Enter 4-digit PIN" autoComplete="new-password"
+                            // MODIFIED: Use translated placeholder
+                            placeholder={t.pinPlaceholder} autoComplete="new-password"
                              aria-required="true"
                         />
                     </div>
                     <div>
+                         {/* MODIFIED: Use translated label */}
                         <label htmlFor="confirmPin" className="block text-sm font-medium text-gray-700 mb-1">
-                            Confirm 4-Digit PIN <span className="text-red-500">*</span>
+                            {t.confirmPinLabel} <span className="text-red-500">{t.requiredIndicator}</span>
                         </label>
                         <input
                             type="password" id="confirmPin" name="confirmPin"
                             value={confirmPin} onChange={handleChange}
                             maxLength={4} pattern="\d{4}"
-                            title="PIN must be exactly 4 digits"
+                            title="PIN must be exactly 4 digits" // Title attribute not easily translatable without more complex setup
                             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                            placeholder="Confirm 4-digit PIN" autoComplete="new-password"
+                            // MODIFIED: Use translated placeholder
+                            placeholder={t.confirmPinPlaceholder} autoComplete="new-password"
                              aria-required="true"
                         />
                     </div>
@@ -274,10 +306,12 @@ const RemoteRegistrationForm: React.FC = () => {
                     disabled={isSubmitting}
                     className="w-full md:w-auto px-8 py-3 bg-indigo-600 text-white font-semibold rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition duration-150 ease-in-out"
                 >
-                    {isSubmitting ? 'Submitting...' : 'Submit Registration Request'}
+                     {/* MODIFIED: Use translated button text */}
+                    {isSubmitting ? t.submittingButton : t.submitButton}
                 </button>
+                 {/* MODIFIED: Use translated notice */}
                  <p className="text-sm text-gray-500 mt-3 text-center">
-                    Your request will be reviewed by an administrator.
+                    {t.submissionNotice}
                 </p>
             </div>
         </form>
