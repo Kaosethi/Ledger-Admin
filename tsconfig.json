@@ -1,3 +1,4 @@
+// tsconfig.json
 {
   "compilerOptions": {
     // Type Checking
@@ -13,11 +14,11 @@
     "moduleResolution": "bundler", // How modules get resolved (modern default for bundlers like Webpack used by Next.js)
     "resolveJsonModule": true, // Allow importing .json files
     "isolatedModules": true, // Ensure modules can be transpiled independently
-    "esModuleInterop": true, // <<< FIXES THE REACT IMPORT ERROR
+    "esModuleInterop": true,
 
     // Emit
     "noEmit": true, // Do not emit outputs (Next.js handles this)
-    "jsx": "preserve", // <<< FIXES THE JSX ERROR (Preserve JSX for Next.js to handle)
+    "jsx": "preserve",
 
     // Paths & Base URL (Ensure this matches your setup)
     "baseUrl": ".", // Base directory to resolve non-absolute module names.
@@ -31,7 +32,9 @@
       {
         "name": "next"
       }
-    ]
+    ],
+    "types": ["node"]
+    // Explicitly include 'node' types to resolve missing type definition error
   },
   "include": [ // Files/patterns for TypeScript to include
     "next-env.d.ts",

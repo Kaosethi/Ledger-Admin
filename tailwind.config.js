@@ -1,7 +1,10 @@
+// tailwind.config.js
 /** @type {import('tailwindcss').Config} */
-import aspectRatio from "@tailwindcss/aspect-ratio";
-import forms from "@tailwindcss/forms";
-import colors from "tailwindcss/colors";
+// MODIFIED: Use require for consistency with module.exports
+const aspectRatio = require("@tailwindcss/aspect-ratio");
+const forms = require("@tailwindcss/forms");
+// MODIFIED: Removed the direct import of 'colors'. Tailwind v3 makes colors available by default.
+// const colors = require("tailwindcss/colors"); // No longer needed to spread
 
 module.exports = {
   content: [
@@ -11,21 +14,37 @@ module.exports = {
   ],
   theme: {
     extend: {
+      // MODIFIED: Removed the spread of '...colors'.
+      // Tailwind v3 includes default colors automatically.
+      // We only need to define our custom extensions/overrides here.
       colors: {
-        ...colors,
+        // Your custom colors remain:
         primary: "#5D5CDE",
         secondary: "#6366F1",
         accent: "#818CF8",
         background: {
           light: "#FFFFFF",
-          dark: "#181818",
+          dark: "#181818", // Example dark mode background
         },
         text: {
-          light: "#1F2937",
-          dark: "#F9FAFB",
+          light: "#1F2937", // Example light mode text
+          dark: "#F9FAFB",   // Example dark mode text
         },
+        // You could explicitly define replacements here if needed,
+        // but simply removing the spread `...colors` is usually sufficient
+        // as Tailwind v3 provides the modern defaults (`sky`, `stone`, etc.) automatically.
+        // Example (likely unnecessary):
+        // sky: colors.sky,
+        // stone: colors.stone,
+        // neutral: colors.neutral,
+        // gray: colors.gray,
+        // slate: colors.slate,
       },
     },
   },
-  plugins: [aspectRatio, forms],
+  plugins: [
+    // MODIFIED: Use the required variables
+    aspectRatio,
+    forms
+  ],
 };

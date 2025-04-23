@@ -1,14 +1,16 @@
-// src/components/AdminDashboard.tsx
-import React, { useState } from "react";
+// src/app/admin/AdminDashboard.tsx
+'use client';
+
+import React, { useState, useEffect } from "react";
 
 // Component Imports
-import Navbar from "./Navbar";
-import DashboardTab from "./tabs/DashboardTab";
-import OnboardingTab from "./tabs/OnboardingTab";
-import AccountsTab from "./tabs/AccountsTab";
-import TransactionsTab from "./tabs/TransactionsTab";
-import MerchantsTab from "./tabs/MerchantsTab";
-import ActivityLogTab from "./tabs/ActivityLogTab";
+import Navbar from "@/components/Navbar";
+import DashboardTab from "@/components/tabs/DashboardTab";
+import OnboardingTab from "@/components/tabs/OnboardingTab";
+import AccountsTab from "@/components/tabs/AccountsTab";
+import TransactionsTab from "@/components/tabs/TransactionsTab";
+import MerchantsTab from "@/components/tabs/MerchantsTab";
+import ActivityLogTab from "@/components/tabs/ActivityLogTab";
 
 // Data and Type Imports
 import mockDataInstance, {
@@ -16,7 +18,9 @@ import mockDataInstance, {
   Merchant,
   AdminLog,
   AppData,
-} from "../lib/mockData";
+  Transaction,
+  PendingRegistration,
+} from "@/lib/mockData";
 
 // --- Props Interface ---
 interface AdminDashboardProps {
@@ -38,10 +42,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       merchants: mockDataInstance.merchants || [],
       transactions: mockDataInstance.transactions || [],
       adminActivityLog: mockDataInstance.adminActivityLog || [],
+      pendingRegistrations: mockDataInstance.pendingRegistrations || [],
     };
   });
-
-  // useEffect(() => { console.log("AdminDashboard: useEffect detected accounts change:", appData.accounts); }, [appData.accounts]);
 
   // --- Helper Functions ---
   const logAdminActivity = (
@@ -61,7 +64,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     };
     setAppData((prevData) => ({
       ...prevData,
-      adminActivityLog: [...prevData.adminActivityLog, newLog],
+      adminActivityLog: [newLog, ...prevData.adminActivityLog],
     }));
   };
 
@@ -74,38 +77,39 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleAccountAdd = (newAccount: Account) => {
     setAppData((prevData) => ({
       ...prevData,
-      accounts: [...prevData.accounts, newAccount],
+      // Add to the beginning of the list for visibility, or end if preferred
+      accounts: [newAccount, ...prevData.accounts],
     }));
     console.log("AdminDashboard: handleAccountAdd called.");
   };
+
   const handleAccountsUpdate = (updatedAccounts: Account[]) => {
-    console.log(
-      "AdminDashboard: handleAccountsUpdate received:",
-      updatedAccounts
-    );
-    setAppData((prevData) => {
-      console.log("AdminDashboard: Updating accounts state inside setAppData.");
-      return { ...prevData, accounts: updatedAccounts };
-    });
+    console.log("AdminDashboard: handleAccountsUpdate received:", updatedAccounts);
+    setAppData((prevData) => ({ ...prevData, accounts: updatedAccounts }));
   };
+
   const handleMerchantsUpdate = (updatedMerchants: Merchant[]) => {
     setAppData((prevData) => ({ ...prevData, merchants: updatedMerchants }));
     console.log("AdminDashboard: handleMerchantsUpdate called.");
   };
 
+  // REMOVED: handlePendingRegistrationAdd (no longer needed as data is added directly to mock)
+
+  // ADDED: Handler to update the entire list of pending registrations
+  // This will be used by AccountsTab after approving/rejecting items
+  const handlePendingRegistrationsUpdate = (updatedList: PendingRegistration[]) => {
+    console.log("AdminDashboard: handlePendingRegistrationsUpdate received:", updatedList);
+    setAppData(prevData => ({
+        ...prevData,
+        pendingRegistrations: updatedList,
+    }));
+  };
+
+
   // --- Render Active Tab Content ---
   const renderTabContent = () => {
-    // console.log("AdminDashboard: Rendering tab:", activeTab);
-    // console.log("AdminDashboard: Rendering tab:", activeTab);
     switch (activeTab) {
       case "dashboard-tab":
-        return (
-          <DashboardTab
-            accounts={appData.accounts}
-            merchants={appData.merchants}
-            transactions={appData.transactions}
-          />
-        );
         return (
           <DashboardTab
             accounts={appData.accounts}
@@ -116,21 +120,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       case "onboarding-tab":
         return (
           <OnboardingTab
-            accounts={appData.accounts}
-            onAccountAdd={handleAccountAdd}
+            accounts={appData.accounts} // Pass accounts for ID checking
+            onAccountAdd={handleAccountAdd} // Pass add handler
             logAdminActivity={logAdminActivity}
           />
         );
       case "accounts-tab":
-        // MODIFIED: Pass transactions and merchants down to AccountsTab
-        // MODIFIED: Pass transactions and merchants down to AccountsTab
+        // MODIFIED: Pass pending registrations and relevant handlers
         return (
           <AccountsTab
             accounts={appData.accounts}
             onAccountsUpdate={handleAccountsUpdate}
             logAdminActivity={logAdminActivity}
-            allTransactions={appData.transactions} // ADDED PROP
-            merchants={appData.merchants} // ADDED PROP
+            allTransactions={appData.transactions}
+            merchants={appData.merchants}
+            pendingRegistrations={appData.pendingRegistrations} // ADDED PROP
+            onPendingRegistrationsUpdate={handlePendingRegistrationsUpdate} // ADDED PROP
+            onAccountAdd={handleAccountAdd} // ADDED PROP (for approving)
           />
         );
       case "transactions-tab":
@@ -138,25 +144,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <TransactionsTab
             transactions={appData.transactions}
             merchants={appData.merchants}
+            // Pass accounts if needed by TransactionsTab for lookups
+            // accounts={appData.accounts}
           />
         );
       case "merchants-tab":
         return (
           <MerchantsTab
             merchants={appData.merchants}
-            transactions={appData.transactions}
+            transactions={appData.transactions} // Pass transactions if needed for merchant details
             onMerchantsUpdate={handleMerchantsUpdate}
             logAdminActivity={logAdminActivity}
           />
         );
       case "activity-log-tab":
         return <ActivityLogTab logs={appData.adminActivityLog} />;
-        return <ActivityLogTab logs={appData.adminActivityLog} />;
       default:
         return (
           <div className="p-6 text-center text-gray-500">
-            {}
-            Select a tab from the navigation above.{}
+            Select a tab from the navigation above.
           </div>
         );
     }
@@ -164,14 +170,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // --- Component Render ---
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen bg-gray-100">
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         adminName={adminEmail}
         onLogout={handleLogout}
       />
-      <div className="flex-1 p-6">{renderTabContent()}</div>
+      <main className="flex-1 p-4 sm:p-6 lg:p-8">
+         {renderTabContent()}
+      </main>
     </div>
   );
 };
