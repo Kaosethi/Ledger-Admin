@@ -1,10 +1,11 @@
 // src/components/tabs/MerchantsTab.tsx
-// MODIFIED: Removed action buttons from table rows, removed 'deactivate' action
+// MODIFIED: Updated filter for managedMerchants to exclude 'Inactive'
+// MODIFIED: Updated handleConfirmAction logic for reactivate to exclude 'Inactive'
 
 import React, { useState, useMemo } from "react";
+// MODIFIED: Import MerchantStatus type
 import type { Merchant, Transaction, MerchantStatus } from "@/lib/mockData";
 import { formatDate, renderStatusBadge } from "@/lib/utils";
-// MODIFIED: Import MerchantActionType excluding 'deactivate' if possible, or handle below
 import MerchantDetailModal, { MerchantActionType } from "../modals/MerchantDetailModal";
 import ConfirmActionModal from "../modals/ConfirmActionModal";
 
@@ -35,7 +36,6 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedMerchant, setSelectedMerchant] = useState<Merchant | null>(null);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-  // MODIFIED: Use AllowedMerchantAction type
   const [confirmActionDetails, setConfirmActionDetails] = useState<{
     actionType: AllowedMerchantAction | null;
     merchant: Merchant | null;
@@ -47,8 +47,9 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
     () => merchants.filter((m) => m.status === "Pending"),
     [merchants]
   );
+  // MODIFIED: Filter managed merchants to only include Active and Suspended
   const managedMerchants = useMemo(
-    () => merchants.filter((m) => !['Pending', 'Rejected'].includes(m.status)),
+    () => merchants.filter((m) => ['Active', 'Suspended'].includes(m.status)),
     [merchants]
   );
 
@@ -69,16 +70,10 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
     setSelectedMerchant(null);
   };
 
-   // MODIFIED: Use AllowedMerchantAction type
    const handleRequestConfirm = (
     actionType: AllowedMerchantAction,
     merchant: Merchant
   ) => {
-    // REMOVED: Deactivate check as it's excluded by type now
-    // if (actionType === 'deactivate') {
-    //   console.warn("Deactivate action is currently disabled.");
-    //   return;
-    // }
     setConfirmActionDetails({ actionType, merchant });
     setIsConfirmModalOpen(true);
     if (isDetailModalOpen) handleCloseDetailModal();
@@ -100,7 +95,6 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
     let newStatus: MerchantStatus | null = null;
     let logActionText: string = "";
 
-    // MODIFIED: Removed 'deactivate' case
     switch (actionType) {
       case "approve":
         if (merchant.status === 'Pending') { newStatus = 'Active'; logActionText = "Approve Merchant Application"; }
@@ -115,16 +109,11 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
          else { console.warn("Can only suspend active merchants"); }
         break;
       case "reactivate":
-         if (merchant.status === 'Suspended' || merchant.status === 'Inactive') { newStatus = 'Active'; logActionText = "Reactivate Merchant"; }
-         else { console.warn("Can only reactivate suspended/inactive merchants"); }
+         // MODIFIED: Only allow reactivation from 'Suspended'
+         if (merchant.status === 'Suspended') { newStatus = 'Active'; logActionText = "Reactivate Merchant"; }
+         else { console.warn("Can only reactivate suspended merchants"); }
         break;
-      // REMOVED: Deactivate case
-      // case "deactivate":
-      //    if (merchant.status === 'Active') { newStatus = 'Inactive'; logActionText = "Deactivate Merchant"; }
-      //    else { console.warn("Can only deactivate active merchants"); }
-      //    break;
       default:
-        // This should ideally not happen due to AllowedMerchantAction type
         console.error("Unknown or disallowed action type:", actionType);
         handleCloseConfirmModal();
         return;
@@ -146,7 +135,6 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
   };
 
 
-    // MODIFIED: Removed 'deactivate' case
     const getConfirmModalProps = () => {
         const { actionType, merchant } = confirmActionDetails;
         if (!actionType || !merchant) return null;
@@ -160,9 +148,6 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
             return { title: "Confirm Suspension", message: `Are you sure you want to suspend the merchant "${merchant.name}"? Transactions may be declined.`, confirmButtonText: "Suspend Merchant", confirmButtonVariant: "danger" as const };
         case "reactivate":
             return { title: "Confirm Reactivation", message: `Are you sure you want to reactivate the merchant "${merchant.name}"?`, confirmButtonText: "Reactivate", confirmButtonVariant: "success" as const };
-        // REMOVED: Deactivate case
-        //  case "deactivate":
-        //     return { title: "Confirm Deactivation", message: `Are you sure you want to deactivate the merchant "${merchant.name}"? They will appear as inactive.`, confirmButtonText: "Deactivate", confirmButtonVariant: "primary" as const };
         default:
             return null;
         }
@@ -198,7 +183,6 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
                     <td className={`${tableCellClasses} font-semibold text-gray-900`}> {merchant.name} </td>
                     <td className={tableCellClasses}> {merchant.contactEmail || 'N/A'} </td>
                     <td className={tableCellClasses}> {formatDate(merchant.submittedAt)} </td>
-                    {/* MODIFIED: Removed Approve/Reject buttons */}
                     <td className={`${tableCellActionsClasses}`}>
                       <button
                         onClick={() => handleViewDetails(merchant.id)}
@@ -206,8 +190,6 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
                       >
                         Details
                       </button>
-                      {/* REMOVED Approve Button */}
-                      {/* REMOVED Reject Button */}
                     </td>
                   </tr>
                 ))
@@ -237,7 +219,8 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
             </thead>
             <tbody id="merchants-table-body" className="bg-white divide-y divide-gray-200" >
               {managedMerchants.length === 0 ? (
-                <tr> <td colSpan={7} className={`${tableCellClasses} text-center`}> No active, inactive, or suspended merchants found. </td> </tr>
+                 // MODIFIED: Updated empty state message
+                <tr> <td colSpan={7} className={`${tableCellClasses} text-center`}> No active or suspended merchants found. </td> </tr>
               ) : (
                 managedMerchants.map((merchant) => {
                   const txCount = transactions.filter( (tx) => tx.merchantId === merchant.id && tx.status === "Completed" ).length;
@@ -249,7 +232,6 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
                       <td className={tableCellCenterClasses}> {renderStatusBadge(merchant.status, "merchant")} </td>
                       <td className={tableCellClasses}> {formatDate(merchant.updatedAt || merchant.submittedAt)} </td>
                       <td className={tableCellCenterClasses}>{txCount}</td>
-                       {/* MODIFIED: Removed action buttons */}
                       <td className={tableCellActionsClasses}>
                         <button
                           onClick={() => handleViewDetails(merchant.id)}
@@ -257,7 +239,6 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
                         >
                           Details
                         </button>
-                         {/* REMOVED Suspend/Deactivate/Reactivate Buttons */}
                       </td>
                     </tr>
                   );
@@ -272,7 +253,7 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
       <MerchantDetailModal
         isOpen={isDetailModalOpen}
         onClose={handleCloseDetailModal}
-        onRequestConfirm={handleRequestConfirm} // Pass handler
+        onRequestConfirm={handleRequestConfirm}
         merchant={selectedMerchant}
         transactions={transactions}
       />
