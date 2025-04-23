@@ -1,4 +1,6 @@
 // src/lib/utils.ts
+// MODIFIED: Updated renderStatusBadge to handle all transaction statuses
+
 import React from 'react';
 
 /**
@@ -133,96 +135,102 @@ export const formatDdMmYyyyHhMmSs = (isoString: string | null | undefined): stri
 /**
  * Renders a status badge component based on the status string and type.
  * @param status - The status string (e.g., 'Active', 'pending_approval', 'Approved').
- * @param type - The type of status ('account', 'merchant', 'transaction', etc.) to determine styling.
+ * @param type - The type of status ('account', 'merchant', 'transaction', etc.) to determine styling. If omitted, uses generic coloring.
  * @returns A JSX element representing the badge.
  */
 export const renderStatusBadge = (
+    // MODIFIED: Made type optional for broader use, defaulting to generic styling
     status: string | undefined | null,
-    type: 'account' | 'merchant' | 'transaction' | 'pending'
+    type?: 'account' | 'merchant' | 'transaction' | 'pending'
 ): React.ReactElement => {
-    let bgColor = 'bg-gray-200';
-    let textColor = 'text-gray-800';
-    let text = status || 'Unknown';
-    text = text.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()); // Format text
+    let bgColor = 'bg-gray-100'; // Default background
+    let textColor = 'text-gray-800'; // Default text color
+    let text = status || 'Unknown'; // Use original status text unless null/undefined
+    // Keep the formatting for potential snake_case inputs from other types
+    text = text.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+    const lowerCaseStatus = status?.toLowerCase();
 
     switch (type) {
-        case 'account':
-            switch (status?.toLowerCase()) {
+        case 'account': // Keep account statuses as they were
+            switch (lowerCaseStatus) {
                 case 'active':
-                    bgColor = 'bg-green-100';
-                    textColor = 'text-green-800';
-                    break;
+                    bgColor = 'bg-green-100'; textColor = 'text-green-800'; break;
                 case 'inactive':
-                case 'rejected':
-                    bgColor = 'bg-red-100';
-                    textColor = 'text-red-800';
-                    break;
+                case 'rejected': // Grouping inactive/rejected for account
+                    bgColor = 'bg-gray-100'; textColor = 'text-gray-600'; break; // Use gray for inactive account
                 case 'suspended':
-                    bgColor = 'bg-yellow-100';
-                    textColor = 'text-yellow-800';
-                    break;
+                    bgColor = 'bg-yellow-100'; textColor = 'text-yellow-800'; break;
                 case 'pending':
-                    bgColor = 'bg-blue-100';
-                    textColor = 'text-blue-800';
-                    break;
+                    bgColor = 'bg-blue-100'; textColor = 'text-blue-800'; break;
             }
             break;
-        case 'merchant':
-             switch (status?.toLowerCase()) {
-                case 'active':
-                    bgColor = 'bg-green-100';
-                    textColor = 'text-green-800';
-                    break;
+        case 'merchant': // Keep merchant statuses as they were, map isActive boolean if needed elsewhere
+             switch (lowerCaseStatus) {
+                case 'active': // Assuming 'Active' is passed if isActive is true
+                    bgColor = 'bg-green-100'; textColor = 'text-green-800'; break;
+                case 'inactive': // Assuming 'Inactive' is passed if isActive is false
+                    bgColor = 'bg-gray-100'; textColor = 'text-gray-600'; break; // Gray for inactive merchant
                 case 'pending_approval':
-                    bgColor = 'bg-blue-100';
-                    textColor = 'text-blue-800';
-                    break;
+                    bgColor = 'bg-blue-100'; textColor = 'text-blue-800'; break;
                  case 'suspended':
-                    bgColor = 'bg-yellow-100';
-                    textColor = 'text-yellow-800';
-                    break;
+                    bgColor = 'bg-yellow-100'; textColor = 'text-yellow-800'; break;
                  case 'rejected':
-                    bgColor = 'bg-red-100';
-                    textColor = 'text-red-800';
-                    break;
+                    bgColor = 'bg-red-100'; textColor = 'text-red-800'; break;
             }
             break;
         case 'transaction':
-             switch (status?.toLowerCase()) {
-                case 'approved':
-                    bgColor = 'bg-green-100';
-                    textColor = 'text-green-800';
-                    break;
-                case 'declined':
-                    bgColor = 'bg-red-100';
-                    textColor = 'text-red-800';
-                    break;
-            }
-            break;
-        case 'pending': // Generic pending status
-             switch (status?.toLowerCase()) {
+             // MODIFIED: Handle specific transaction statuses
+             switch (lowerCaseStatus) {
+                case 'completed': // Use 'completed' to match data
+                    bgColor = 'bg-green-100'; textColor = 'text-green-800'; break;
                 case 'pending':
-                    bgColor = 'bg-blue-100';
-                    textColor = 'text-blue-800';
-                    break;
-                case 'approved':
-                     bgColor = 'bg-green-100';
-                     textColor = 'text-green-800';
-                     break;
-                 case 'rejected':
-                    bgColor = 'bg-red-100';
-                    textColor = 'text-red-800';
-                    break;
+                    bgColor = 'bg-blue-100'; textColor = 'text-blue-800'; break; // Blue for pending
+                case 'failed': // Red for failed
+                    bgColor = 'bg-red-100'; textColor = 'text-red-800'; break;
+                case 'declined': // Also red for declined
+                    bgColor = 'bg-red-100'; textColor = 'text-red-800'; break;
             }
             break;
+        case 'pending': // Generic pending registration/request status
+             switch (lowerCaseStatus) {
+                case 'pending':
+                    bgColor = 'bg-blue-100'; textColor = 'text-blue-800'; break;
+                case 'approved':
+                     bgColor = 'bg-green-100'; textColor = 'text-green-800'; break;
+                 case 'rejected':
+                    bgColor = 'bg-red-100'; textColor = 'text-red-800'; break;
+            }
+            break;
+        default: // Fallback / Generic coloring if type is not provided
+             switch (lowerCaseStatus) {
+                case 'active':
+                case 'completed':
+                case 'approved':
+                    bgColor = 'bg-green-100'; textColor = 'text-green-800'; break;
+                case 'inactive':
+                    bgColor = 'bg-gray-100'; textColor = 'text-gray-600'; break;
+                case 'pending':
+                case 'pending_approval':
+                    bgColor = 'bg-blue-100'; textColor = 'text-blue-800'; break;
+                case 'suspended':
+                    bgColor = 'bg-yellow-100'; textColor = 'text-yellow-800'; break;
+                case 'failed':
+                case 'declined':
+                case 'rejected':
+                    bgColor = 'bg-red-100'; textColor = 'text-red-800'; break;
+             }
+            break;
+
     }
 
+    // Use createElement for simpler JSX construction without importing React explicitly everywhere
     return React.createElement(
         'span',
         {
             className: `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${bgColor} ${textColor}`
         },
-        text
+        text // Use the original case status text for display
     );
 };
 

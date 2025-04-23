@@ -1,7 +1,9 @@
-// src/app/admin/AdminDashboard.tsx
+// src/components/AdminDashboard.tsx
+// MODIFIED: Added useEffect for periodic status check, modified handleLogout
 'use client';
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation"; // ADDED: Import useRouter
 
 // Component Imports
 import Navbar from "@/components/Navbar";
@@ -20,6 +22,7 @@ import mockDataInstance, {
   AppData,
   Transaction,
   PendingRegistration,
+  AdminUser // ADDED: Import AdminUser type
 } from "@/lib/mockData";
 
 // --- Props Interface ---
@@ -28,16 +31,27 @@ interface AdminDashboardProps {
   adminEmail: string;
 }
 
+// ADDED: Constant for localStorage key (must match Login.tsx)
+const ADMIN_EMAIL_STORAGE_KEY = "loggedInAdminEmail";
+// ADDED: Interval time for status check (e.g., 15 seconds)
+const STATUS_CHECK_INTERVAL_MS = 15 * 1000;
+
 // --- Main Component ---
 const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onLogout,
   adminEmail,
 }) => {
   const [activeTab, setActiveTab] = useState<string>("accounts-tab");
+  const router = useRouter(); // ADDED: Initialize router
 
   const [appData, setAppData] = useState<AppData>(() => {
     console.log("AdminDashboard: Initializing state with mock data.");
+    // IMPORTANT: Use a deep copy of mock data if you intend to modify it
+    // without affecting the original import across sessions/reloads.
+    // For now, direct assignment might be okay for mock purposes, but be aware.
     return {
+      // NOTE: We need the 'admins' array here too for the status check
+      admins: mockDataInstance.admins || [],
       accounts: mockDataInstance.accounts || [],
       merchants: mockDataInstance.merchants || [],
       transactions: mockDataInstance.transactions || [],
@@ -56,9 +70,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const newLog: AdminLog = {
       id: `LOG-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       timestamp: new Date().toISOString(),
-      adminEmail: adminEmail || "Unknown Admin",
+      // MODIFIED: Use adminEmail prop passed down
+      adminUsername: adminEmail || "Unknown Admin",
       action: action,
-      targetType: targetType,
+      // targetType: targetType, // If adding targetType back to AdminLog interface
       targetId: targetId,
       details: details,
     };
@@ -68,16 +83,81 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }));
   };
 
+  // MODIFIED: handleLogout to clear localStorage and redirect
   const handleLogout = () => {
     logAdminActivity("Logout", "System", "-", "Admin logged out.");
-    onLogout();
+    try {
+      localStorage.removeItem(ADMIN_EMAIL_STORAGE_KEY); // Clear stored admin email
+      console.log("Admin email removed from localStorage.");
+    } catch (storageError) {
+      console.error("Failed to remove admin email from localStorage:", storageError);
+    }
+    onLogout(); // Call the original onLogout passed from parent (clears parent state)
+    router.push('/'); // Redirect to login page
   };
+
+
+  // --- ADDED: Periodic Admin Status Check ---
+  useEffect(() => {
+    console.log("AdminDashboard: Setting up periodic status check interval.");
+
+    const checkAdminStatus = () => {
+      try {
+        const currentAdminEmail = localStorage.getItem(ADMIN_EMAIL_STORAGE_KEY);
+        if (!currentAdminEmail) {
+          console.log("Status Check: No admin email found in localStorage. Potential logout needed.");
+          // Consider forcing logout if no email is found while dashboard is active
+          // handleLogout();
+          return;
+        }
+
+        // Find the admin in the current state's admin list
+        // IMPORTANT: This relies on `appData.admins` being available and up-to-date.
+        // In a real app, you'd likely make an API call here to get the *current* status.
+        const adminUser = appData.admins.find(admin => admin.email === currentAdminEmail);
+
+        if (!adminUser) {
+          console.warn(`Status Check: Logged in admin (${currentAdminEmail}) not found in mock data. Forcing logout.`);
+          handleLogout();
+        } else if (!adminUser.isActive) {
+          console.log(`Status Check: Admin (${currentAdminEmail}) is inactive. Forcing logout.`);
+          // Log before logging out completely
+          logAdminActivity("Forced Logout", "System", adminUser.id, "Admin account became inactive.");
+          alert("Your admin account has become inactive. You will be logged out."); // Optional user feedback
+          handleLogout();
+        } else {
+          // console.log(`Status Check: Admin (${currentAdminEmail}) is active.`); // Optional: log for debugging
+        }
+      } catch (error) {
+        console.error("Error during admin status check:", error);
+        // Decide if an error here should trigger a logout or just be logged
+      }
+    };
+
+    // Run the check immediately on mount
+    checkAdminStatus();
+
+    // Set up the interval
+    const intervalId = setInterval(checkAdminStatus, STATUS_CHECK_INTERVAL_MS);
+
+    // Cleanup function to clear the interval when the component unmounts
+    return () => {
+      console.log("AdminDashboard: Clearing status check interval.");
+      clearInterval(intervalId);
+    };
+    // Dependencies: Include `appData.admins` and `handleLogout`
+    // `handleLogout` uses `logAdminActivity`, `onLogout`, `router`
+    // `logAdminActivity` uses `adminEmail`, `setAppData`
+    // Need to ensure `handleLogout` is stable or memoized if dependencies grow complex.
+    // For now, listing direct dependencies. Re-eval if behavior is unexpected.
+  }, [appData.admins, adminEmail, onLogout, router]); // ADDED: Dependencies for useEffect
+  // --- END: Periodic Admin Status Check ---
+
 
   // --- Data Update Handlers ---
   const handleAccountAdd = (newAccount: Account) => {
     setAppData((prevData) => ({
       ...prevData,
-      // Add to the beginning of the list for visibility, or end if preferred
       accounts: [newAccount, ...prevData.accounts],
     }));
     console.log("AdminDashboard: handleAccountAdd called.");
@@ -93,10 +173,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     console.log("AdminDashboard: handleMerchantsUpdate called.");
   };
 
-  // REMOVED: handlePendingRegistrationAdd (no longer needed as data is added directly to mock)
-
-  // ADDED: Handler to update the entire list of pending registrations
-  // This will be used by AccountsTab after approving/rejecting items
   const handlePendingRegistrationsUpdate = (updatedList: PendingRegistration[]) => {
     console.log("AdminDashboard: handlePendingRegistrationsUpdate received:", updatedList);
     setAppData(prevData => ({
@@ -120,13 +196,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       case "onboarding-tab":
         return (
           <OnboardingTab
-            accounts={appData.accounts} // Pass accounts for ID checking
-            onAccountAdd={handleAccountAdd} // Pass add handler
+            accounts={appData.accounts}
+            onAccountAdd={handleAccountAdd}
             logAdminActivity={logAdminActivity}
           />
         );
       case "accounts-tab":
-        // MODIFIED: Pass pending registrations and relevant handlers
         return (
           <AccountsTab
             accounts={appData.accounts}
@@ -134,9 +209,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             logAdminActivity={logAdminActivity}
             allTransactions={appData.transactions}
             merchants={appData.merchants}
-            pendingRegistrations={appData.pendingRegistrations} // ADDED PROP
-            onPendingRegistrationsUpdate={handlePendingRegistrationsUpdate} // ADDED PROP
-            onAccountAdd={handleAccountAdd} // ADDED PROP (for approving)
+            pendingRegistrations={appData.pendingRegistrations}
+            onPendingRegistrationsUpdate={handlePendingRegistrationsUpdate}
+            onAccountAdd={handleAccountAdd}
           />
         );
       case "transactions-tab":
@@ -144,15 +219,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <TransactionsTab
             transactions={appData.transactions}
             merchants={appData.merchants}
-            // Pass accounts if needed by TransactionsTab for lookups
-            // accounts={appData.accounts}
           />
         );
       case "merchants-tab":
         return (
           <MerchantsTab
             merchants={appData.merchants}
-            transactions={appData.transactions} // Pass transactions if needed for merchant details
+            transactions={appData.transactions}
             onMerchantsUpdate={handleMerchantsUpdate}
             logAdminActivity={logAdminActivity}
           />
@@ -174,8 +247,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        adminName={adminEmail}
-        onLogout={handleLogout}
+        adminName={adminEmail} // Pass the email to Navbar for display
+        onLogout={handleLogout} // Pass the enhanced logout handler
       />
       <main className="flex-1 p-4 sm:p-6 lg:p-8">
          {renderTabContent()}

@@ -1,10 +1,15 @@
 // src/components/Login.tsx
+// MODIFIED: Check against mockDataInstance.admins, check isActive, store email in localStorage
 import React, { useState } from "react";
+import mockDataInstance, { AdminUser } from "@/lib/mockData"; // ADDED: Import mock data and AdminUser type
 
 // Define the props (inputs) the component expects
 interface LoginProps {
-  onLoginSuccess: (email: string) => void; // A function to call when login is successful
+  onLoginSuccess: (adminEmail: string) => void; // Function to call when login is successful
 }
+
+// ADDED: Constant for localStorage key
+const ADMIN_EMAIL_STORAGE_KEY = "loggedInAdminEmail";
 
 const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   // State for form inputs
@@ -23,14 +28,36 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       return;
     }
 
-    // --- MOCK LOGIN CHECK ---
-    // Replace this with a real API call later
-    if (email === "admin@example.com" && password === "password") {
-      onLoginSuccess(email); // Call the function passed from the parent page
+    // --- MODIFIED: MOCK LOGIN CHECK ---
+    // Find admin by email in the mock data
+    const adminUser = mockDataInstance.admins.find(
+      (admin) => admin.email === email
+    );
+
+    // Check if admin exists and password matches (MOCK check, replace with secure hash comparison)
+    if (adminUser && adminUser.passwordHash === password) {
+      // ADDED: Check if the admin account is active
+      if (!adminUser.isActive) {
+        setError("This admin account is inactive. Please contact support.");
+        return; // Stop login process
+      }
+
+      // ADDED: Store admin email in localStorage upon successful login
+      try {
+        localStorage.setItem(ADMIN_EMAIL_STORAGE_KEY, adminUser.email);
+        console.log("Admin email stored in localStorage:", adminUser.email);
+      } catch (storageError) {
+        console.error("Failed to save admin email to localStorage:", storageError);
+        // Optionally inform the user or handle appropriately
+        setError("Login failed: Could not save session information.");
+        return;
+      }
+
+      onLoginSuccess(adminUser.email); // Call the function passed from the parent page
     } else {
       setError("Invalid admin credentials.");
     }
-    // --- END MOCK LOGIN CHECK ---
+    // --- END MODIFIED MOCK LOGIN CHECK ---
   };
 
   return (

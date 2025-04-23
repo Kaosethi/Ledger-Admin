@@ -1,18 +1,24 @@
 // src/components/modals/MerchantDetailModal.tsx
-import React from 'react';
-import type { Merchant, Transaction } from '@/lib/mockData';
-import { formatDate, renderStatusBadge } from '@/lib/utils'; // Removed unused formatDdMmYyyy
+// MODIFIED: Changed onRequestConfirm prop type to AllowedModalAction
 
-// ADDED: Define action types that can be requested
-export type MerchantActionType = 'approve' | 'reject' | 'suspend' | 'reactivate';
+import React from 'react';
+import type { Merchant, Transaction, MerchantStatus } from '@/lib/mockData';
+import { formatDate, renderStatusBadge } from '@/lib/utils';
+
+// Type for all possible actions (even if not all used by this modal)
+export type MerchantActionType = 'approve' | 'reject' | 'suspend' | 'reactivate' | 'deactivate';
+
+// MODIFIED: Define allowed actions for this modal's buttons *within this file*
+type AllowedModalAction = Exclude<MerchantActionType, 'deactivate'>;
+
 
 interface MerchantDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   merchant: Merchant | null;
   transactions: Transaction[];
-  // MODIFIED: Removed onSave and logAdminActivity, added onRequestConfirm
-  onRequestConfirm: (actionType: MerchantActionType, merchant: Merchant) => void;
+  // MODIFIED: Changed prop type to use the more specific AllowedModalAction
+  onRequestConfirm: (actionType: AllowedModalAction, merchant: Merchant) => void;
 }
 
 const MerchantDetailModal: React.FC<MerchantDetailModalProps> = ({
@@ -20,36 +26,39 @@ const MerchantDetailModal: React.FC<MerchantDetailModalProps> = ({
   onClose,
   merchant,
   transactions,
-  onRequestConfirm, // Destructure new prop
+  onRequestConfirm, // This prop now expects the more specific type
 }) => {
   if (!isOpen || !merchant) {
     return null;
   }
 
-  const approvedTransactionsCount = transactions.filter(
-    tx => tx.merchantId === merchant.id && tx.status === 'Approved'
+  const completedTransactionsCount = transactions.filter(
+    tx => tx.merchantId === merchant.id && tx.status === 'Completed'
   ).length;
 
-  // REMOVED: handleStatusToggle function, as actions are now requested
 
   // --- Button Rendering Logic ---
 
-  // Renders Approve/Reject buttons for pending merchants
   const renderApplicationActionButtons = () => {
-    if (merchant.status !== 'pending_approval') return null;
+    if (merchant.status !== 'Pending') return null;
+    // Define actions with the restricted type for clarity inside the function
+    const actionApprove: AllowedModalAction = 'approve';
+    const actionReject: AllowedModalAction = 'reject';
 
     return (
         <div className="pt-5 mt-5 border-t border-gray-200">
             <h4 className="text-base font-semibold text-gray-800 mb-3">Application Actions</h4>
             <div className="flex space-x-3">
                  <button
-                    onClick={() => onRequestConfirm('approve', merchant)}
+                    // Call prop with the correct type
+                    onClick={() => onRequestConfirm(actionApprove, merchant)}
                     className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition duration-150 ease-in-out"
                 >
                     Approve Application
                 </button>
                  <button
-                    onClick={() => onRequestConfirm('reject', merchant)}
+                    // Call prop with the correct type
+                    onClick={() => onRequestConfirm(actionReject, merchant)}
                     className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition duration-150 ease-in-out"
                 >
                     Reject Application
@@ -59,31 +68,45 @@ const MerchantDetailModal: React.FC<MerchantDetailModalProps> = ({
     );
   }
 
-  // Renders Suspend/Reactivate buttons for active/suspended merchants
   const renderStatusActionButtons = () => {
-    let buttonConfig: { text: string; action: MerchantActionType; variant: 'danger' | 'success' } | null = null;
+    let actionButtons: React.ReactNode[] = [];
+    // Define actions with the restricted type for clarity inside the function
+    const actionSuspend: AllowedModalAction = 'suspend';
+    const actionReactivate: AllowedModalAction = 'reactivate';
 
-    if (merchant.status === 'active') {
-      buttonConfig = { text: 'Suspend Merchant', action: 'suspend', variant: 'danger' };
-    } else if (merchant.status === 'suspended') {
-      buttonConfig = { text: 'Reactivate Merchant', action: 'reactivate', variant: 'success' };
+    if (merchant.status === 'Active') {
+      actionButtons.push(
+        <button
+            key="suspend"
+            // Call prop with the correct type
+            onClick={() => onRequestConfirm(actionSuspend, merchant)}
+            className={`w-full px-4 py-2 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition duration-150 ease-in-out bg-yellow-500 hover:bg-yellow-600 focus:ring-yellow-400`}
+        >
+            Suspend Merchant
+        </button>
+      );
+      // Deactivate button is removed
+    } else if (merchant.status === 'Suspended' || merchant.status === 'Inactive') {
+       actionButtons.push(
+        <button
+            key="reactivate"
+             // Call prop with the correct type
+            onClick={() => onRequestConfirm(actionReactivate, merchant)}
+            className={`w-full px-4 py-2 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition duration-150 ease-in-out bg-blue-600 hover:bg-blue-700 focus:ring-blue-500`}
+        >
+            Reactivate Merchant
+        </button>
+      );
     }
 
-    if (!buttonConfig) return null; // No button for pending/rejected in this section
-
-    const buttonClass = buttonConfig.variant === 'danger'
-        ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
-        : 'bg-green-600 hover:bg-green-700 focus:ring-green-500';
+    if (actionButtons.length === 0) return null;
 
     return (
          <div className="pt-5 mt-5 border-t border-gray-200">
             <h4 className="text-base font-semibold text-gray-800 mb-3">Merchant Status Actions</h4>
-            <button
-                onClick={() => onRequestConfirm(buttonConfig!.action, merchant)}
-                className={`w-full mt-1 mb-2 px-4 py-2 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition duration-150 ease-in-out ${buttonClass}`}
-            >
-                {buttonConfig.text}
-            </button>
+             <div className="space-y-2">
+                {actionButtons}
+             </div>
          </div>
     );
   };
@@ -104,7 +127,7 @@ const MerchantDetailModal: React.FC<MerchantDetailModalProps> = ({
             isOpen ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
           }`}
         >
-          {/* Modal Header (Unchanged) */}
+          {/* Modal Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
             <h3 className="text-lg font-medium text-gray-900" id="merchant-details-title">
               Merchant Details
@@ -122,58 +145,27 @@ const MerchantDetailModal: React.FC<MerchantDetailModalProps> = ({
 
           {/* Modal Body */}
           <div className="px-8 py-6 space-y-5">
-            {/* Merchant Information Section (Unchanged - using previous spacing improvements) */}
             <h4 className="text-base font-semibold text-gray-800 mb-4">Merchant Information</h4>
             <div className="text-sm space-y-3 text-gray-600">
-              <div className="flex justify-between border-b pb-2">
-                <span className="font-medium text-gray-500 w-1/3">Merchant ID</span>
-                <span className="font-mono text-right w-2/3">{merchant.id}</span>
-              </div>
-              <div className="flex justify-between border-b pb-2">
-                <span className="font-medium text-gray-500 w-1/3">Store Name</span>
-                <span className="text-right w-2/3">{merchant.businessName}</span>
-              </div>
-               <div className="flex justify-between border-b pb-2">
-                <span className="font-medium text-gray-500 w-1/3">Contact Person</span>
-                <span className="text-right w-2/3">{merchant.contactPerson || 'N/A'}</span>
-              </div>
-               <div className="flex justify-between border-b pb-2">
-                <span className="font-medium text-gray-500 w-1/3">Contact Email</span>
-                <a href={`mailto:${merchant.contactEmail}`} className="text-primary hover:underline text-right w-2/3 truncate">{merchant.contactEmail}</a>
-              </div>
-               <div className="flex justify-between border-b pb-2">
-                <span className="font-medium text-gray-500 w-1/3">Contact Phone</span>
-                <span className="text-right w-2/3">{merchant.contactPhone || 'N/A'}</span>
-              </div>
-               <div className="flex justify-between border-b pb-2">
-                <span className="font-medium text-gray-500 w-1/3">Store Address</span>
-                <span className="text-right w-2/3">{merchant.storeAddress || 'N/A'}</span>
-              </div>
-              <div className="flex justify-between border-b pb-2 items-center">
-                 <span className="font-medium text-gray-500 w-1/3">Status</span>
-                 <div className="text-right w-2/3">{renderStatusBadge(merchant.status, 'merchant')}</div>
-              </div>
-              <div className="flex justify-between border-b pb-2">
-                <span className="font-medium text-gray-500 w-1/3">Application Submitted</span>
-                <span className="text-right w-2/3">{formatDate(merchant.submittedAt) || 'N/A'}</span>
-              </div>
-              <div className="flex justify-between border-b pb-2">
-                <span className="font-medium text-gray-500 w-1/3">Last Updated</span>
-                 <span className="text-right w-2/3">{formatDate(merchant.updatedAt) || 'N/A'}</span>
-              </div>
-               <div className="flex justify-between pt-1">
-                <span className="font-medium text-gray-500 w-1/3">Approved Transactions</span>
-                <span className="text-right w-2/3">{approvedTransactionsCount}</span>
-              </div>
+              {/* Fields */}
+              <div className="flex justify-between border-b pb-2"> <span className="font-medium text-gray-500 w-1/3">Merchant ID</span> <span className="font-mono text-right w-2/3">{merchant.id}</span> </div>
+              <div className="flex justify-between border-b pb-2"> <span className="font-medium text-gray-500 w-1/3">Merchant Name</span> <span className="text-right w-2/3">{merchant.name}</span> </div>
+              <div className="flex justify-between border-b pb-2"> <span className="font-medium text-gray-500 w-1/3">Location</span> <span className="text-right w-2/3">{merchant.location || 'N/A'}</span> </div>
+              <div className="flex justify-between border-b pb-2"> <span className="font-medium text-gray-500 w-1/3">Category</span> <span className="text-right w-2/3">{merchant.category || 'N/A'}</span> </div>
+              <div className="flex justify-between border-b pb-2"> <span className="font-medium text-gray-500 w-1/3">Contact Email</span> {merchant.contactEmail ? (<a href={`mailto:${merchant.contactEmail}`} className="text-primary hover:underline text-right w-2/3 truncate">{merchant.contactEmail}</a>) : (<span className="text-right w-2/3">N/A</span>)} </div>
+              <div className="flex justify-between border-b pb-2 items-center"> <span className="font-medium text-gray-500 w-1/3">Status</span> <div className="text-right w-2/3">{renderStatusBadge(merchant.status, 'merchant')}</div> </div>
+              <div className="flex justify-between border-b pb-2"> <span className="font-medium text-gray-500 w-1/3">Submitted / Created</span> <span className="text-right w-2/3">{formatDate(merchant.submittedAt) || 'N/A'}</span> </div>
+              <div className="flex justify-between border-b pb-2"> <span className="font-medium text-gray-500 w-1/3">Last Updated</span> <span className="text-right w-2/3">{formatDate(merchant.updatedAt) || 'N/A'}</span> </div>
+              <div className="flex justify-between pt-1"> <span className="font-medium text-gray-500 w-1/3">Completed Transactions</span> <span className="text-right w-2/3">{completedTransactionsCount}</span> </div>
             </div>
 
-            {/* MODIFIED: Render action buttons based on status */}
+            {/* Render action buttons based on status */}
             {renderApplicationActionButtons()}
             {renderStatusActionButtons()}
 
           </div>
 
-          {/* Modal Footer (Unchanged) */}
+          {/* Modal Footer */}
           <div className="px-8 py-4 bg-gray-50 flex justify-end border-t border-gray-200">
             <button
               type="button"
