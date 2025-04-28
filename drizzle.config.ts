@@ -1,4 +1,5 @@
 import * as dotenv from "dotenv";
+import { defineConfig } from "drizzle-kit";
 
 dotenv.config();
 
@@ -8,19 +9,11 @@ if (!process.env.DATABASE_URL) {
 
 console.log(process.env.DATABASE_URL);
 
-const config = {
+export default defineConfig({
   schema: "./src/lib/db/schema.ts",
   out: "./src/lib/db/migrations",
   dialect: "postgresql",
   dbCredentials: {
     url: process.env.DATABASE_URL,
   },
-  studio: {
-    url: process.env.DATABASE_URL,
-  },
-  push: {
-    url: process.env.DATABASE_URL,
-  },
-};
-
-export default config;
+});

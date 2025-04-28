@@ -1,6 +1,6 @@
 {
-  "id": "e5e3ca18-3a30-42f5-af9b-ceba7c7bc842",
-  "prevId": "34e665b6-2f02-4a5b-b1b9-fae0fb647028",
+  "id": "34e665b6-2f02-4a5b-b1b9-fae0fb647028",
+  "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -285,7 +285,7 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true,
-          "default": "'pending_approval'"
+          "default": "'Pending'"
         },
         "submitted_at": {
           "name": "submitted_at",
@@ -455,10 +455,10 @@
       "name": "merchant_status",
       "schema": "public",
       "values": [
-        "pending_approval",
-        "active",
-        "rejected",
-        "suspended"
+        "Pending",
+        "Active",
+        "Suspended",
+        "Rejected"
       ]
     },
     "public.transaction_status": {

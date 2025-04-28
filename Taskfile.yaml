@@ -2,7 +2,8 @@ version: "3"
 
 vars:
   NODE_ENV: development
-  DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/ledger"
+  DATABASE_URL: "postgresql://username:password@localhost:5432/ledger"
+  NODE_TLS_REJECT_UNAUTHORIZED: 0
 
 tasks:
   default:
@@ -69,6 +70,7 @@ tasks:
       - bun run db:push
     env:
       DATABASE_URL: "{{.DATABASE_URL}}"
+      NODE_TLS_REJECT_UNAUTHORIZED: 0
     desc: Push schema changes to the database
 
   db:studio:

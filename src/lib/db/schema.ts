@@ -17,7 +17,6 @@ import { relations } from "drizzle-orm";
 export const accountStatusEnum = pgEnum("account_status", [
   "Active",
   "Inactive",
-  "Pending",
   "Suspended",
 ]);
 export const merchantStatusEnum = pgEnum("merchant_status", [
@@ -27,12 +26,15 @@ export const merchantStatusEnum = pgEnum("merchant_status", [
   "suspended",
 ]);
 export const transactionStatusEnum = pgEnum("transaction_status", [
-  "Approved",
+  "Completed",
+  "Pending",
+  "Failed",
   "Declined",
 ]);
 export const transactionTypeEnum = pgEnum("transaction_type", [
   "Debit",
   "Credit",
+  "Adjustment",
 ]);
 
 // Define the administrators table
@@ -47,32 +49,37 @@ export const administrators = pgTable("administrators", {
 // Define the accounts table
 export const accounts = pgTable("accounts", {
   id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  guardianName: text("guardian_name"),
-  status: accountStatusEnum("status").default("Pending").notNull(),
+  childName: text("child_name").notNull(),
+  guardianName: text("guardian_name").notNull(),
+  status: accountStatusEnum("status").default("Active").notNull(),
   balance: numeric("balance", { precision: 10, scale: 2 })
     .default("0.00")
     .notNull(),
   hashedPin: text("hashed_pin"),
-  lastTransactionAt: timestamp("last_transaction_at"),
+  lastActivity: timestamp("last_activity").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  currentQrToken: text("current_qr_token").unique(),
+  guardianDob: text("guardian_dob"),
+  guardianContact: text("guardian_contact"),
+  address: text("address"),
 });
 
 // Define the merchants table
 export const merchants = pgTable("merchants", {
   id: text("id").primaryKey(),
   businessName: text("business_name").notNull(),
-  contactPerson: text("contact_person").notNull(),
-  contactEmail: text("contact_email").notNull().unique(),
-  contactPhone: text("contact_phone").notNull(),
-  storeAddress: text("store_address").notNull(),
-  hashedPassword: text("hashed_password").notNull(),
+  contactPerson: text("contact_person"),
+  contactEmail: text("contact_email").unique(),
+  contactPhone: text("contact_phone"),
+  storeAddress: text("store_address"),
+  hashedPassword: text("hashed_password"),
   status: merchantStatusEnum("status").default("pending_approval").notNull(),
-  submittedAt: timestamp("submitted_at").defaultNow(),
+  submittedAt: timestamp("submitted_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   declineReason: text("decline_reason"),
-  pinVerified: boolean("pin_verified"),
+  pinVerified: boolean("pin_verified").default(false),
+  category: text("category"),
 });
 
 // Define the transactions table
@@ -83,20 +90,23 @@ export const transactions = pgTable("transactions", {
   type: transactionTypeEnum("type").notNull(),
   accountId: text("account_id")
     .notNull()
-    .references(() => accounts.id),
-  merchantId: text("merchant_id").references(() => merchants.id),
+    .references(() => accounts.id, { onDelete: "restrict" }),
+  merchantId: text("merchant_id").references(() => merchants.id, {
+    onDelete: "set null",
+  }),
   status: transactionStatusEnum("status").notNull(),
   declineReason: text("decline_reason"),
   pinVerified: boolean("pin_verified"),
-  previousBalance: numeric("previous_balance", { precision: 10, scale: 2 }),
-  newBalance: numeric("new_balance", { precision: 10, scale: 2 }),
+  description: text("description"),
 });
 
 // Define the admin logs table
 export const adminLogs = pgTable("admin_logs", {
-  id: text("id").primaryKey(),
+  id: uuid("id").primaryKey().defaultRandom(),
   timestamp: timestamp("timestamp").defaultNow().notNull(),
-  adminEmail: text("admin_email").references(() => administrators.email),
+  adminEmail: text("admin_email")
+    .notNull()
+    .references(() => administrators.email, { onDelete: "set null" }),
   action: text("action").notNull(),
   targetType: text("target_type"),
   targetId: text("target_id"),
@@ -169,7 +179,7 @@ export const createAccountSchema = insertAccountSchema.omit({
   createdAt: true,
   updatedAt: true,
   balance: true,
-  lastTransactionAt: true,
+  lastActivity: true,
 });
 
 export const createMerchantSchema = insertMerchantSchema
@@ -180,16 +190,15 @@ export const createMerchantSchema = insertMerchantSchema
     declineReason: true,
   })
   .extend({
-    contactEmail: z.string().email(),
-    password: z.string().min(8),
+    contactEmail: z.string().email().optional(),
+    password: z.string().min(8).optional(),
   });
 
 export const createTransactionSchema = insertTransactionSchema.omit({
   timestamp: true,
-  previousBalance: true,
-  newBalance: true,
 });
 
 export const createAdminLogSchema = insertAdminLogSchema.omit({
   timestamp: true,
+  id: true,
 });
