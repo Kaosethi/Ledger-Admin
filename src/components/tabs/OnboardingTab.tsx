@@ -62,7 +62,7 @@ const OnboardingTab: React.FC<OnboardingTabProps> = ({
   // --- react-to-print hook ---
   const handlePrintQr = useReactToPrint({
     // Assuming the 'content' error (TS2353) might resolve after fixing usage, or requires @ts-ignore
-    // @ts-ignore - If TS2353 persists, uncomment this line to suppress the known type issue.
+    // @ts-expect-error - If TS2353 persists, uncomment this line to suppress the known type issue.
     content: () => qrCodeRef.current,
     documentTitle: `QRCode-${accountId || 'NewAccount'}`,
     onAfterPrint: () => { if (accountId) logAdminActivity("Print QR Code", "Account (Onboarding)", accountId, `Printed QR for ${childName || "N/A"}`); }
@@ -117,13 +117,13 @@ const OnboardingTab: React.FC<OnboardingTabProps> = ({
           {/* Left Column (Guardian/Child Info) */}
           <div className="space-y-4">
              {/* Guardian/Child Fields ... */}
-             <h3 className="text-lg font-medium text-gray-800 border-b pb-2">Guardian's Information</h3>
-              <div><label htmlFor="guardian-name" className="block text-sm font-medium text-gray-700">Guardian's Full Name</label><input type="text" id="guardian-name" required className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:outline-none focus:ring-primary focus:border-primary placeholder-gray-400" placeholder="Guardian's Full Name" value={guardianName} onChange={(e) => setGuardianName(e.target.value)}/></div>
-              <div><label htmlFor="guardian-dob" className="block text-sm font-medium text-gray-700">Guardian's Date of Birth</label><input type="date" id="guardian-dob" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:outline-none focus:ring-primary focus:border-primary placeholder-gray-400" value={guardianDob} onChange={(e) => setGuardianDob(e.target.value)}/></div>
-              <div><label htmlFor="guardian-contact" className="block text-sm font-medium text-gray-700">Guardian's Contact Number</label><input type="tel" id="guardian-contact" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:outline-none focus:ring-primary focus:border-primary placeholder-gray-400" placeholder="Contact number" value={guardianContact} onChange={(e) => setGuardianContact(e.target.value)}/></div>
+             <h3 className="text-lg font-medium text-gray-800 border-b pb-2">Guardian&apos;s Information</h3>
+              <div><label htmlFor="guardian-name" className="block text-sm font-medium text-gray-700">Guardian&apos;s Full Name</label><input type="text" id="guardian-name" required className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:outline-none focus:ring-primary focus:border-primary placeholder-gray-400" placeholder="Guardian&apos;s Full Name" value={guardianName} onChange={(e) => setGuardianName(e.target.value)}/></div>
+              <div><label htmlFor="guardian-dob" className="block text-sm font-medium text-gray-700">Guardian&apos;s Date of Birth</label><input type="date" id="guardian-dob" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:outline-none focus:ring-primary focus:border-primary placeholder-gray-400" value={guardianDob} onChange={(e) => setGuardianDob(e.target.value)}/></div>
+              <div><label htmlFor="guardian-contact" className="block text-sm font-medium text-gray-700">Guardian&apos;s Contact Number</label><input type="tel" id="guardian-contact" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:outline-none focus:ring-primary focus:border-primary placeholder-gray-400" placeholder="Contact number" value={guardianContact} onChange={(e) => setGuardianContact(e.target.value)}/></div>
               <div><label htmlFor="guardian-address" className="block text-sm font-medium text-gray-700">Address</label><textarea id="guardian-address" rows={3} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:outline-none focus:ring-primary focus:border-primary placeholder-gray-400" placeholder="Enter address" value={guardianAddress} onChange={(e) => setGuardianAddress(e.target.value)}></textarea></div>
-             <h3 className="text-lg font-medium text-gray-800 border-b pb-2 pt-4">Child's Information</h3>
-             <div><label htmlFor="child-name" className="block text-sm font-medium text-gray-700">Child's Full Name</label><input type="text" id="child-name" required className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:outline-none focus:ring-primary focus:border-primary placeholder-gray-400" placeholder="Child's Full Name" value={childName} onChange={(e) => setChildName(e.target.value)}/></div>
+             <h3 className="text-lg font-medium text-gray-800 border-b pb-2 pt-4">Child&apos;s Information</h3>
+             <div><label htmlFor="child-name" className="block text-sm font-medium text-gray-700">Child&apos;s Full Name</label><input type="text" id="child-name" required className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:outline-none focus:ring-primary focus:border-primary placeholder-gray-400" placeholder="Child's Full Name" value={childName} onChange={(e) => setChildName(e.target.value)}/></div>
           </div>
           {/* Right Column (Account Setup/QR) */}
           <div className="space-y-4">
@@ -163,7 +163,7 @@ const OnboardingTab: React.FC<OnboardingTabProps> = ({
                   </div>
                   <div className="space-y-1 text-center mt-3">
                     <p className="text-sm text-gray-600">Account ID: <span className="font-medium text-gray-800 break-all">{accountId}</span></p>
-                    <p className="text-sm text-gray-600">Child's Name: <span className="font-medium text-gray-800">{childName || "N/A"}</span></p>
+                    <p className="text-sm text-gray-600">Child&apos;s Name: <span className="font-medium text-gray-800">{childName || "N/A"}</span></p>
                     <p className="text-sm text-gray-600">Guardian: <span className="font-medium text-gray-800">{guardianName || "N/A"}</span></p>
                     <p className="text-sm text-gray-600">Initial Balance: <span className="font-medium text-gray-800">${(initialBalanceStr === "" ? 0 : parseFloat(initialBalanceStr) || 0).toFixed(2)}</span></p>
                     <button

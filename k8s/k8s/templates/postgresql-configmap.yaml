@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgresql-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: postgresql
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+data:
+  postgresql.conf: |-
+    # DB Version: 17
+    # OS Type: linux
+    # DB Type: web
+    # Total Memory (RAM): 1 GB
+    # CPUs num: 2
+    # Connections num: 100
+    
+    listen_addresses = '*'
+    max_connections = 100
+    shared_buffers = 128MB
+    effective_cache_size = 512MB
+    maintenance_work_mem = 64MB
+    checkpoint_completion_target = 0.9
+    wal_buffers = 4MB
+    default_statistics_target = 100
+    random_page_cost = 1.1
+    effective_io_concurrency = 200
+    work_mem = 1310kB
+    min_wal_size = 1GB
+    max_wal_size = 4GB
+    max_worker_processes = 2
+    max_parallel_workers_per_gather = 1
+    max_parallel_workers = 2
+    max_parallel_maintenance_workers = 1
+
+  pg_hba.conf: |-
+    # TYPE  DATABASE        USER            ADDRESS                 METHOD
+    local   all             all                                     trust
+    host    all             all             127.0.0.1/32            trust
+    host    all             all             ::1/128                 trust
+    host    all             all             0.0.0.0/0               md5 

@@ -1,0 +1,18 @@
+Database Credentials and Connection Details
+Redis
+Username: default (not explicitly set)
+Password: redispass
+Service URL: redis.invgen-dev.svc.cluster.local:6379
+Connection String: redis://:redispass@redis.invgen-dev.svc.cluster.local:6379
+Headless Service: redis-headless.invgen-dev.svc.cluster.local (for StatefulSet direct pod access)
+PostgreSQL
+Username: devuser
+Password: devpasswd
+Database: invoice_gen_dev
+Service URL: postgresql.invgen-dev.svc.cluster.local:5432
+Connection String: postgres://devuser:devpasswd@postgresql.invgen-dev.svc.cluster.local:5432/invoice_gen_dev?sslmode=disable
+Both services are running successfully as StatefulSets:
+PostgreSQL StatefulSet: postgresql (1/1 ready)
+Redis StatefulSet: redis-master (1/1 ready)
+These services are accessible only from within the Kubernetes cluster using the cluster DNS names shown above.
+
