@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/lib/auth/config";
 import { createJWT } from "@/lib/auth/jwt";
+import { cookies } from "next/headers";
+import { SignJWT } from "jose";
+import { db } from "@/lib/db";
+import { administrators } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+import mockDataInstance from "@/lib/mockData";
 
 // Authentication schema for login
 const loginSchema = z.object({
@@ -17,84 +23,98 @@ const TEST_PASSWORD = "password";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    const { email, password } = body;
 
-    // Validate the request body
-    const result = loginSchema.safeParse(body);
-    if (!result.success) {
+    if (!email || !password) {
       return NextResponse.json(
-        { error: "Invalid request body" },
+        { error: "Email and password are required" },
         { status: 400 }
       );
     }
 
-    const { email, password } = result.data;
+    // First try to authenticate against the database
+    let admin;
+    try {
+      admin = await db
+        .select()
+        .from(administrators)
+        .where(eq(administrators.email, email))
+        .limit(1);
 
-    // Test bypass for development
-    let loginResult;
-    if (email === TEST_EMAIL && password === TEST_PASSWORD) {
-      console.log("Using test bypass for authentication");
-      loginResult = {
-        success: true,
-        user: {
-          id: "test-admin-id",
-          email: TEST_EMAIL,
-          role: "admin",
-        },
-      };
-    } else {
-      // Regular authentication using Better Auth
-      loginResult = await auth.emailAndPassword.login({
-        email,
-        password,
-      });
+      if (admin && admin.length > 0) {
+        const adminUser = admin[0];
+        // In a real app, you would use a proper password comparison
+        // e.g., const isPasswordValid = await bcrypt.compare(password, adminUser.passwordHash);
+        const isPasswordValid = adminUser.passwordHash === password; // Simplified for demo
+
+        if (!isPasswordValid) {
+          return NextResponse.json(
+            { error: "Invalid credentials" },
+            { status: 401 }
+          );
+        }
+      }
+    } catch (dbError) {
+      console.warn(
+        "Database error, falling back to mock authentication:",
+        dbError
+      );
+      admin = null;
     }
 
-    if (!loginResult.success) {
-      return NextResponse.json(
-        { error: loginResult.error || "Authentication failed" },
-        { status: 401 }
+    // If no admin found in DB or DB error occurred, check mock data
+    if (!admin || admin.length === 0) {
+      const mockAdmin = mockDataInstance.admins.find(
+        (a) => a.email === email && a.passwordHash === password
       );
-    }
 
-    // Check if user object exists
-    if (!loginResult.user) {
-      return NextResponse.json(
-        { error: "Authentication succeeded but user data is missing" },
-        { status: 500 }
-      );
+      if (!mockAdmin) {
+        return NextResponse.json(
+          { error: "Invalid credentials" },
+          { status: 401 }
+        );
+      }
+
+      admin = [mockAdmin];
     }
 
     // Create a JWT token
-    const token = await createJWT({
-      sub: loginResult.user.id,
-      email: loginResult.user.email,
-      role: loginResult.user.role,
-    });
+    const jwtSecret =
+      process.env.JWT_SECRET || "default-mock-secret-do-not-use-in-production";
+    const token = await new SignJWT({
+      id: admin[0].id,
+      email: admin[0].email,
+      role: admin[0].role || "Admin", // Default role if not specified
+    })
+      .setProtectedHeader({ alg: "HS256" })
+      .setIssuedAt()
+      .setExpirationTime("8h")
+      .sign(new TextEncoder().encode(jwtSecret));
 
-    // Create the response
-    const response = NextResponse.json({
-      message: "Login successful",
-      user: {
-        id: loginResult.user.id,
-        email: loginResult.user.email,
-        role: loginResult.user.role,
-      },
-    });
-
-    // Set the JWT token as a cookie
-    response.cookies.set({
+    // Set cookie
+    cookies().set({
       name: "auth-token",
       value: token,
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
       path: "/",
-      maxAge: 60 * 60 * 12, // 12 hours
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 8, // 8 hours
     });
 
-    return response;
+    return NextResponse.json({
+      message: "Logged in successfully",
+      user: {
+        id: admin[0].id,
+        email: admin[0].email,
+        name: admin[0].name,
+        role: admin[0].role || "Admin",
+      },
+    });
   } catch (error) {
-    console.error("Error during login:", error);
-    return NextResponse.json({ error: "Failed to login" }, { status: 500 });
+    console.error("Login error:", error);
+    return NextResponse.json(
+      { error: "An error occurred during login" },
+      { status: 500 }
+    );
   }
 }
