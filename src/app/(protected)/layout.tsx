@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Navbar from "@/components/Navbar";
-import Link from "next/link";
 
 export default function ProtectedLayout({
   children,
@@ -14,6 +13,53 @@ export default function ProtectedLayout({
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
+
+  // Determine active tab based on current pathname
+  const getActiveTabId = (path: string) => {
+    if (path.includes("/dashboard")) return "dashboard-tab";
+    if (path.includes("/accounts")) return "accounts-tab";
+    if (path.includes("/merchants")) return "merchants-tab";
+    if (path.includes("/transactions")) return "transactions-tab";
+    if (path.includes("/onboarding")) return "onboarding-tab";
+    if (path.includes("/activity-log")) return "activity-log-tab";
+    return "dashboard-tab"; // Default
+  };
+
+  const [activeTab, setActiveTab] = useState(getActiveTabId(pathname));
+
+  // Effect to update active tab when path changes
+  useEffect(() => {
+    setActiveTab(getActiveTabId(pathname));
+  }, [pathname]);
+
+  // Handle tab navigation
+  const handleTabChange = (tabId: string) => {
+    setActiveTab(tabId);
+
+    // Navigate to the corresponding path
+    switch (tabId) {
+      case "dashboard-tab":
+        router.push("/dashboard");
+        break;
+      case "accounts-tab":
+        router.push("/accounts");
+        break;
+      case "merchants-tab":
+        router.push("/merchants");
+        break;
+      case "transactions-tab":
+        router.push("/transactions");
+        break;
+      case "onboarding-tab":
+        router.push("/onboarding");
+        break;
+      case "activity-log-tab":
+        router.push("/activity-log");
+        break;
+      default:
+        router.push("/dashboard");
+    }
+  };
 
   // Effect to check authentication state
   useEffect(() => {
@@ -82,45 +128,15 @@ export default function ProtectedLayout({
     );
   }
 
-  // Navigation tabs with active state based on current path
-  const tabs = [
-    { name: "Dashboard", path: "/dashboard" },
-    { name: "Accounts", path: "/accounts" },
-    { name: "Merchants", path: "/merchants" },
-    { name: "Transactions", path: "/transactions" },
-    { name: "Onboarding", path: "/onboarding" },
-    { name: "Activity Log", path: "/activity-log" },
-  ];
-
   return (
     <div className="flex flex-col min-h-screen">
-      <Navbar adminEmail={adminEmail || ""} onLogout={handleLogout} />
-
+      <Navbar
+        activeTab={activeTab}
+        setActiveTab={handleTabChange}
+        adminName={adminEmail || ""}
+        onLogout={handleLogout}
+      />
       <div className="mx-auto w-full max-w-screen-xl px-4 py-2">
-        {/* Tab Navigation */}
-        <div className="border-b mb-6">
-          <nav className="flex space-x-8" aria-label="Tabs">
-            {tabs.map((tab) => (
-              <Link
-                key={tab.path}
-                href={tab.path}
-                className={`
-                  px-3 py-2 text-sm font-medium border-b-2 -mb-px
-                  ${
-                    pathname === tab.path
-                      ? "border-primary text-primary"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  }
-                `}
-                aria-current={pathname === tab.path ? "page" : undefined}
-              >
-                {tab.name}
-              </Link>
-            ))}
-          </nav>
-        </div>
-
-        {/* Page content */}
         <main>{children}</main>
       </div>
     </div>
