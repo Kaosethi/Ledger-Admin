@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { auth } from "@/lib/auth/config";
-import { createJWT } from "@/lib/auth/jwt";
-import { cookies } from "next/headers";
 import { SignJWT } from "jose";
 import { db } from "@/lib/db";
 import { administrators } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import mockDataInstance from "@/lib/mockData";
+import mockDataInstance, { AdminUser } from "@/lib/mockData";
 
 // Authentication schema for login
 const loginSchema = z.object({
@@ -30,6 +27,44 @@ export async function POST(request: NextRequest) {
         { error: "Email and password are required" },
         { status: 400 }
       );
+    }
+
+    // Bypass authentication for test credentials
+    if (email === TEST_EMAIL && password === TEST_PASSWORD) {
+      // Create a JWT token for test user
+      const jwtSecret =
+        process.env.JWT_SECRET ||
+        "default-mock-secret-do-not-use-in-production";
+      const token = await new SignJWT({
+        sub: "test-admin-id",
+        email: TEST_EMAIL,
+        role: "Admin",
+      })
+        .setProtectedHeader({ alg: "HS256" })
+        .setIssuedAt()
+        .setExpirationTime("8h")
+        .sign(new TextEncoder().encode(jwtSecret));
+
+      const response = NextResponse.json({
+        message: "Logged in successfully (test user)",
+        user: {
+          id: "test-admin-id",
+          email: TEST_EMAIL,
+          name: "Test Administrator",
+          role: "Admin",
+        },
+      });
+
+      response.cookies.set({
+        name: "auth-token",
+        value: token,
+        httpOnly: true,
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 60 * 60 * 8, // 8 hours
+      });
+
+      return response;
     }
 
     // First try to authenticate against the database
@@ -82,17 +117,28 @@ export async function POST(request: NextRequest) {
     const jwtSecret =
       process.env.JWT_SECRET || "default-mock-secret-do-not-use-in-production";
     const token = await new SignJWT({
-      id: admin[0].id,
+      sub: String(admin[0].id),
       email: admin[0].email,
-      role: admin[0].role || "Admin", // Default role if not specified
+      role: (admin[0] as AdminUser).role || "Admin", // Cast to AdminUser type for mock data
     })
       .setProtectedHeader({ alg: "HS256" })
       .setIssuedAt()
       .setExpirationTime("8h")
       .sign(new TextEncoder().encode(jwtSecret));
 
-    // Set cookie
-    cookies().set({
+    // Create the response with JSON data
+    const response = NextResponse.json({
+      message: "Logged in successfully",
+      user: {
+        id: admin[0].id,
+        email: admin[0].email,
+        name: (admin[0] as AdminUser).name || "Administrator",
+        role: (admin[0] as AdminUser).role || "Admin",
+      },
+    });
+
+    // Set cookie directly on the response
+    response.cookies.set({
       name: "auth-token",
       value: token,
       httpOnly: true,
@@ -101,15 +147,7 @@ export async function POST(request: NextRequest) {
       maxAge: 60 * 60 * 8, // 8 hours
     });
 
-    return NextResponse.json({
-      message: "Logged in successfully",
-      user: {
-        id: admin[0].id,
-        email: admin[0].email,
-        name: admin[0].name,
-        role: admin[0].role || "Admin",
-      },
-    });
+    return response;
   } catch (error) {
     console.error("Login error:", error);
     return NextResponse.json(

@@ -140,7 +140,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
 
   // --- Component Render ---
   return (
-    <div className="bg-gray-100 p-6 lg:p-8 rounded-lg space-y-8">
+    <div className="bg-white p-6 rounded-lg shadow-md">
       {/* Header section */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>

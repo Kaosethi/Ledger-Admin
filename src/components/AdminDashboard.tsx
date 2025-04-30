@@ -243,17 +243,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // --- Component Render ---
   return (
-    // <div className="flex flex-col min-h-screen bg-gray-100">
-    //   <Navbar
-    //     activeTab={activeTab}
-    //     setActiveTab={setActiveTab}
-    //     adminName={adminEmail} // Pass the email to Navbar for display
-    //     onLogout={handleLogout} // Pass the enhanced logout handler
-    //   />
-    //   <main className="flex-1 p-4 sm:p-6 lg:p-8">
-    //      {renderTabContent()}
-    //   </main>
-    // </div>
+    <div className="">
+      
+      <main className="flex-1 p-4 sm:p-6 lg:p-8">
+         {renderTabContent()}
+      </main>
+    </div>
   );
 };
 
