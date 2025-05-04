@@ -45,11 +45,15 @@ import {
   Sector,
   Label as RechartsLabel,
 } from "recharts";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface DashboardTabProps {
   accounts: Account[];
   merchants: Merchant[];
   transactions: Transaction[];
+  accountsLoading?: boolean;
+  merchantsLoading?: boolean;
+  transactionsLoading?: boolean;
 }
 
 // Define colors for Pie chart segments (using actual status values)
@@ -67,6 +71,9 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
   accounts = [],
   merchants = [],
   transactions = [],
+  accountsLoading = false,
+  merchantsLoading = false,
+  transactionsLoading = false,
 }) => {
   // Changed state to handle Date objects
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
@@ -283,9 +290,13 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div id="db-total-accounts" className="text-2xl font-bold">
-              {totalAccounts}
-            </div>
+            {accountsLoading ? (
+              <Skeleton className="h-8 w-16 mb-2" />
+            ) : (
+              <div id="db-total-accounts" className="text-2xl font-bold">
+                {totalAccounts}
+              </div>
+            )}
             <p className="text-xs text-muted-foreground">
               Total registered accounts
             </p>
@@ -301,9 +312,13 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
             <Building className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div id="db-active-merchants" className="text-2xl font-bold">
-              {activeMerchants}
-            </div>
+            {merchantsLoading ? (
+              <Skeleton className="h-8 w-16 mb-2" />
+            ) : (
+              <div id="db-active-merchants" className="text-2xl font-bold">
+                {activeMerchants}
+              </div>
+            )}
             <p className="text-xs text-muted-foreground">
               Ready to process transactions
             </p>
@@ -319,9 +334,13 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div id="db-pending-merchants" className="text-2xl font-bold">
-              {pendingMerchants}
-            </div>
+            {merchantsLoading ? (
+              <Skeleton className="h-8 w-16 mb-2" />
+            ) : (
+              <div id="db-pending-merchants" className="text-2xl font-bold">
+                {pendingMerchants}
+              </div>
+            )}
             <p className="text-xs text-muted-foreground">
               Applications awaiting approval
             </p>
@@ -335,9 +354,13 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div id="db-total-transactions" className="text-2xl font-bold">
-              {totalTxCount}
-            </div>
+            {transactionsLoading ? (
+              <Skeleton className="h-8 w-16 mb-2" />
+            ) : (
+              <div id="db-total-transactions" className="text-2xl font-bold">
+                {totalTxCount}
+              </div>
+            )}
             <p className="text-xs text-muted-foreground">
               Total (All Statuses)
             </p>
@@ -354,9 +377,13 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div id="db-total-tx-value" className="text-2xl font-bold">
-              {formatCurrency(totalTxValue)}
-            </div>
+            {transactionsLoading ? (
+              <Skeleton className="h-8 w-24 mb-2" />
+            ) : (
+              <div id="db-total-tx-value" className="text-2xl font-bold">
+                {formatCurrency(totalTxValue)}
+              </div>
+            )}
             <p className="text-xs text-muted-foreground">
               Sum of completed transactions
             </p>
@@ -374,9 +401,13 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
             {/* Used Hash for Average */}
           </CardHeader>
           <CardContent>
-            <div id="db-avg-tx-value" className="text-2xl font-bold">
-              {formatCurrency(avgTxValue)}
-            </div>
+            {transactionsLoading ? (
+              <Skeleton className="h-8 w-24 mb-2" />
+            ) : (
+              <div id="db-avg-tx-value" className="text-2xl font-bold">
+                {formatCurrency(avgTxValue)}
+              </div>
+            )}
             <p className="text-xs text-muted-foreground">
               Average completed transaction
             </p>
@@ -401,7 +432,9 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
           <CardContent className="pl-2 pr-4 pb-4">
             {" "}
             {/* Adjust padding for chart */}
-            {transactionsPerDay.length > 0 ? (
+            {transactionsLoading ? (
+              <Skeleton className="h-[300px] w-full" />
+            ) : transactionsPerDay.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
                 {/* LineChart Definition (styles inside chart might need further tweaking) */}
                 <LineChart
@@ -485,7 +518,9 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
           <CardContent className="flex-grow flex items-center justify-center pb-4">
             {" "}
             {/* Adjust padding and ensure centering */}
-            {accountStatusData.length > 0 ? (
+            {accountsLoading ? (
+              <Skeleton className="h-[300px] w-full" />
+            ) : accountStatusData.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
                 {/* PieChart Definition (styles inside chart might need further tweaking) */}
                 <PieChart>

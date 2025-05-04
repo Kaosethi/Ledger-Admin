@@ -42,13 +42,68 @@ Ledger-Admin is a Next.js web application designed to serve as an administrative
 
 ### Data Model
 
-The application manages several key entities:
+The application uses a PostgreSQL database with Drizzle ORM, featuring a robust schema with:
 
 1. **Administrators** - Users with access to the admin dashboard
+
+   - UUID-based primary keys
+   - Profile information (first/last name, email)
+   - Role-based access control
+   - Password security with hashing
+   - Activity and login tracking
+   - Soft delete capability
+
 2. **Accounts** - Beneficiary accounts with balance information
+
+   - Unique display IDs for public reference
+   - Child and guardian information
+   - Balance management with precision numeric type
+   - PIN-based authentication
+   - Status control (Active/Inactive/Suspended)
+   - QR code token generation
+   - Contact details and notes
+   - Performance indexes on frequently queried fields
+   - Soft delete capability
+
 3. **Merchants** - Vendors/shops that can receive transactions
+
+   - Business profile with contact details
+   - Status workflow (pending_approval/active/rejected/suspended)
+   - Category classification
+   - Web presence tracking (website, logo)
+   - Optimized indexes for quick lookups
+   - Soft delete capability
+
 4. **Transactions** - Financial transactions between accounts and merchants
+
+   - Comprehensive transaction details
+   - Multiple transaction types (Debit/Credit/Adjustment)
+   - Status tracking (Completed/Pending/Failed/Declined)
+   - Reference codes and metadata support
+   - Extensive indexing for reporting performance
+
 5. **Admin Logs** - Audit trail of administrator activities
+
+   - Detailed tracking of all administrative actions
+   - IP address and user agent recording
+   - Categorized by action types
+   - Target entity references
+   - Optimized for security audits
+
+6. **Account Permissions** - Granular access control system
+   - Many-to-many relationship between administrators and accounts
+   - Permission-based authorization model
+   - Audit timestamps for permission grants
+
+### Database Features
+
+- **UUID Primary Keys** - All tables use UUID for security and distribution
+- **Consistent Timestamps** - Creation and update tracking across all entities
+- **Soft Delete Pattern** - Non-destructive record removal
+- **Optimized Indexes** - Performance tuning for common queries
+- **Field Validation** - Zod schema validation with detailed error messages
+- **Referential Integrity** - Enforced foreign key constraints with appropriate cascade/restrict policies
+- **Type Safety** - Comprehensive TypeScript integration with Drizzle ORM
 
 ### Key Features
 

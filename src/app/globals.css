@@ -281,3 +281,82 @@
 
 /* END OF VALID CSS RULES */
 /* DO NOT PASTE HTML OR JAVASCRIPT BELOW THIS LINE */
+
+/* Global styles for shadcn/ui components to have white background */
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+}
+
+/* Make all card components have white background by default */
+.card {
+  background-color: white !important;
+}
+
+/* Set white backgrounds for other shadcn UI components */
+.dialog-content,
+.popover-content,
+.select-content,
+.dropdown-menu-content,
+.sheet-content,
+.drawer-content,
+.command-dialog,
+.toast,
+.alert,
+.hover-card-content {
+  background-color: white !important;
+}
+
+/* For Radix components */
+[data-radix-popper-content-wrapper] {
+  background-color: white !important;
+}
+
+/* Toast specific styling - make all elements white and opaque */
+.toast {
+  background-color: white !important;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Target internal elements and related toast classes */
+[role="status"].toast,
+[data-state="open"].toast,
+[data-swipe="move"].toast,
+[data-swipe="cancel"].toast,
+[data-swipe="end"].toast,
+.toast > *,
+.toast > div,
+.toast-description,
+.toast-title {
+  background-color: white !important;
+  backdrop-filter: none !important;
+  background-image: none !important;
+  opacity: 1 !important;
+}
+
+/* Fix for the toast variant classes */
+.toast[data-variant="default"] {
+  background-color: white !important;
+  border-color: #e5e7eb;
+}
+
+.toast[data-variant="destructive"] {
+  background-color: white !important;
+  border-color: #f87171;
+}
+
+/* Target Radix-specific toast elements */
+[data-radix-toast-root],
+[data-radix-toast-title],
+[data-radix-toast-description],
+[data-radix-toast-action],
+[data-radix-toast-close] {
+  background-color: white !important;
+}
+
+/* Override any background color from element ancestors */
+.toast * {
+  background-color: transparent !important;
+}

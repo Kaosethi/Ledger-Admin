@@ -18,6 +18,7 @@ export interface AdminUser {
 // --- Account Interface ---
 export interface Account {
     id: string;
+    displayId: string;
     guardianName: string;
     childName: string;
     balance: number;
@@ -124,11 +125,11 @@ const mockDataInstance: AppData = {
         { id: 'ADM-003', email: 'inactive@example.com', passwordHash: 'test', name: 'Inactive User', role: 'Admin', isActive: false, createdAt: '2023-03-01T00:00:00Z', },
     ],
     accounts: [
-        { id: 'ACC-001', guardianName: 'Alice Wonderland', childName: 'Caterpillar Jr.', balance: 150.75, status: 'Active', createdAt: '2023-01-15T10:30:00Z', lastActivity: '2024-03-10T14:00:00Z', updatedAt: '2023-01-15T10:30:00Z', pin: '1234', qrCodeUrl: generateMockQrCodeUrl('ACC-001'), guardianDob: '1985-05-20', guardianContact: '555-1234', address: '123 Rabbit Hole Lane, Wonderland', },
-        { id: 'ACC-002', guardianName: 'Bob The Builder', childName: 'Wendy Tool', balance: 320.00, status: 'Active', createdAt: '2023-02-20T09:00:00Z', lastActivity: '2024-03-11T11:25:00Z', updatedAt: '2023-02-20T09:00:00Z', pin: '5678', qrCodeUrl: generateMockQrCodeUrl('ACC-002'), guardianDob: '1978-11-30', guardianContact: '555-5678', address: '456 Construction Way, Builderville', },
-        { id: 'ACC-003', guardianName: 'Charlie Chaplin', childName: 'Little Tramp', balance: 0.00, status: 'Inactive', createdAt: '2023-03-01T11:00:00Z', lastActivity: '2023-09-01T11:00:00Z', updatedAt: '2023-09-01T11:00:00Z', pin: '9012', qrCodeUrl: generateMockQrCodeUrl('ACC-003'), guardianDob: '1980-01-01', guardianContact: '555-9012', address: '789 Silent Film St, Hollywood', },
-        { id: 'ACC-004', guardianName: 'Diana Prince', childName: 'Steve Trevor Jr.', balance: 500.50, status: 'Active', createdAt: '2023-04-10T08:15:00Z', lastActivity: '2024-03-09T16:45:00Z', updatedAt: '2023-04-10T08:15:00Z', pin: '3456', qrCodeUrl: generateMockQrCodeUrl('ACC-004'), guardianDob: '1975-03-08', guardianContact: '555-3456', address: '1 Wonder Way, Themyscira', },
-        { id: 'ACC-005', guardianName: 'Ethan Hunt', childName: 'Benji Dunn', balance: 10.00, status: 'Suspended', createdAt: '2023-05-22T13:00:00Z', lastActivity: '2024-01-15T10:00:00Z', updatedAt: '2024-03-12T16:00:00Z', pin: '7890', qrCodeUrl: generateMockQrCodeUrl('ACC-005'), guardianDob: '1982-07-18', guardianContact: '555-7890', address: '1 Impossible Mission Ln, Langley', }
+        { id: 'ACC-001', displayId: 'ACC-001', guardianName: 'Alice Wonderland', childName: 'Caterpillar Jr.', balance: 150.75, status: 'Active', createdAt: '2023-01-15T10:30:00Z', lastActivity: '2024-03-10T14:00:00Z', updatedAt: '2023-01-15T10:30:00Z', pin: '1234', qrCodeUrl: generateMockQrCodeUrl('ACC-001'), guardianDob: '1985-05-20', guardianContact: '555-1234', address: '123 Rabbit Hole Lane, Wonderland', },
+        { id: 'ACC-002', displayId: 'ACC-002', guardianName: 'Bob The Builder', childName: 'Wendy Tool', balance: 320.00, status: 'Active', createdAt: '2023-02-20T09:00:00Z', lastActivity: '2024-03-11T11:25:00Z', updatedAt: '2023-02-20T09:00:00Z', pin: '5678', qrCodeUrl: generateMockQrCodeUrl('ACC-002'), guardianDob: '1978-11-30', guardianContact: '555-5678', address: '456 Construction Way, Builderville', },
+        { id: 'ACC-003', displayId: 'ACC-003',guardianName: 'Charlie Chaplin', childName: 'Little Tramp', balance: 0.00, status: 'Inactive', createdAt: '2023-03-01T11:00:00Z', lastActivity: '2023-09-01T11:00:00Z', updatedAt: '2023-09-01T11:00:00Z', pin: '9012', qrCodeUrl: generateMockQrCodeUrl('ACC-003'), guardianDob: '1980-01-01', guardianContact: '555-9012', address: '789 Silent Film St, Hollywood', },
+        { id: 'ACC-004', displayId: 'ACC-004',guardianName: 'Diana Prince', childName: 'Steve Trevor Jr.', balance: 500.50, status: 'Active', createdAt: '2023-04-10T08:15:00Z', lastActivity: '2024-03-09T16:45:00Z', updatedAt: '2023-04-10T08:15:00Z', pin: '3456', qrCodeUrl: generateMockQrCodeUrl('ACC-004'), guardianDob: '1975-03-08', guardianContact: '555-3456', address: '1 Wonder Way, Themyscira', },
+        { id: 'ACC-005', displayId: 'ACC-005',guardianName: 'Ethan Hunt', childName: 'Benji Dunn', balance: 10.00, status: 'Suspended', createdAt: '2023-05-22T13:00:00Z', lastActivity: '2024-01-15T10:00:00Z', updatedAt: '2024-03-12T16:00:00Z', pin: '7890', qrCodeUrl: generateMockQrCodeUrl('ACC-005'), guardianDob: '1982-07-18', guardianContact: '555-7890', address: '1 Impossible Mission Ln, Langley', }
     ],
     merchants: [
         { id: 'MER-001', name: 'General Groceries', location: 'Main Street Plaza', category: 'Groceries', status: 'Active', submittedAt: '2022-11-01T00:00:00Z', contactEmail: 'groceries@example.com', updatedAt: '2022-11-01T00:00:00Z', },

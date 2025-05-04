@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { accounts, createAccountSchema } from "@/lib/db/schema";
 import { z } from "zod";
 import mockDataInstance from "@/lib/mockData";
+import { password as BunPassword } from "bun";
 
 // GET /api/accounts - Get all accounts
 export async function GET(request: Request, context: any) {
@@ -34,38 +35,52 @@ export async function POST(request: Request, context: any) {
     // Validate request body against schema
     const validatedData = createAccountSchema.parse(body);
 
-    // Generate unique ID for account
-    const accountId = `ACC${Date.now()}`;
+    // Get PIN from request body
+    const pin = body.pin;
 
-    // Extract id from validatedData if it exists to avoid overwriting
-    const { id, ...accountData } = validatedData;
+    // Use account ID from request for displayId
+    const displayId = body.id || `FALLBACK-${Date.now()}`;
+
+    // Create account data object - without duplicate fields
+    const accountData: any = {
+      // Remove id to let DB generate UUID
+      displayId,
+      email: body.email,
+      childName: body.childName,
+      guardianName: body.guardianName,
+      status: body.status || "Active",
+      guardianDob: body.guardianDob,
+      guardianContact: body.guardianContact,
+      address: body.address,
+      currentQrToken: body.currentQrToken,
+    };
+
+    // Hash PIN if provided
+    if (pin) {
+      accountData.hashedPin = await BunPassword.hash(pin);
+    }
 
     try {
-      // Insert new account with our generated id
+      // Insert new account
       const newAccount = await db
         .insert(accounts)
-        .values({
-          id: accountId,
-          ...accountData,
-        })
+        .values(accountData)
         .returning();
 
       return NextResponse.json(newAccount[0], { status: 201 });
     } catch (dbError) {
       console.warn("Database error on POST, returning mock response:", dbError);
-      // Return a mock response that would make sense for the client
-      return NextResponse.json(
-        {
-          id: accountId,
-          ...accountData,
-          // Add any required fields that might be missing
-          createdAt: new Date().toISOString(),
-          lastActivity: new Date().toISOString(),
-          status: "Active",
-          balance: 0,
-        },
-        { status: 201 }
-      );
+
+      // Create mock response with UUID
+      const mockResponse = {
+        id: crypto.randomUUID(),
+        ...accountData,
+        createdAt: new Date().toISOString(),
+        lastActivity: new Date().toISOString(),
+        balance: 0,
+      };
+
+      return NextResponse.json(mockResponse, { status: 201 });
     }
   } catch (error) {
     console.error("Error creating account:", error);

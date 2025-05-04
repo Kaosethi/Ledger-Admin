@@ -80,6 +80,13 @@ tasks:
       DATABASE_URL: "{{.DATABASE_URL}}"
     desc: Open Drizzle Studio to manage database
 
+  db:migrate:
+    cmds:
+      - bun run db:migrate
+    env:
+      DATABASE_URL: "{{.DATABASE_URL}}"
+    desc: Run database migrations
+
   docker:build:
     desc: Build the Docker image with environment variables
     cmds:

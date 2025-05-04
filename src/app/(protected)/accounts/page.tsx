@@ -85,10 +85,6 @@ export default function AccountsPage() {
     // In a real app, this would call an API to log the activity
   };
 
-  if (loading) {
-    return <div className="text-center py-10">Loading accounts data...</div>;
-  }
-
   return (
     <AccountsTab
       accounts={accounts}
@@ -99,6 +95,7 @@ export default function AccountsPage() {
       onAccountAdd={handleAccountAdd}
       onPendingRegistrationsUpdate={handlePendingRegistrationsUpdate}
       logAdminActivity={logAdminActivity}
+      isLoading={loading}
     />
   );
 }

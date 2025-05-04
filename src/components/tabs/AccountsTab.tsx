@@ -22,6 +22,8 @@ import { useReactToPrint } from "react-to-print";
 import BulkQrPrintView from "../print/BulkQrPrintView"; // Ensure path is correct
 import ConfirmActionModal from "../modals/ConfirmActionModal"; // Ensure path is correct
 import PendingRegistrationDetailModal from "../modals/PendingRegistrationDetailModal"; // Ensure path is correct
+import { Loader2 } from "lucide-react"; // Import loading icon
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface AccountsTabProps {
   accounts: Account[];
@@ -37,6 +39,7 @@ interface AccountsTabProps {
   pendingRegistrations: PendingRegistration[];
   onPendingRegistrationsUpdate: (updatedList: PendingRegistration[]) => void;
   onAccountAdd: (newAccount: Account) => void;
+  isLoading?: boolean; // Add isLoading prop
 }
 
 // Helper to generate unique account IDs (remains unchanged)
@@ -62,6 +65,7 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
   pendingRegistrations = [],
   onPendingRegistrationsUpdate,
   onAccountAdd,
+  isLoading = false, // Default to false
 }) => {
   // --- State for Managed Accounts ---
   const [isBulkEditModalOpen, setIsBulkEditModalOpen] = useState(false);
@@ -489,10 +493,11 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
       {/* --- Pending Registrations Section --- */}
       <div className="bg-white p-6 rounded-lg shadow-md mb-8">
         <h2 className="text-xl font-semibold text-gray-800 mb-4">
-          Pending Registration Requests ({pendingRegistrations.length})
+          Pending Registration Requests (
+          {isLoading ? "..." : pendingRegistrations.length})
         </h2>
         {/* Bulk Action Buttons */}
-        {pendingRegistrations.length > 0 && (
+        {!isLoading && pendingRegistrations.length > 0 && (
           <div className="flex justify-start mb-4 space-x-2">
             <button
               onClick={handleBulkApprove}
@@ -530,7 +535,7 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
                     checked={isAllPendingSelected}
                     ref={selectAllPendingCheckboxRef}
                     onChange={handleSelectAllPendingChange}
-                    disabled={pendingRegistrations.length === 0}
+                    disabled={isLoading || pendingRegistrations.length === 0}
                   />
                 </th>
                 <th
@@ -566,8 +571,31 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {/* Pending Table Body */}
-              {pendingRegistrations.length === 0 ? (
+              {/* Loading indicator for pending table */}
+              {isLoading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <tr key={i}>
+                    <td className="px-4 py-4">
+                      <Skeleton className="h-4 w-4 rounded" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <Skeleton className="h-4 w-32" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <Skeleton className="h-4 w-32" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <Skeleton className="h-4 w-28" />
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <Skeleton className="h-4 w-16 mx-auto" />
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <Skeleton className="h-8 w-24 mx-auto" />
+                    </td>
+                  </tr>
+                ))
+              ) : pendingRegistrations.length === 0 ? (
                 <tr>
                   <td
                     colSpan={6}
@@ -683,7 +711,7 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 space-y-3 md:space-y-0">
           <h2 className="text-xl font-semibold text-gray-800">
-            Managed Accounts ({accounts.length})
+            Managed Accounts ({isLoading ? "..." : accounts.length})
           </h2>
           {/* Search and bulk actions */}
           <div className="flex flex-wrap gap-2">
@@ -697,6 +725,7 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
                 value={searchTerm}
                 onChange={handleSearchChange}
                 aria-label="Search managed accounts"
+                disabled={isLoading}
               />
               <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                 <svg
@@ -719,7 +748,7 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
               id="bulk-update-btn"
               className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
               onClick={handleOpenBulkUpdateModal}
-              disabled={selectedAccountIds.size === 0}
+              disabled={isLoading || selectedAccountIds.size === 0}
             >
               Bulk Update ({selectedAccountIds.size})
             </button>
@@ -728,7 +757,7 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
               id="bulk-print-qr-btn"
               className="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
               onClick={handleBulkPrintClick}
-              disabled={selectedAccountIds.size === 0}
+              disabled={isLoading || selectedAccountIds.size === 0}
             >
               Bulk Print QR ({selectedAccountIds.size})
             </button>
@@ -755,7 +784,7 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
                     checked={isAllSelected}
                     ref={selectAllCheckboxRef}
                     onChange={handleSelectAllChange}
-                    disabled={filteredAccounts.length === 0}
+                    disabled={isLoading || filteredAccounts.length === 0}
                   />
                 </th>
                 <th
@@ -808,8 +837,37 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
               id="accounts-table-body"
               className="bg-white divide-y divide-gray-200"
             >
-              {/* Managed Accounts Table Body */}
-              {filteredAccounts.length === 0 ? (
+              {/* Loading indicator for accounts table */}
+              {isLoading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={i}>
+                    <td className="px-4 py-4">
+                      <Skeleton className="h-4 w-4 rounded" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <Skeleton className="h-4 w-32" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <Skeleton className="h-4 w-32" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <Skeleton className="h-4 w-32" />
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <Skeleton className="h-4 w-20 mx-auto" />
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <Skeleton className="h-4 w-16 mx-auto" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <Skeleton className="h-4 w-28" />
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <Skeleton className="h-8 w-20 mx-auto" />
+                    </td>
+                  </tr>
+                ))
+              ) : filteredAccounts.length === 0 ? (
                 <tr>
                   <td
                     colSpan={8}
@@ -884,16 +942,21 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
         {/* Pagination (Placeholder) */}
         <div className="flex items-center justify-between mt-4 px-1">
           <div className="text-sm text-gray-700">
-            Showing{" "}
-            <span id="pagination-start">
-              {filteredAccounts.length > 0 ? 1 : 0}
-            </span>{" "}
-            to{" "}
-            <span id="pagination-end">
-              {Math.min(10, filteredAccounts.length)}
-            </span>{" "}
-            of <span id="pagination-total">{filteredAccounts.length}</span>{" "}
-            accounts {searchTerm && ` (filtered from ${accounts.length} total)`}
+            {!isLoading && (
+              <>
+                Showing{" "}
+                <span id="pagination-start">
+                  {filteredAccounts.length > 0 ? 1 : 0}
+                </span>{" "}
+                to{" "}
+                <span id="pagination-end">
+                  {Math.min(10, filteredAccounts.length)}
+                </span>{" "}
+                of <span id="pagination-total">{filteredAccounts.length}</span>{" "}
+                accounts{" "}
+                {searchTerm && ` (filtered from ${accounts.length} total)`}
+              </>
+            )}
           </div>
           <div className="flex space-x-2">
             <button

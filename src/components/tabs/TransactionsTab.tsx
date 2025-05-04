@@ -2,23 +2,47 @@
 // MODIFIED: Removed whitespace in thead, removed 'Type' column, adjusted colspan, removed Type from export
 
 import React, { useState, useMemo } from "react";
-import type { Transaction, Merchant } from "@/lib/mockData";
-import { formatCurrency, formatDdMmYyyy, formatTime, renderStatusBadge } from "@/lib/utils";
+import type { Transaction, Merchant, Account } from "@/lib/mockData";
+import {
+  formatCurrency,
+  formatDdMmYyyy,
+  formatTime,
+  renderStatusBadge,
+} from "@/lib/utils";
 import { unparse } from "papaparse";
 import TransactionDetailModal from "../modals/TransactionDetailModal";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { CalendarIcon, Loader2 } from "lucide-react";
+import { format } from "date-fns";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface TransactionsTabProps {
   transactions: Transaction[];
   merchants: Merchant[];
+  accounts: Account[];
+  transactionsLoading?: boolean;
+  accountsLoading?: boolean;
+  merchantsLoading?: boolean;
 }
 
 const TransactionsTab: React.FC<TransactionsTabProps> = ({
   transactions = [],
   merchants = [],
+  accounts = [],
+  transactionsLoading = false,
+  accountsLoading = false,
+  merchantsLoading = false,
 }) => {
   // --- State for Filters ---
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [merchantIdSearchTerm, setMerchantIdSearchTerm] = useState("");
   const [accountIdSearchTerm, setAccountIdSearchTerm] = useState("");
 
@@ -33,11 +57,22 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
     const lowerCaseMerchantIdSearch = merchantIdSearchTerm.trim().toLowerCase();
 
     return transactions.filter((tx) => {
-      const txDate = tx.timestamp?.substring(0, 10);
-      if (!txDate) return false;
-
-      if (startDate && txDate < startDate) return false;
-      if (endDate && txDate > endDate) return false;
+      try {
+        const txDate = new Date(tx.timestamp);
+        txDate.setHours(0, 0, 0, 0);
+        if (startDate) {
+          const start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+          if (txDate < start) return false;
+        }
+        if (endDate) {
+          const end = new Date(endDate);
+          end.setHours(0, 0, 0, 0);
+          if (txDate > end) return false;
+        }
+      } catch (e) {
+        return false;
+      }
       if (
         lowerCaseMerchantIdSearch &&
         (!tx.merchantId ||
@@ -61,12 +96,6 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
   ]);
 
   // --- Event Handlers ---
-  const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setStartDate(e.target.value);
-  };
-  const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEndDate(e.target.value);
-  };
   const handleMerchantIdSearchChange = (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -79,8 +108,8 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
   };
 
   const handleClearFilters = () => {
-    setStartDate("");
-    setEndDate("");
+    setStartDate(undefined);
+    setEndDate(undefined);
     setMerchantIdSearchTerm("");
     setAccountIdSearchTerm("");
   };
@@ -106,7 +135,9 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
       const merchant = merchants.find((m) => m.id === tx.merchantId);
       const merchantName = merchant
         ? merchant.name
-        : tx.merchantId ? "Unknown/Inactive Merchant" : "N/A";
+        : tx.merchantId
+        ? "Unknown/Inactive Merchant"
+        : "N/A";
       return {
         Date: formatDdMmYyyy(tx.timestamp),
         Time: formatTime(tx.timestamp),
@@ -162,80 +193,128 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
           Transaction History
         </h2>
         <div className="flex flex-wrap items-end gap-3 flex-grow">
-            {/* Start Date */}
-            <div className="flex-grow md:flex-grow-0">
-                <label htmlFor="tx-start-date-filter" className="text-xs font-medium text-gray-500 block mb-1">
-                    Start Date:
-                </label>
-                <input
-                    type="date"
-                    id="tx-start-date-filter"
-                    className="block w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary text-sm"
-                    value={startDate}
-                    onChange={handleStartDateChange}
-                    />
-            </div>
-            {/* End Date */}
-            <div className="flex-grow md:flex-grow-0">
-                <label htmlFor="tx-end-date-filter" className="text-xs font-medium text-gray-500 block mb-1">
-                    End Date:
-                </label>
-                <input
-                    type="date"
-                    id="tx-end-date-filter"
-                    className="block w-full px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary text-sm"
-                    value={endDate}
-                    onChange={handleEndDateChange}
-                    min={startDate}
-                    />
-            </div>
-            {/* Merchant ID */}
-             <div className="flex-grow">
-                <label htmlFor="merchant-id-filter" className="text-xs font-medium text-gray-500 block mb-1">
-                    Merchant ID:
-                </label>
-                <input
-                    type="text"
-                    id="merchant-id-filter"
-                    className="block w-full px-3 py-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary text-sm"
-                    placeholder="Filter by Merchant ID"
-                    value={merchantIdSearchTerm}
-                    onChange={handleMerchantIdSearchChange}
-                    />
-            </div>
-            {/* Account ID */}
-            <div className="flex-grow">
-                <label htmlFor="account-filter" className="text-xs font-medium text-gray-500 block mb-1">
-                    Account ID:
-                </label>
-                <input
-                    type="text"
-                    id="account-filter"
-                    className="block w-full px-3 py-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary text-sm"
-                    placeholder="Filter by Account ID"
-                    value={accountIdSearchTerm}
-                    onChange={handleAccountIdSearchChange}
-                    />
-            </div>
-             {/* Action Buttons */}
-             <div className="flex items-end gap-2 flex-shrink-0">
-                 <button
-                    type="button"
-                    className="py-1 px-3 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-                    onClick={handleClearFilters}
-                    >
-                    Clear
-                 </button>
-                <button
-                    id="export-transactions-btn"
-                    type="button"
-                    className="py-1 px-3 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
-                    onClick={handleExport}
-                    disabled={filteredTransactions.length === 0}
-                    >
-                    Export ({filteredTransactions.length})
-                </button>
-             </div>
+          {/* Start Date Picker */}
+          <div className="flex-grow md:flex-grow-0">
+            <Label className="text-xs font-medium text-gray-500 block mb-1">
+              Start Date:
+            </Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={
+                    "w-full sm:w-[160px] justify-start text-left font-normal text-sm" +
+                    (!startDate ? " text-muted-foreground" : "")
+                  }
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {startDate ? (
+                    format(startDate, "PPP")
+                  ) : (
+                    <span>Pick a date</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 border bg-white z-50">
+                <Calendar
+                  mode="single"
+                  selected={startDate}
+                  onSelect={setStartDate}
+                  disabled={(date) =>
+                    Boolean((endDate && date > endDate) || date > new Date())
+                  }
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+          {/* End Date Picker */}
+          <div className="flex-grow md:flex-grow-0">
+            <Label className="text-xs font-medium text-gray-500 block mb-1">
+              End Date:
+            </Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={
+                    "w-full sm:w-[160px] justify-start text-left font-normal text-sm" +
+                    (!endDate ? " text-muted-foreground" : "")
+                  }
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {endDate ? format(endDate, "PPP") : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 border bg-white z-50">
+                <Calendar
+                  mode="single"
+                  selected={endDate}
+                  onSelect={setEndDate}
+                  disabled={(date) =>
+                    Boolean(
+                      date > new Date() || (startDate && date < startDate)
+                    )
+                  }
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+          {/* Merchant ID */}
+          <div className="flex-grow">
+            <Label
+              htmlFor="merchant-id-filter"
+              className="text-xs font-medium text-gray-500 block mb-1"
+            >
+              Merchant ID:
+            </Label>
+            <input
+              type="text"
+              id="merchant-id-filter"
+              className="block w-full px-3 py-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary text-sm"
+              placeholder="Filter by Merchant ID"
+              value={merchantIdSearchTerm}
+              onChange={handleMerchantIdSearchChange}
+            />
+          </div>
+          {/* Account ID */}
+          <div className="flex-grow">
+            <Label
+              htmlFor="account-filter"
+              className="text-xs font-medium text-gray-500 block mb-1"
+            >
+              Account ID:
+            </Label>
+            <input
+              type="text"
+              id="account-filter"
+              className="block w-full px-3 py-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary text-sm"
+              placeholder="Filter by Account ID"
+              value={accountIdSearchTerm}
+              onChange={handleAccountIdSearchChange}
+            />
+          </div>
+          {/* Action Buttons */}
+          <div className="flex items-end gap-2 flex-shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              className="py-1 px-3 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+              onClick={handleClearFilters}
+            >
+              Clear
+            </Button>
+            <Button
+              id="export-transactions-btn"
+              type="button"
+              className="py-1 px-3 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
+              onClick={handleExport}
+              disabled={filteredTransactions.length === 0}
+            >
+              Export ({filteredTransactions.length})
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -245,23 +324,101 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
           {/* MODIFIED: Removed 'Type' header, cleaned whitespace */}
           <thead className="bg-gray-50">
             <tr>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Merchant Name</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Merchant ID</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Account ID</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transaction ID</th>
-                {/* <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th> REMOVED */}
-                <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
+              <th
+                scope="col"
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+              >
+                Date
+              </th>
+              <th
+                scope="col"
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+              >
+                Time
+              </th>
+              <th
+                scope="col"
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+              >
+                Merchant Name
+              </th>
+              <th
+                scope="col"
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+              >
+                Merchant ID
+              </th>
+              <th
+                scope="col"
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+              >
+                Account ID
+              </th>
+              <th
+                scope="col"
+                className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+              >
+                Transaction ID
+              </th>
+              {/* <th scope="col" className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th> REMOVED */}
+              <th
+                scope="col"
+                className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+              >
+                Amount
+              </th>
+              <th
+                scope="col"
+                className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+              >
+                Status
+              </th>
+              <th
+                scope="col"
+                className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
+              >
+                Details
+              </th>
             </tr>
           </thead>
           <tbody
             id="transactions-table-body"
             className="bg-white divide-y divide-gray-200"
           >
-            {filteredTransactions.length === 0 ? (
+            {transactionsLoading ? (
+              // Skeleton rows for loading state
+              Array.from({ length: 6 }).map((_, i) => (
+                <tr key={i}>
+                  <td className="px-4 py-4">
+                    <Skeleton className="h-4 w-20" />
+                  </td>
+                  <td className="px-4 py-4">
+                    <Skeleton className="h-4 w-16" />
+                  </td>
+                  <td className="px-4 py-4">
+                    <Skeleton className="h-4 w-32" />
+                  </td>
+                  <td className="px-4 py-4">
+                    <Skeleton className="h-4 w-24" />
+                  </td>
+                  <td className="px-4 py-4">
+                    <Skeleton className="h-4 w-24" />
+                  </td>
+                  <td className="px-4 py-4">
+                    <Skeleton className="h-4 w-28" />
+                  </td>
+                  <td className="px-4 py-4 text-center">
+                    <Skeleton className="h-4 w-16 mx-auto" />
+                  </td>
+                  <td className="px-4 py-4 text-center">
+                    <Skeleton className="h-4 w-16 mx-auto" />
+                  </td>
+                  <td className="px-4 py-4 text-center">
+                    <Skeleton className="h-8 w-16 mx-auto" />
+                  </td>
+                </tr>
+              ))
+            ) : filteredTransactions.length === 0 ? (
               // MODIFIED: Colspan to match new number of columns (9)
               <tr>
                 <td
@@ -279,8 +436,10 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
                   (m) => m.id === transaction.merchantId
                 );
                 const merchantName = merchant
-                    ? merchant.name
-                    : transaction.merchantId ? "Unknown/Inactive Merchant" : "N/A";
+                  ? merchant.name
+                  : transaction.merchantId
+                  ? "Unknown/Inactive Merchant"
+                  : "N/A";
 
                 return (
                   <tr key={transaction.id}>
@@ -302,12 +461,12 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
                     <td className="px-4 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
                       {transaction.id}
                     </td>
-                     {/* REMOVED: Transaction Type cell */}
+                    {/* REMOVED: Transaction Type cell */}
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700 text-center">
                       {formatCurrency(transaction.amount)}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-center">
-                        {renderStatusBadge(transaction.status, "transaction")}
+                      {renderStatusBadge(transaction.status, "transaction")}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-center actions">
                       <button
@@ -334,10 +493,10 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
           </span>{" "}
           to{" "}
           <span id="tx-pagination-end">
-            {Math.min(10, filteredTransactions.length)} {/* TODO: Implement pagination */}
+            {Math.min(10, filteredTransactions.length)}{" "}
+            {/* TODO: Implement pagination */}
           </span>{" "}
-          of{" "}
-          <span id="tx-pagination-total">{filteredTransactions.length}</span>{" "}
+          of <span id="tx-pagination-total">{filteredTransactions.length}</span>{" "}
           transactions{" "}
           {(startDate ||
             endDate ||
@@ -367,7 +526,6 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
         isOpen={isDetailModalOpen}
         onClose={handleCloseDetailModal}
         transaction={selectedTransaction}
-        merchants={merchants}
       />
     </div>
   );

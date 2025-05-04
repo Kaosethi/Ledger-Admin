@@ -52,16 +52,13 @@ export default function MerchantsPage() {
     // In a real app, this would call an API to log the activity
   };
 
-  if (loading) {
-    return <div className="text-center py-10">Loading merchants data...</div>;
-  }
-
   return (
     <MerchantsTab
       merchants={merchants}
       transactions={transactions}
       onMerchantsUpdate={handleMerchantsUpdate}
       logAdminActivity={logAdminActivity}
+      merchantsLoading={loading}
     />
   );
 }

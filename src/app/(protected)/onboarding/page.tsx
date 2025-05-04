@@ -3,14 +3,17 @@
 import { useEffect, useState } from "react";
 import OnboardingTab from "@/components/tabs/OnboardingTab";
 import { Account } from "@/lib/mockData";
+import { useToast } from "@/hooks/use-toast";
 
 export default function OnboardingPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const { toast } = useToast();
 
   // Fetch data for onboarding
   useEffect(() => {
     const fetchData = async () => {
+      setInitialLoading(true);
       try {
         // Fetch existing accounts for reference
         const accountsResponse = await fetch("/api/accounts");
@@ -20,17 +23,36 @@ export default function OnboardingPage() {
         }
       } catch (error) {
         console.error("Error fetching onboarding data:", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description:
+            "Failed to fetch existing accounts. Some features may be limited.",
+        });
       } finally {
-        setLoading(false);
+        setInitialLoading(false);
       }
     };
 
     fetchData();
-  }, []);
+  }, [toast]);
 
   // Handlers for onboarding operations
   const handleAccountAdd = (newAccount: Account) => {
     setAccounts((prev) => [newAccount, ...prev]);
+    toast({
+      title: "Account Created",
+      description: `Account ${newAccount.displayId} for ${newAccount.childName} was successfully registered.`,
+      variant: "default",
+    });
+  };
+
+  const handleAccountError = (error: string) => {
+    toast({
+      title: "Registration Failed",
+      description: error,
+      variant: "destructive",
+    });
   };
 
   const logAdminActivity = (
@@ -43,14 +65,11 @@ export default function OnboardingPage() {
     // In a real app, this would call an API to log the activity
   };
 
-  if (loading) {
-    return <div className="text-center py-10">Loading onboarding data...</div>;
-  }
-
   return (
     <OnboardingTab
       accounts={accounts}
       onAccountAdd={handleAccountAdd}
+      onAccountError={handleAccountError}
       logAdminActivity={logAdminActivity}
     />
   );

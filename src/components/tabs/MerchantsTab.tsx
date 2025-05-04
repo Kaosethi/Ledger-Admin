@@ -10,6 +10,7 @@ import MerchantDetailModal, {
   MerchantActionType,
 } from "../modals/MerchantDetailModal";
 import ConfirmActionModal from "../modals/ConfirmActionModal";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface MerchantsTabProps {
   merchants: Merchant[];
@@ -21,6 +22,7 @@ interface MerchantsTabProps {
     targetId?: string,
     details?: string
   ) => void;
+  merchantsLoading?: boolean;
 }
 
 // Define allowed actions excluding deactivate
@@ -38,6 +40,7 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
   transactions = [],
   onMerchantsUpdate,
   logAdminActivity,
+  merchantsLoading = false,
 }) => {
   // --- State for Modals ---
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -256,7 +259,24 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
               id="pending-merchants-table-body"
               className="bg-white divide-y divide-gray-200"
             >
-              {pendingMerchants.length === 0 ? (
+              {merchantsLoading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <tr key={i}>
+                    <td className="px-4 py-4">
+                      <Skeleton className="h-4 w-32" />
+                    </td>
+                    <td className="px-4 py-4">
+                      <Skeleton className="h-4 w-40" />
+                    </td>
+                    <td className="px-4 py-4">
+                      <Skeleton className="h-4 w-28" />
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <Skeleton className="h-8 w-24 mx-auto" />
+                    </td>
+                  </tr>
+                ))
+              ) : pendingMerchants.length === 0 ? (
                 <tr>
                   {" "}
                   <td colSpan={4} className={`${tableCellClasses} text-center`}>
@@ -336,8 +356,33 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
               id="merchants-table-body"
               className="bg-white divide-y divide-gray-200"
             >
-              {managedMerchants.length === 0 ? (
-                // MODIFIED: Updated empty state message
+              {merchantsLoading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={i}>
+                    <td className="px-4 py-4">
+                      <Skeleton className="h-4 w-32" />
+                    </td>
+                    <td className="px-4 py-4">
+                      <Skeleton className="h-4 w-40" />
+                    </td>
+                    <td className="px-4 py-4">
+                      <Skeleton className="h-4 w-40" />
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <Skeleton className="h-4 w-20 mx-auto" />
+                    </td>
+                    <td className="px-4 py-4">
+                      <Skeleton className="h-4 w-28" />
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <Skeleton className="h-4 w-16 mx-auto" />
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <Skeleton className="h-8 w-20 mx-auto" />
+                    </td>
+                  </tr>
+                ))
+              ) : managedMerchants.length === 0 ? (
                 <tr>
                   {" "}
                   <td colSpan={7} className={`${tableCellClasses} text-center`}>
