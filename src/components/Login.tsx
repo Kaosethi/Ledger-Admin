@@ -47,7 +47,10 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         localStorage.setItem(ADMIN_EMAIL_STORAGE_KEY, adminUser.email);
         console.log("Admin email stored in localStorage:", adminUser.email);
       } catch (storageError) {
-        console.error("Failed to save admin email to localStorage:", storageError);
+        console.error(
+          "Failed to save admin email to localStorage:",
+          storageError
+        );
         // Optionally inform the user or handle appropriately
         setError("Login failed: Could not save session information.");
         return;

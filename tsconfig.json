@@ -33,16 +33,18 @@
         "name": "next"
       }
     ],
-    "types": ["node"]
-    // Explicitly include 'node' types to resolve missing type definition error
+    "types": ["node", "bun-types"]
+    // Include both node and bun-types
   },
-  "include": [ // Files/patterns for TypeScript to include
+  "include": [
+    // Files/patterns for TypeScript to include
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts" // Include Next.js generated types
   ],
-  "exclude": [ // Files/patterns to exclude
+  "exclude": [
+    // Files/patterns to exclude
     "node_modules"
   ]
 }

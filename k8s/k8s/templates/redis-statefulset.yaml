@@ -1,0 +1,173 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Values.redis.serviceName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/component: master
+    app.kubernetes.io/instance: {{ .Values.redis.serviceName }}
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+spec:
+  replicas: {{ .Values.redis.replicaCount | default 1 }}
+  serviceName: {{ .Values.redis.headlessServiceName | default "redis-headless" }}
+  podManagementPolicy: OrderedReady
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: master
+      app.kubernetes.io/instance: {{ .Values.redis.serviceName }}
+      app.kubernetes.io/name: redis
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: master
+        app.kubernetes.io/instance: {{ .Values.redis.serviceName }}
+        app.kubernetes.io/name: redis
+        app.kubernetes.io/managed-by: Helm
+        helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9121"
+    spec:
+      serviceAccountName: {{ .Values.redis.serviceAccountName | default "redis" }}
+      securityContext:
+        fsGroup: 1001
+        runAsUser: 1001
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 1
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/component: master
+                  app.kubernetes.io/instance: {{ .Values.redis.serviceName }}
+                  app.kubernetes.io/name: redis
+              topologyKey: kubernetes.io/hostname
+              namespaces:
+              - {{ .Values.namespace }}
+      {{- if .Values.redis.tolerations }}
+      tolerations:
+{{ toYaml .Values.redis.tolerations | indent 6 }}
+      {{- end }}
+      containers:
+      - name: redis
+        image: {{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag | default "7.0.15" }}
+        imagePullPolicy: {{ .Values.redis.image.pullPolicy | default "IfNotPresent" }}
+        command:
+        - /bin/bash
+        args:
+        - -c
+        - /opt/bitnami/scripts/start-scripts/start-master.sh
+        env:
+        - name: BITNAMI_DEBUG
+          value: {{ .Values.redis.debug | default "false" | quote }}
+        - name: REDIS_REPLICATION_MODE
+          value: master
+        - name: ALLOW_EMPTY_PASSWORD
+          value: {{ .Values.redis.auth.enabled | ternary "no" "yes" | quote }}
+        {{- if .Values.redis.auth.enabled }}
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.redis.auth.secretName | default "redis" }}
+              key: {{ .Values.redis.auth.secretKey | default "redis-password" }}
+        {{- end }}
+        - name: REDIS_PORT
+          value: {{ .Values.redis.port | default "6379" | quote }}
+        - name: REDIS_DISABLE_COMMANDS
+          value: "FLUSHDB,FLUSHALL"
+        ports:
+        - name: redis
+          containerPort: {{ .Values.redis.port | default 6379 }}
+          protocol: TCP
+        resources:
+          requests:
+            cpu: {{ .Values.redis.resources.requests.cpu | default "100m" }}
+            memory: {{ .Values.redis.resources.requests.memory | default "128Mi" }}
+          limits:
+            cpu: {{ .Values.redis.resources.limits.cpu | default "1" }}
+            memory: {{ .Values.redis.resources.limits.memory | default "2Gi" }}
+        securityContext:
+          runAsUser: 1001
+        volumeMounts:
+        - name: start-scripts
+          mountPath: /opt/bitnami/scripts/start-scripts
+        - name: health
+          mountPath: /health
+        - name: redis-data
+          mountPath: /data
+        - name: config
+          mountPath: /opt/bitnami/redis/mounted-etc
+        - name: redis-tmp-conf
+          mountPath: /opt/bitnami/redis/etc/
+        - name: tmp
+          mountPath: /tmp
+      {{- if .Values.redis.metrics.enabled }}
+      - name: metrics
+        image: {{ .Values.redis.metrics.image.repository }}:{{ .Values.redis.metrics.image.tag | default "1.37.0-debian-10-r39" }}
+        imagePullPolicy: {{ .Values.redis.metrics.image.pullPolicy | default "IfNotPresent" }}
+        command:
+        - /bin/bash
+        - -c
+        - |
+          if [[ -f '/secrets/redis-password' ]]; then
+          export REDIS_PASSWORD=$(cat /secrets/redis-password)
+          fi
+          redis_exporter
+        env:
+        - name: REDIS_ALIAS
+          value: {{ .Values.redis.metrics.redisAlias | default "redis" }}
+        {{- if .Values.redis.auth.enabled }}
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.redis.auth.secretName | default "redis" }}
+              key: {{ .Values.redis.auth.secretKey | default "redis-password" }}
+        {{- end }}
+        ports:
+        - name: metrics
+          containerPort: 9121
+          protocol: TCP
+        securityContext:
+          runAsUser: 1001
+      {{- end }}
+      volumes:
+      - name: start-scripts
+        configMap:
+          name: {{ .Values.redis.configMaps.scripts | default "redis-scripts" }}
+          defaultMode: 493
+      - name: health
+        configMap:
+          name: {{ .Values.redis.configMaps.health | default "redis-health" }}
+          defaultMode: 493
+      - name: config
+        configMap:
+          name: {{ .Values.redis.configMaps.configuration | default "redis-configuration" }}
+          defaultMode: 420
+      - name: redis-tmp-conf
+        emptyDir: {}
+      - name: tmp
+        emptyDir: {}
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      partition: 0
+  volumeClaimTemplates:
+  - metadata:
+      name: redis-data
+      labels:
+        app.kubernetes.io/component: master
+        app.kubernetes.io/instance: {{ .Values.redis.serviceName }}
+        app.kubernetes.io/name: redis
+    spec:
+      accessModes:
+      - {{ .Values.redis.persistence.accessMode | default "ReadWriteOnce" }}
+      storageClassName: {{ .Values.redis.persistence.storageClass | default "cbs" }}
+      resources:
+        requests:
+          storage: {{ .Values.redis.persistence.size | default "10Gi" }} 
