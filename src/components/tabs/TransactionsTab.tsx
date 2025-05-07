@@ -220,7 +220,7 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
                   mode="single"
                   selected={startDate}
                   onSelect={setStartDate}
-                  disabled={(date) =>
+                  disabled={(date: Date) =>
                     Boolean((endDate && date > endDate) || date > new Date())
                   }
                   initialFocus
@@ -251,7 +251,7 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
                   mode="single"
                   selected={endDate}
                   onSelect={setEndDate}
-                  disabled={(date) =>
+                  disabled={(date: Date) =>
                     Boolean(
                       date > new Date() || (startDate && date < startDate)
                     )
