@@ -1,40 +1,43 @@
-import { NextRequest, NextResponse } from "next/server";
-import { verifyJWT } from "@/lib/auth/jwt";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-export const config = {
-  matcher: [
-    /*
-     * Match all request paths except:
-     * - /api/auth/* (authentication endpoints)
-     * - /login (login page)
-     * - /_next/static (static files)
-     * - /_next/image (image optimization files)
-     * - /favicon.ico (favicon file)
-     * - /public/* (public assets)
-     */
-    "/((?!api/auth|login|_next/static|_next/image|favicon.ico|public/).*)",
-  ],
-};
+const PROTECTED_PATHS = [
+  "/dashboard",
+  "/accounts",
+  "/merchants",
+  "/transactions",
+  "/onboarding",
+  "/activity-log",
+];
 
-export async function middleware(request: NextRequest) {
-  // Get the token from the cookies
-  const token = request.cookies.get("auth-token")?.value;
-
-  // If there's no token and the path is not the login page, redirect to login
-  if (!token) {
-    return NextResponse.redirect(new URL("/login", request.url));
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  // Check if the path is protected
+  const isProtected = PROTECTED_PATHS.some((path) => pathname.startsWith(path));
+  if (!isProtected) {
+    return NextResponse.next();
   }
 
-  // Verify the token
-  const payload = await verifyJWT(token);
-
-  // If the token is invalid, redirect to login
-  if (!payload) {
-    const response = NextResponse.redirect(new URL("/login", request.url));
-    response.cookies.delete("auth-token");
-    return response;
+  // Check for auth-token cookie
+  const authToken = request.cookies.get("auth-token");
+  if (!authToken) {
+    // Redirect to login if not authenticated
+    const loginUrl = new URL("/login", request.url);
+    return NextResponse.redirect(loginUrl);
   }
 
-  // Continue to the requested page
+  // Authenticated, allow request
   return NextResponse.next();
 }
+
+// Optionally, specify which paths to run middleware on
+export const config = {
+  matcher: [
+    "/dashboard/:path*",
+    "/accounts/:path*",
+    "/merchants/:path*",
+    "/transactions/:path*",
+    "/onboarding/:path*",
+    "/activity-log/:path*",
+  ],
+};

@@ -1,0 +1,1 @@
+ALTER TYPE "public"."account_status" ADD VALUE 'Pending' BEFORE 'Active';
