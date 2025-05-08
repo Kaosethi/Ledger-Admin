@@ -1,28 +1,28 @@
 # Ledger Admin
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+A Next.js application for managing ledger operations.
 
 ## Prerequisites
 
-- Node.js (v18 or later)
-- npm, yarn, pnpm, or bun
+- [Bun](https://bun.sh/)
 - PostgreSQL database
 - [Task](https://taskfile.dev/) (optional but recommended)
+- Docker & Docker Compose (for local database)
 
 ## Getting Started
 
 1. Clone the repository:
 
 ```bash
-git clone [repository-url]
+git clone git@github.com:Kaosethi/Ledger-Admin.git
 cd Ledger-Admin
 ```
 
 2. Install dependencies:
 
 ```bash
-# Using npm
-npm install
+# Using Bun directly
+bun install
 
 # Using Task (recommended)
 task install
@@ -30,182 +30,105 @@ task install
 
 3. Set up environment variables:
 
-   - Copy `.env.example` to `.env`
-   - Update the database connection URL in `.env` with your credentials:
+   - Copy `dot.env.example` to `.env.local`:
+
+   ```bash
+   cp dot.env.example .env.local
+   ```
+
+   - Update the database connection URL in `.env.local` with your credentials:
 
    ```
-   DATABASE_URL="postgresql://username:password@host:port/database?sslmode=require"
+   DATABASE_URL="postgresql://username:password@localhost:5432/database?sslmode=require"
    ```
 
-4. Run database migrations:
+4. Start the local PostgreSQL database:
 
 ```bash
-# Using npm
-npm run db:generate  # Generate migration files
-npm run db:push      # Apply migrations to the database
+docker compose up -d
+```
+
+5. Run database migrations:
+
+```bash
+# Using Bun directly
+bun run db:generate  # Generate migration files
+bun run db:push      # Apply migrations to the database
 
 # Using Task (recommended)
 task db:generate
 task db:push
 ```
 
-5. Run the development server:
+6. Run the development server:
 
 ```bash
-# Using npm
-npm run dev
+# Using Bun directly
+bun run dev
 
 # Using Task (recommended)
 task dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+7. Open [http://localhost:3000](http://localhost:3000) with your browser to see the application.
 
-## Database Setup
+## Available Commands
 
-This project uses PostgreSQL as its database. A Docker Compose configuration is provided for local development.
-
-### Local Development Database
-
-1. Start the PostgreSQL database:
+### Using Task (recommended)
 
 ```bash
-docker-compose up -d
+task dev                # Run development server
+task install            # Install dependencies
+task build              # Build for production
+task start              # Start production server
+task lint               # Run ESLint
+task db:generate        # Generate database migrations
+task db:push            # Apply migrations to database
+task db:studio          # Open Drizzle Studio for database management
+task db:migrate         # Run database migrations
+task docker:compose     # Start database using docker-compose
 ```
 
-2. The database will be available with the following connection string:
-
-```
-postgresql://username:password@localhost:5432/database?sslmode=require
-```
-
-3. To stop the database:
+### Using Bun directly
 
 ```bash
-docker-compose down
+bun run dev             # Run development server
+bun run build           # Build for production
+bun run start           # Start production server
+bun run lint            # Run ESLint
+bun run db:generate     # Generate database migrations
+bun run db:push         # Apply migrations to database
+bun run db:studio       # Open Drizzle Studio
+bun run db:migrate      # Run database migrations
 ```
 
-This project uses [Drizzle ORM](https://orm.drizzle.team/) with PostgreSQL for database management.
+## Database Information
 
-### Schema
+- PostgreSQL database runs via Docker Compose
+- Default connection: `postgresql://username:password@localhost:5432/database`
+- Database schema is managed with [Drizzle ORM](https://orm.drizzle.team/)
 
-The database schema is defined in `src/lib/db/schema.ts`:
+### Accessing Database UI
 
-- **Users**: Stores user information with roles and authentication details
-- **Transactions**: Records transactions linked to users
-
-### Working with Migrations
-
-#### Creating a New Migration
-
-When you make changes to your database schema in `src/lib/db/schema.ts`:
-
-1. Generate migration files:
-
-   ```bash
-   task db:generate
-   ```
-
-   This creates SQL migration files in `src/lib/db/migrations/`.
-
-2. Review the generated SQL files in the migrations directory.
-
-3. Apply the migrations to your database:
-   ```bash
-   task db:push
-   ```
-
-#### Adding a New Table or Column
-
-1. Edit `src/lib/db/schema.ts` to add your new table or column:
-
-   ```typescript
-   // Example: Adding a new table
-   export const products = pgTable("products", {
-     id: serial("id").primaryKey(),
-     name: varchar("name", { length: 255 }).notNull(),
-     price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-     description: text("description"),
-     createdAt: timestamp("created_at").defaultNow().notNull(),
-   });
-
-   // Example: Adding relations for the new table
-   export const productsRelations = relations(products, ({ many }) => ({
-     // Define relationships here
-   }));
-   ```
-
-2. Generate and apply migrations as described above.
-
-#### Viewing Database Content
-
-You can use Drizzle Studio to view and manage your database content:
+Run the following command to open Drizzle Studio (in progress):
 
 ```bash
 task db:studio
-```
-
-This opens a web interface where you can browse tables, run queries, and modify data.
-
-### Database Commands
-
-- `task db:generate` - Generate SQL migration files from schema changes
-- `task db:push` - Apply migrations to the database
-- `task db:studio` - Open Drizzle Studio to manage database content visually
-
-### API Routes
-
-The following API endpoints are available:
-
-- **GET /api/users** - Fetch all users
-- **POST /api/users** - Create a new user
-- **GET /api/transactions** - Fetch all transactions
-- **POST /api/transactions** - Create a new transaction
-
-## Development Tasks
-
-This project uses [Task](https://taskfile.dev/) for common development tasks. Here are the available commands:
-
-- `task dev` - Run the development server
-- `task install` - Install project dependencies
-- `task build` - Build the application for production
-- `task start` - Start the production server
-- `task lint` - Run ESLint to check code quality
-- `task format` - Format code using Prettier
-- `task clean` - Clean build artifacts and dependencies
-
-To see all available tasks:
-
-```bash
-task --list
+# or
+bun run db:studio
 ```
 
 ## Project Structure
 
 - `src/` - Source code directory
-  - `app/` - Next.js app directory
+  - `app/` - Next.js app directory (routes and API endpoints)
   - `components/` - Reusable React components
   - `lib/` - Utility functions and shared code
     - `db/` - Database schema and client
-    - `config.ts` - Environment configuration
-  - `types/` - TypeScript type definitions
+  - `hooks/` - Custom React hooks
 
-## Development
+## Troubleshooting
 
-- The project uses TypeScript for type safety
-- Tailwind CSS for styling
-- ESLint for code linting
-- Prettier for code formatting
-
-## Learn More
-
-To learn more about the technologies used in this project:
-
-- [Next.js Documentation](https://nextjs.org/docs)
-- [Drizzle ORM Documentation](https://orm.drizzle.team/docs/overview)
-- [Tailwind CSS Documentation](https://tailwindcss.com/docs)
-- [PostgreSQL Documentation](https://www.postgresql.org/docs/)
-
-## Deployment
-
-For production deployment, ensure all environment variables are properly configured in your deployment platform.
+- If you encounter database connection issues, ensure Docker is running and the PostgreSQL container is started
+- Check `.env.local` for correct environment variables
+- For permission issues with Docker, you may need to run commands with `sudo`
