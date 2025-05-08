@@ -17,6 +17,7 @@ import { relations } from "drizzle-orm";
 
 // ENUMs
 export const accountStatusEnum = pgEnum("account_status", [
+  "Pending",
   "Active",
   "Inactive",
   "Suspended",
@@ -328,8 +329,28 @@ export const createAccountSchema = insertAccountSchema
   .extend({
     childName: z.string().min(1, "Child name is required"),
     guardianName: z.string().min(1, "Guardian name is required"),
-    email: z.string().email("Invalid email address").optional(),
-    guardianContact: z.string().optional(),
+    email: z.string().email("Invalid email address").optional().nullable(),
+    guardianContact: z.string().optional().nullable(),
+    currentQrToken: z.string().optional().nullable(),
+    displayId: z.string().optional(),
+    guardianDob: z.string().optional().nullable(),
+    address: z.string().optional().nullable(),
+  });
+
+export const createPublicRegistrationSchema = createAccountSchema
+  .omit({
+    status: true,
+    hashedPin: true,
+    displayId: true,
+    currentQrToken: true,
+  })
+  .extend({
+    pin: z
+      .string()
+      .length(4, "PIN must be exactly 4 digits")
+      .regex(/^\d+$/, "PIN must contain only digits"),
+    guardianDob: z.string().min(1, "Guardian date of birth is required"),
+    submissionLanguage: z.string().optional(),
   });
 
 export const createMerchantSchema = insertMerchantSchema

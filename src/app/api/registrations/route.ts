@@ -2,39 +2,22 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { accounts, createAccountSchema } from "@/lib/db/schema";
 import { z } from "zod";
-import mockDataInstance from "@/lib/mockData";
 import { password as BunPassword } from "bun";
-import { generateFallbackId } from "../registrations/route";
+import { env } from "@/lib/config";
 
-// GET /api/accounts - Get all accounts
-export async function GET(request: Request, context: any) {
-  try {
-    // Try to fetch from the database
-    try {
-      const allAccounts = await db.select().from(accounts);
-      if (allAccounts && allAccounts.length > 0) {
-        return NextResponse.json(allAccounts);
-      }
-    } catch (dbError) {
-      console.warn("Database error, falling back to mock data:", dbError);
-    }
-
-    // If database fetch fails or returns empty, use mock data
-    return NextResponse.json(mockDataInstance.accounts);
-  } catch (error) {
-    console.error("Error fetching accounts:", error);
-    // Final fallback to mock data
-    return NextResponse.json(mockDataInstance.accounts);
-  }
-}
-
-// POST /api/accounts - Create a new account
+// POST /api/registrations - Public endpoint to create a new account without qr code
 export async function POST(request: Request, context: any) {
   try {
     const body = await request.json();
 
+    console.log("env", env);
+    console.log("db", process.env.DATABASE_URL);
+    console.log("bun-db", Bun.env.DATABASE_URL);
+
     // Validate request body against schema
     const validatedData = createAccountSchema.parse(body);
+
+    console.log("validatedData", validatedData);
 
     // Get PIN from request body
     const pin = body.pin;
@@ -49,7 +32,7 @@ export async function POST(request: Request, context: any) {
       email: body.email,
       childName: body.childName,
       guardianName: body.guardianName,
-      status: body.status || "Pending",
+      status: body.status || "Pending", // TODO: change to enum
       guardianDob: body.guardianDob,
       guardianContact: body.guardianContact,
       address: body.address,
@@ -98,4 +81,10 @@ export async function POST(request: Request, context: any) {
       { status: 500 }
     );
   }
+}
+
+export function generateFallbackId() {
+  const year = new Date().getFullYear().toString();
+  const randomChars = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `STC-${year}-${randomChars}`;
 }

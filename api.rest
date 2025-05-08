@@ -72,6 +72,22 @@ Content-Type: {{contentType}}
 # Delete account
 DELETE {{baseUrl}}/accounts/ACC1234567890
 
+### Public Registrations
+# Create new account (public endpoint)
+POST {{baseUrl}}/registrations
+Content-Type: {{contentType}}
+
+{
+  "email": "parent@example.com",
+  "childName": "Child Name",
+  "guardianName": "Guardian Name",
+  "guardianDob": "1980-01-01",
+  "guardianContact": "1234567890",
+  "address": "123 Main St",
+  "pin": "1234",
+  "submissionLanguage": "en"
+}
+
 ### Merchants
 # Get all merchants
 GET {{baseUrl}}/merchants
