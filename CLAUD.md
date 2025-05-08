@@ -36,9 +36,13 @@ Ledger-Admin is a Next.js web application designed to serve as an administrative
 - Integration with Better Auth for secure credential management
 - JSON Web Tokens (JWT) using jose for token handling
 - HTTP-only cookies for secure token storage
+- Centralized authentication middleware for API routes
+- Higher-order function approach for DRY authentication logic
+- Type-safe JWT payload handling with discriminated unions
 - Middleware-based route protection
 - Automatic redirection to login for unauthenticated requests
 - Session status checks via API endpoint
+- Unified error responses for authentication failures
 
 ### Data Model
 
@@ -112,6 +116,8 @@ The application uses a PostgreSQL database with Drizzle ORM, featuring a robust 
 - Email/password authentication for administrators
 - Session management with periodic status checks
 - Activity logging for security audit
+- Protected API routes using reusable authentication middleware
+- JWT token verification with typed payload access
 
 #### Account Management
 
@@ -165,6 +171,13 @@ The backend API follows RESTful conventions with endpoints organized by resource
 - `/api/accounts/*` - Account management
 - `/api/merchants/*` - Merchant management
 - `/api/transactions/*` - Transaction processing
+
+All API endpoints are protected by a centralized authentication middleware that:
+
+- Verifies the presence of a valid JWT token in cookies
+- Provides typed access to the authenticated user's information
+- Handles authentication errors with consistent responses
+- Uses higher-order functions for cleaner route handlers
 
 ## Development Infrastructure
 
