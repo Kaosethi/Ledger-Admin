@@ -1,6 +1,5 @@
 // src/components/modals/EditAccountModal.tsx
-// FIXED: Removed whitespace between table elements (<table>, <thead>, <tbody>) to prevent hydration errors.
-// FIXED: Addressed TS errors by using 'childName' instead of 'name'.
+// MODIFIED: Changed currency symbol and code in Balance input from USD/$ to THB/฿.
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import type { Account, Transaction, Merchant } from "@/lib/mockData"; // Ensure this path is correct
@@ -111,7 +110,7 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
       "Edit Account Details",
       "Account",
       account.id,
-      `Updated balance or PIN.`
+      `Updated balance or PIN.` // Logging balance change doesn't include symbol, so no change needed here.
     );
     onSave(updatedAccount);
     onClose();
@@ -298,9 +297,11 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
                   <label htmlFor="edit-balance" className="block text-sm font-medium text-gray-700">Balance</label>
                   <div className="mt-1 relative rounded-md shadow-sm">
                       {/* Balance Input Structure */}
-                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><span className="text-gray-500 sm:text-sm">$</span></div>
+                       {/* MODIFIED: Changed $ to ฿ */}
+                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><span className="text-gray-500 sm:text-sm">฿</span></div>
                        <input type="number" id="edit-balance" value={balanceStr} onChange={(e) => setBalanceStr(e.target.value)} className="block w-full pl-7 pr-12 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary text-sm" placeholder="0.00" step="0.01" min="0"/>
-                       <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none"><span className="text-gray-500 sm:text-sm">USD</span></div>
+                       {/* MODIFIED: Changed USD to THB */}
+                       <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none"><span className="text-gray-500 sm:text-sm">THB</span></div>
                   </div>
                 </div>
                 {/* PIN Input */}
@@ -329,7 +330,7 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
                   ) : currentQrToken ? (
                     <QRCodeSVG value={currentQrToken} size={140} bgColor={"#ffffff"} fgColor={"#000000"} level={"H"} includeMargin={true} />
                   ) : (
-                    <span className="text-gray-500 text-sm text-center">Click &quot;Generate QR Code&quot; to display the code.</span>
+                    <span className="text-gray-500 text-sm text-center">Click "Generate QR Code" to display the code.</span>
                   )}
                 </div>
               </div>

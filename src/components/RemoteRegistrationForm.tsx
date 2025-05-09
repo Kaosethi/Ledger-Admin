@@ -285,9 +285,9 @@ const RemoteRegistrationForm: React.FC<RemoteRegistrationFormProps> = ({
                 <SelectTrigger
                   id="guardianDobMonth"
                   className="w-full sm:w-28"
-                  aria-label={t.monthPlaceholder || "Month"}
+                  aria-label={t.pinPlaceholder || "Month"}
                 >
-                  <SelectValue placeholder={t.monthPlaceholder || "Month"} />
+                  <SelectValue placeholder={t.pinPlaceholder || "Month"} />
                 </SelectTrigger>
                 <SelectContent>
                   {Array.from({ length: 12 }, (_, i) => (
@@ -308,10 +308,10 @@ const RemoteRegistrationForm: React.FC<RemoteRegistrationFormProps> = ({
                 <SelectTrigger
                   id="guardianDobDay"
                   className="w-full sm:w-20"
-                  aria-label={t.dayPlaceholder || "Day"}
+                  aria-label={t.yearPlaceholder || "Day"}
                   disabled={!guardianDobYear || !guardianDobMonth}
                 >
-                  <SelectValue placeholder={t.dayPlaceholder || "Day"} />
+                  <SelectValue placeholder={t.yearPlaceholder || "Day"} />
                 </SelectTrigger>
                 <SelectContent>
                   {(() => {

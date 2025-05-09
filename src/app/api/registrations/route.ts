@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { accounts, createAccountSchema } from "@/lib/db/schema";
 import { z } from "zod";
-import { password as BunPassword } from "bun";
+// import { password as BunPassword } from "bun";
 import { env } from "@/lib/config";
 
 // POST /api/registrations - Public endpoint to create a new account without qr code
@@ -41,7 +41,8 @@ export async function POST(request: Request, context: any) {
 
     // Hash PIN if provided
     if (pin) {
-      accountData.hashedPin = await BunPassword.hash(pin);
+      // accountData.hashedPin = await BunPassword.hash(pin);
+      accountData.hashedPin = pin;
     }
 
     try {

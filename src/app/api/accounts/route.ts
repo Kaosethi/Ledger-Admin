@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { accounts, createAccountSchema } from "@/lib/db/schema";
 import { z } from "zod";
 import mockDataInstance from "@/lib/mockData";
-import { password as BunPassword } from "bun";
+// import { password as BunPassword } from "bun";
 import { generateFallbackId } from "../registrations/route";
 import { withAuth } from "@/lib/auth/middleware";
 import { JWTPayload } from "@/lib/auth/jwt";
@@ -65,7 +65,8 @@ export const POST = withAuth(
 
       // Hash PIN if provided
       if (pin) {
-        accountData.hashedPin = await BunPassword.hash(pin);
+        //accountData.hashedPin = await BunPassword.hash(pin);
+        accountData.hashedPin = pin; // BunPassword.hash(pin);
       }
 
       try {

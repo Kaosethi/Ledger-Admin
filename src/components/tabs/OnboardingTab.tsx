@@ -1,6 +1,5 @@
 // src/components/tabs/OnboardingTab.tsx
-// FIXED: Corrected Account object creation to match type definition.
-// FIXED: Corrected onClick handler for react-to-print button.
+// MODIFIED: Changed currency symbols and codes from USD/$ to THB/฿ in relevant places.
 
 import React, { useState, useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
@@ -36,6 +35,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useMutation } from "@tanstack/react-query";
+// ADDED: Import formatCurrency to potentially use it for consistency if desired later,
+// though current changes are direct string replacements.
+import { formatCurrency } from "@/lib/utils";
+
 
 interface OnboardingTabProps {
   accounts: Account[];
@@ -100,13 +103,14 @@ const OnboardingTab: React.FC<OnboardingTabProps> = ({
       // Add created account to local state
       onAccountAdd(accountWithoutPin);
 
+      // MODIFIED: Changed $ to ฿ for logging
       logAdminActivity(
         "Onboard Account",
         "Account",
         accountWithoutPin.id,
         `Registered ${accountWithoutPin.childName} (Guardian: ${
           accountWithoutPin.guardianName
-        }) with initial balance $${
+        }) with initial balance ฿${
           typeof accountWithoutPin.balance === "number"
             ? accountWithoutPin.balance.toFixed(2)
             : "0.00"
@@ -209,7 +213,6 @@ const OnboardingTab: React.FC<OnboardingTabProps> = ({
 
   // --- react-to-print hook ---
   const handlePrintQr = useReactToPrint({
-    // Assuming the 'content' error (TS2353) might resolve after fixing usage, or requires @ts-ignore
     // @ts-expect-error - If TS2353 persists, uncomment this line to suppress the known type issue.
     content: () => qrCodeRef.current,
     documentTitle: `QRCode-${accountId || "NewAccount"}`,
@@ -354,10 +357,10 @@ const OnboardingTab: React.FC<OnboardingTabProps> = ({
             <div className="space-y-4">
               {/* Guardian/Child Fields - Replaced with shadcn components */}
               <h3 className="text-lg font-medium text-foreground border-b pb-2">
-                Guardian&apos;s Information
+                Guardian's Information
               </h3>
               <div className="space-y-2">
-                <Label htmlFor="guardian-name">Guardian&apos;s Full Name</Label>
+                <Label htmlFor="guardian-name">Guardian's Full Name</Label>
                 <Input
                   id="guardian-name"
                   required
@@ -367,7 +370,7 @@ const OnboardingTab: React.FC<OnboardingTabProps> = ({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="guardian-email">Guardian&apos;s Email</Label>
+                <Label htmlFor="guardian-email">Guardian's Email</Label>
                 <Input
                   type="email"
                   id="guardian-email"
@@ -378,7 +381,7 @@ const OnboardingTab: React.FC<OnboardingTabProps> = ({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="guardian-dob">
-                  Guardian&apos;s Date of Birth
+                  Guardian's Date of Birth
                 </Label>
                 <div className="flex gap-2">
                   {/* Year Selector */}
@@ -460,7 +463,7 @@ const OnboardingTab: React.FC<OnboardingTabProps> = ({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="guardian-contact">
-                  Guardian&apos;s Contact Number
+                  Guardian's Contact Number
                 </Label>
                 <Input
                   type="tel"
@@ -482,10 +485,10 @@ const OnboardingTab: React.FC<OnboardingTabProps> = ({
               </div>
 
               <h3 className="text-lg font-medium text-foreground border-b pb-2 pt-4">
-                Child&apos;s Information
+                Child's Information
               </h3>
               <div className="space-y-2">
-                <Label htmlFor="child-name">Child&apos;s Full Name</Label>
+                <Label htmlFor="child-name">Child's Full Name</Label>
                 <Input
                   id="child-name"
                   required
@@ -561,31 +564,31 @@ const OnboardingTab: React.FC<OnboardingTabProps> = ({
                 <Label htmlFor="initial-balance">
                   Initial Balance (Optional)
                 </Label>
-                {/* TODO: Refine input group styling if needed */}
                 <div className="relative">
+                  {/* MODIFIED: Changed $ to ฿ */}
                   <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-muted-foreground sm:text-sm">
-                    $
+                    ฿
                   </span>
                   <Input
                     type="number"
                     id="initial-balance"
-                    className="pl-7 pr-12"
+                    className="pl-7 pr-12" // Ensure padding accommodates symbol
                     placeholder="0.00"
                     step="0.01"
                     min="0"
                     value={initialBalanceStr}
                     onChange={(e) => setInitialBalanceStr(e.target.value)}
                   />
+                  {/* MODIFIED: Changed USD to THB */}
                   <span className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-muted-foreground sm:text-sm">
-                    USD
+                    THB
                   </span>
                 </div>
               </div>
 
-              {/* QR Code Section - Placeholder for now, needs further refinement */}
+              {/* QR Code Section */}
               <Card className="mt-6 bg-muted/30">
                 {" "}
-                {/* Use Card for visual separation */}
                 <CardHeader>
                   <CardTitle className="text-lg">Account QR Code</CardTitle>
                 </CardHeader>
@@ -634,7 +637,7 @@ const OnboardingTab: React.FC<OnboardingTabProps> = ({
                           </span>
                         </p>
                         <p>
-                          Child&apos;s Name:{" "}
+                          Child's Name:{" "}
                           <span className="font-medium text-foreground">
                             {childName || "N/A"}
                           </span>
@@ -647,8 +650,9 @@ const OnboardingTab: React.FC<OnboardingTabProps> = ({
                         </p>
                         <p>
                           Initial Balance:{" "}
+                           {/* MODIFIED: Changed $ to ฿ */}
                           <span className="font-medium text-foreground">
-                            $
+                            ฿
                             {(initialBalanceStr === ""
                               ? 0
                               : parseFloat(initialBalanceStr) || 0

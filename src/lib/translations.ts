@@ -2,6 +2,7 @@
 // NEW FILE
 
 export interface TranslationStrings {
+    yearPlaceholder: string;
     // Page Title
     pageTitle: string;
 
@@ -77,6 +78,7 @@ export const translations: { [key: string]: TranslationStrings } = {
         requiredIndicator: '*',
         switchToEnglish: 'English',
         switchToThai: 'ภาษาไทย',
+        yearPlaceholder: ""
     },
     th: {
         pageTitle: 'ลงทะเบียนบัญชีผู้รับผลประโยชน์',
@@ -108,5 +110,6 @@ export const translations: { [key: string]: TranslationStrings } = {
         requiredIndicator: '*',
         switchToEnglish: 'English',
         switchToThai: 'ภาษาไทย',
+        yearPlaceholder: ""
     },
 };

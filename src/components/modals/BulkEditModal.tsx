@@ -1,6 +1,5 @@
 // src/components/modals/BulkEditModal.tsx
-// FIXED: Use 'childName' instead of 'name' when displaying selected accounts.
-// FIXED: Updated normalizeAccountStatus to handle 'Active' | 'Inactive' | 'Suspended'.
+// MODIFIED: Changed currency symbol and code in Amount input from USD/$ to THB/฿.
 
 import React, { useState, useEffect } from 'react';
 import type { Account } from '@/lib/mockData'; // Ensure path is correct
@@ -106,9 +105,11 @@ const BulkEditModal: React.FC<BulkEditModalProps> = ({
                 <label htmlFor="bulk-amount" className="block text-sm font-medium text-gray-700 mb-1 sr-only">Amount</label>
                  <div className="mt-1 relative rounded-md shadow-sm">
                      {/* Amount input structure */}
-                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><span className="text-gray-500 sm:text-sm">$</span></div>
+                     {/* MODIFIED: Changed $ to ฿ */}
+                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><span className="text-gray-500 sm:text-sm">฿</span></div>
                      <input type="number" name="bulk-amount" id="bulk-amount" className="focus:ring-primary focus:border-primary block w-full pl-10 pr-12 sm:text-sm border-gray-300 rounded-md" placeholder="Leave blank for no change" value={amountStr} onChange={(e) => setAmountStr(e.target.value)} min="0" step="0.01"/>
-                     <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none"><span className="text-gray-500 sm:text-sm">USD</span></div>
+                     {/* MODIFIED: Changed USD to THB */}
+                     <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none"><span className="text-gray-500 sm:text-sm">THB</span></div>
                  </div>
             </div>
         </fieldset>

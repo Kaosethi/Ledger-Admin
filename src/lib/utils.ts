@@ -1,32 +1,32 @@
 // src/lib/utils.ts
-// ADDED: formatDateTime function (if not already present and exported)
+// MODIFIED: formatCurrency function defaults and fallback for THB
 
 import React from "react";
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
-// ADDED: cn utility function
+// cn utility function
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// ... (formatCurrency, formatDate, formatDdMmYyyy, formatTime, formatDdMmYyyyHhMmSs remain the same) ...
+// MODIFIED: formatCurrency to default to THB and use Baht symbol
 export const formatCurrency = (
   amount: number | undefined | null,
-  currency: string = "USD",
-  locale: string = "en-US"
+  currency: string = "THB", // MODIFIED: Default currency to THB
+  locale: string = "en-US" // Kept as en-US, Intl.NumberFormat will use THB symbol
 ): string => {
-  // ... implementation ...
   if (amount === undefined || amount === null || isNaN(amount)) {
-    return "$ -.--";
+    return "฿ -.--"; // MODIFIED: Fallback symbol to Baht and placeholder
   }
   try {
     return new Intl.NumberFormat(locale, {
       style: "currency",
-      currency: currency,
+      currency: currency, // This will now be 'THB' by default
     }).format(amount);
   } catch (error) {
     console.error("Error formatting currency:", error);
+    // This will also use 'THB' (or the provided currency) if currency default is changed
     return `${currency} ${amount.toFixed(2)}`;
   }
 };
@@ -36,7 +36,6 @@ export const formatDate = (
   locale: string = "en-US",
   options?: Intl.DateTimeFormatOptions
 ): string => {
-  // ... implementation ...
   if (!dateInput) return "N/A";
 
   try {
@@ -49,7 +48,7 @@ export const formatDate = (
 
     const defaultOptions: Intl.DateTimeFormatOptions = {
       year: "numeric",
-      month: "numeric", // Use 'short' for month abbreviation if desired
+      month: "numeric",
       day: "numeric",
       ...options,
     };
@@ -63,7 +62,6 @@ export const formatDate = (
 export const formatDdMmYyyy = (
   isoString: string | null | undefined
 ): string => {
-  // ... implementation ...
   if (!isoString) return "N/A";
   try {
     const date = new Date(isoString);
@@ -79,7 +77,6 @@ export const formatDdMmYyyy = (
 };
 
 export const formatTime = (isoString: string | null | undefined): string => {
-  // ... implementation ...
   if (!isoString) return "N/A";
   try {
     const date = new Date(isoString);
@@ -87,7 +84,7 @@ export const formatTime = (isoString: string | null | undefined): string => {
     const hours = date.getHours().toString().padStart(2, "0");
     const minutes = date.getMinutes().toString().padStart(2, "0");
     const seconds = date.getSeconds().toString().padStart(2, "0");
-    return `${hours}:${minutes}:${seconds}`; // Keep seconds for detail? Or remove if not needed
+    return `${hours}:${minutes}:${seconds}`;
   } catch (e) {
     console.error("Error in formatTime:", e);
     return "Invalid Time";
@@ -97,7 +94,6 @@ export const formatTime = (isoString: string | null | undefined): string => {
 export const formatDdMmYyyyHhMmSs = (
   isoString: string | null | undefined
 ): string => {
-  // ... implementation ...
   if (!isoString) return "N/A";
   try {
     const date = new Date(isoString);
@@ -115,14 +111,6 @@ export const formatDdMmYyyyHhMmSs = (
   }
 };
 
-// ADDED: formatDateTime function for combined, localized date and time
-/**
- * Formats an ISO date string into localized date and time parts.
- * Example output: { date: 'Mar 12, 2024', time: '06:00 PM' }
- * @param isoString The ISO date string.
- * @param locale Locale string (default: 'en-US').
- * @returns An object with formatted date and time strings, or { date: 'N/A', time: 'N/A' }.
- */
 export const formatDateTime = (
   isoString: string | null | undefined,
   locale: string = "en-US"
@@ -140,8 +128,8 @@ export const formatDateTime = (
     };
     const timeOptions: Intl.DateTimeFormatOptions = {
       hour: "2-digit",
-      minute: "2-digit" /* hour12: true */,
-    }; // Optional: Use 12-hour clock
+      minute: "2-digit",
+    };
 
     const date = dateObj.toLocaleDateString(locale, dateOptions);
     const time = dateObj.toLocaleTimeString(locale, timeOptions);
@@ -156,7 +144,6 @@ export const renderStatusBadge = (
   status: string | undefined | null,
   type?: "account" | "merchant" | "transaction" | "pending"
 ): React.ReactElement => {
-  // ... implementation (should be correct based on previous update) ...
   let bgColor = "bg-gray-100";
   let textColor = "text-gray-800";
   let text = status || "Unknown";
@@ -192,11 +179,10 @@ export const renderStatusBadge = (
           bgColor = "bg-green-100";
           textColor = "text-green-800";
           break;
-        // Removed 'inactive' as it's not a valid state anymore
         case "pending":
           bgColor = "bg-blue-100";
           textColor = "text-blue-800";
-          break; // Changed from pending_approval
+          break;
         case "suspended":
           bgColor = "bg-yellow-100";
           textColor = "text-yellow-800";
@@ -224,10 +210,10 @@ export const renderStatusBadge = (
         case "declined":
           bgColor = "bg-red-100";
           textColor = "text-red-800";
-          break; // Same as failed for now
+          break;
       }
       break;
-    case "pending": // Generic pending registration/request status
+    case "pending":
       switch (lowerCaseStatus) {
         case "pending":
           bgColor = "bg-blue-100";
@@ -243,7 +229,7 @@ export const renderStatusBadge = (
           break;
       }
       break;
-    default: // Fallback
+    default:
       switch (lowerCaseStatus) {
         case "active":
         case "completed":
