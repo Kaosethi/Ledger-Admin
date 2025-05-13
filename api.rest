@@ -92,7 +92,7 @@ Content-Type: {{contentType}}
 # Get all merchants
 GET {{baseUrl}}/merchants
 
-# Create new merchant
+### Create new merchant
 POST {{baseUrl}}/merchants
 Content-Type: {{contentType}}
 
@@ -149,4 +149,17 @@ Content-Type: {{contentType}}
 {
   "status": "Declined",
   "declineReason": "Insufficient funds"
+}
+
+### register merchant
+POST {{baseUrl}}/merchant-app/auth/register
+Content-Type: {{contentType}}
+
+{
+  "name": "Store Owner",
+  "email": "store@example.com",
+  "password": "123passwd",
+  "location": "Bangkok",
+  "category": "123 Main St",
+  "contactEmail": "store@example.com"
 }
