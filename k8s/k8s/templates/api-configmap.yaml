@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.api.serviceName }}-config
+  namespace: {{ .Values.namespace }}
+data:
+  ENV: "{{ .Values.environment }}"
+  APP_ENV: "{{ .Values.environment }}"
+  APP_PORT: "{{ .Values.api.configs.appPort }}"
+  BUN_DEBUG: "{{ .Values.api.configs.bunDebug }}"
+  TZ: "{{ .Values.api.configs.timezone }}"
+  V2_BASE_URL: "{{ .Values.api.configs.v2BaseUrl }}"
+  APP_BASE_URL: "{{ .Values.api.configs.appBaseUrl }}"
+  CALLBACK_WHITELIST: "{{ .Values.api.configs.callbackWhitelist }}"
+  EMAIL_PROVIDER: "{{ .Values.api.secrets.emailProvider }}"
+  MAILPIT_UI: "{{ .Values.api.configs.mailpitUI }}" 

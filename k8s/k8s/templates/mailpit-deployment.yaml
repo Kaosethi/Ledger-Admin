@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mailpit
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: mailpit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mailpit
+  template:
+    metadata:
+      labels:
+        app: mailpit
+    spec:
+      containers:
+      - name: mailpit
+        image: {{ .Values.mailpit.image.repository }}:{{ .Values.mailpit.image.tag }}
+        imagePullPolicy: {{ .Values.mailpit.image.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.mailpit.smtpPort }}
+          name: smtp
+        - containerPort: {{ .Values.mailpit.uiPort }}
+          name: ui
+        resources:
+          requests:
+            memory: {{ .Values.mailpit.resources.requests.memory }}
+            cpu: {{ .Values.mailpit.resources.requests.cpu }}
+          limits:
+            memory: {{ .Values.mailpit.resources.limits.memory }}
+            cpu: {{ .Values.mailpit.resources.limits.cpu }}
+        env:
+        - name: MP_SMTP_AUTH_ACCEPT_ANY
+          value: "true"
+        - name: MP_SMTP_AUTH_ALLOW_INSECURE
+          value: "true" 

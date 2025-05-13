@@ -1,0 +1,465 @@
+/* src/app/globals.css */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom styles copied from Admin.txt <style> block */
+.pin-input {
+  width: 3rem;
+  height: 3rem;
+  font-size: 1.5rem;
+  text-align: center;
+}
+.status-badge {
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  white-space: nowrap;
+  display: inline-block;
+}
+.status-active {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+.status-pending_approval,
+.status-pending-approval {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+.status-suspended {
+  background-color: #ffe4e6;
+  color: #991b1b;
+}
+.status-rejected {
+  background-color: #e5e7eb;
+  color: #4b5563;
+}
+.status-unknown {
+  background-color: #e5e7eb;
+  color: #4b5563;
+}
+
+/* Print Preview and Bulk Print Specific Styles */
+.bulk-print-preview-container {
+  background-color: #f0f0f0; /* Light grey background for the preview page itself */
+  padding: 20px;
+  min-height: 100vh;
+}
+.bulk-print-controls {
+  background-color: white;
+  padding: 15px;
+  margin-bottom: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+.bulk-print-page {
+  background-color: white; /* A4 page background */
+  width: 210mm; /* A4 width */
+  min-height: 297mm; /* A4 height */
+  padding: 15mm; /* Margins */
+  margin: 20px auto; /* Centering the page */
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+  box-sizing: border-box;
+}
+.bulk-print-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); /* 2 columns */
+  gap: 10mm; /* Gap between items */
+  min-height: calc(297mm - 30mm); /* Fill page height minus margins */
+}
+.bulk-print-item {
+  border: 1px solid #ccc;
+  padding: 5mm;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
+  overflow: hidden; /* Prevent content overflow */
+  page-break-inside: avoid; /* Try to keep item on one page */
+}
+.bulk-print-item img {
+  width: 80px; /* Smaller QR code for grid */
+  height: 80px;
+  display: block;
+  margin: 5px auto;
+}
+.bulk-print-item p {
+  font-size: 8pt;
+  margin: 1px 0;
+  line-height: 1.1;
+  word-break: break-word; /* Break long names/IDs */
+}
+.bulk-print-item strong {
+  font-weight: bold;
+  font-size: 8.5pt;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-section,
+  .print-section * {
+    visibility: visible;
+  }
+  .print-section {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  /* Ensure interactive elements and modals are hidden when printing */
+  button,
+  input,
+  select,
+  textarea,
+  .modal-container,
+  .bulk-print-controls {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  .bulk-print-preview-container {
+    background-color: transparent;
+    padding: 0;
+  }
+  .bulk-print-page,
+  .bulk-print-page * {
+    visibility: visible;
+  }
+  .bulk-print-page {
+    width: 100%; /* Use full printable area */
+    height: auto;
+    min-height: 0;
+    margin: 0;
+    padding: 0; /* Use @page margins */
+    box-shadow: none;
+    border: none;
+    page-break-after: always; /* Ensure each A4 div is on a new page */
+  }
+  .bulk-print-grid {
+    min-height: 0; /* Reset min-height for printing */
+  }
+  .bulk-print-item {
+    border: 1px solid #eee; /* Lighter border for print */
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 15mm; /* Printer margins */
+  }
+}
+
+/* Custom utility-like classes from Admin.txt */
+.modal-dt {
+  /* Add specific styles if needed, or handle with Tailwind in components */
+}
+.modal-dd {
+  /* Add specific styles if needed, or handle with Tailwind in components */
+}
+
+/* Use @layer components to define reusable component styles if preferred */
+/* Or define them as regular CSS */
+.dashboard-card {
+  /* Consider using Tailwind apply for consistency if desired */
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  padding: 1.5rem;
+  border: 1px solid #e5e7eb;
+  background-color: #ffffff;
+  /* Or keep custom CSS: */
+  /* background-color: theme('colors.white'); */
+  /* border-radius: theme('borderRadius.lg'); */
+  /* box-shadow: theme('boxShadow.md'); */
+  /* padding: theme('spacing.6'); */
+  /* border: 1px solid theme('colors.gray.200'); */
+}
+
+.table-header {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.table-header.center {
+  text-align: center;
+}
+
+.table-cell {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+  text-align: left;
+  font-size: 0.875rem;
+  color: #1f2937;
+}
+.table-cell.center {
+  text-align: center;
+}
+.table-cell.actions {
+  text-align: center;
+  white-space: nowrap;
+}
+.table-cell.details {
+  white-space: normal;
+  word-break: break-word;
+}
+
+/* Add empty definitions if you rely on the applyCommonStyles JS from the demo, */
+/* BUT the correct React approach is to add Tailwind classes directly in JSX */
+/* It's better to remove these empty rules and apply classes in components */
+.input-field {
+  /* Apply Tailwind classes in JSX: block w-full px-3 py-2 border... */
+}
+.input-addon {
+  /* Apply Tailwind classes in JSX */
+}
+.input-icon {
+  /* Apply Tailwind classes in JSX */
+}
+.checkbox {
+  /* Apply Tailwind classes in JSX: h-4 w-4 text-primary... */
+}
+.modal-container {
+  /* Apply Tailwind classes in JSX: fixed inset-0 bg-gray-500... */
+}
+.modal-content {
+  /* Apply Tailwind classes in JSX: bg-white rounded-lg... */
+}
+.btn-primary {
+  /* Apply Tailwind classes in JSX: py-2 px-4 border bg-primary... */
+}
+.btn-secondary {
+  /* Apply Tailwind classes in JSX: py-2 px-4 border border-gray-300... */
+}
+.pagination-btn {
+  /* Apply Tailwind classes in JSX: py-1 px-3 border border-gray-300... */
+}
+
+/* Specific Component Styles */
+.session-header .chevron-icon {
+  transition: transform 0.2s ease-in-out;
+}
+.session-header .rotate-180 {
+  transform: rotate(180deg);
+}
+
+.account-status-btn {
+  flex: 1;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: 0.375rem;
+}
+.merchant-status-btn {
+  flex: 1;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: 0.375rem;
+}
+
+/* END OF VALID CSS RULES */
+/* DO NOT PASTE HTML OR JAVASCRIPT BELOW THIS LINE */
+
+/* Global styles for shadcn/ui components to have white background */
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+}
+
+/* Make all card components have white background by default */
+.card {
+  background-color: white !important;
+}
+
+/* Set white backgrounds for other shadcn UI components */
+.dialog-content,
+.popover-content,
+.select-content,
+.dropdown-menu-content,
+.sheet-content,
+.drawer-content,
+.command-dialog,
+.toast,
+.alert,
+.hover-card-content {
+  background-color: white !important;
+}
+
+/* For Radix components */
+[data-radix-popper-content-wrapper] {
+  background-color: white !important;
+}
+
+/* Toast specific styling - make all elements white and opaque */
+.toast {
+  background-color: white !important;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Target internal elements and related toast classes */
+[role="status"].toast,
+[data-state="open"].toast,
+[data-swipe="move"].toast,
+[data-swipe="cancel"].toast,
+[data-swipe="end"].toast,
+.toast > *,
+.toast > div,
+.toast-description,
+.toast-title {
+  background-color: white !important;
+  backdrop-filter: none !important;
+  background-image: none !important;
+  opacity: 1 !important;
+}
+
+/* Fix for the toast variant classes */
+.toast[data-variant="default"] {
+  background-color: white !important;
+  border-color: #e5e7eb;
+}
+
+.toast[data-variant="destructive"] {
+  background-color: white !important;
+  border-color: #f87171;
+}
+
+/* Target Radix-specific toast elements */
+[data-radix-toast-root],
+[data-radix-toast-title],
+[data-radix-toast-description],
+[data-radix-toast-action],
+[data-radix-toast-close] {
+  background-color: white !important;
+}
+
+/* Override any background color from element ancestors */
+.toast * {
+  background-color: transparent !important;
+}
+
+/* Add styles for the print-only-container */
+.print-only-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Make print container visible when printing */
+.printing-active {
+  visibility: visible !important;
+  opacity: 1 !important;
+  z-index: 9999 !important;
+  background: white !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: auto !important;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  /* Override for our specific printing container */
+  .print-only-container.printing-active,
+  .print-only-container.printing-active * {
+    visibility: visible !important;
+    display: block !important;
+    opacity: 1 !important;
+  }
+
+  .print-only-container.printing-active {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    z-index: 9999 !important;
+    background-color: white !important;
+  }
+
+  .print-section,
+  .print-section * {
+    visibility: visible;
+  }
+  .print-section {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  /* Ensure interactive elements and modals are hidden when printing */
+  button,
+  input,
+  select,
+  textarea,
+  .modal-container,
+  .bulk-print-controls {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  .bulk-print-preview-container {
+    background-color: transparent;
+    padding: 0;
+  }
+  .bulk-print-page,
+  .bulk-print-page * {
+    visibility: visible;
+  }
+  .bulk-print-page {
+    width: 100%; /* Use full printable area */
+    height: auto;
+    min-height: 0;
+    margin: 0;
+    padding: 0; /* Use @page margins */
+    box-shadow: none;
+    border: none;
+    page-break-after: always; /* Ensure each A4 div is on a new page */
+  }
+  .bulk-print-grid {
+    min-height: 0; /* Reset min-height for printing */
+  }
+  .bulk-print-item {
+    border: 1px solid #eee; /* Lighter border for print */
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 15mm; /* Printer margins */
+  }
+}
