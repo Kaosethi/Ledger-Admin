@@ -1,125 +1,138 @@
 // src/components/modals/TransactionDetailModal.tsx
-// FIXED: Corrected status comparison to match Transaction type definition.
+// REFINED: UI using shadcn/ui Dialog components and Tailwind CSS for better presentation.
+// FIXED: Ensure amount uses formatCurrency with Math.abs() and defaults to THB/฿.
+// ADDED: Use renderStatusBadge utility for consistent status display.
+// FIXED: Removed incorrect import and type assertion for TransactionStatus.
 
 import React from "react";
-import type { Transaction, Merchant } from "@/lib/mockData"; // Ensure path is correct
-import { formatCurrency, formatDdMmYyyy, formatTime } from "@/lib/utils"; // Ensure path is correct
+import type { Transaction } from "@/lib/mockData";
+// REMOVED: Incorrect import for TransactionStatus
+import {
+  formatCurrency,
+  formatDdMmYyyy,
+  formatTime,
+  renderStatusBadge, // ADDED: Import renderStatusBadge
+} from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogClose, // ADDED: For the close button
+} from "@/components/ui/dialog"; // ADDED: Shadcn Dialog components
+import { Button } from "@/components/ui/button"; // ADDED: Shadcn Button
 
 interface TransactionDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   transaction: Transaction | null;
-  // MODIFIED: Removed merchants prop as it wasn't used after changes
-  // merchants: Merchant[];
 }
 
 const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
   isOpen,
   onClose,
   transaction,
-  // merchants = [], // Removed from destructuring
 }) => {
-  if (!isOpen || !transaction) return null;
+  // Handle modal visibility using the Dialog's 'open' prop controlled by 'isOpen'
+  if (!transaction) return null; // Don't render if no transaction
 
-  // Display only merchant ID if it exists
+  // Use merchantId directly if available
   const merchantDisplay = transaction.merchantId || "N/A";
 
-  // MODIFIED: Status class calculation to use correct status values
-  const statusClass =
-    transaction.status === "Completed" // Use 'Completed' instead of 'Approved'
-      ? "text-green-600 bg-green-100"
-      : transaction.status === "Failed" || transaction.status === "Declined" // Group Failed/Declined as red
-      ? "text-red-600 bg-red-100"
-      : transaction.status === "Pending" // Handle Pending specifically
-      ? "text-yellow-600 bg-yellow-100"
-      : "text-gray-600 bg-gray-100"; // Default/fallback
-
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex justify-center items-center p-4">
-      <div className="relative mx-auto p-6 border w-full max-w-lg shadow-lg rounded-md bg-white">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-4 pb-3 border-b">
-          <h3 className="text-lg font-semibold text-gray-900">
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-lg bg-white p-0">
+        <DialogHeader className="p-6 pb-4 border-b">
+          <DialogTitle className="text-lg font-semibold text-gray-900">
             Transaction Details
-          </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-             {/* Close Icon */}
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-          </button>
-        </div>
+          </DialogTitle>
+          {/* Optional: Add DialogDescription here if needed */}
+          {/* <DialogDescription>Details for transaction {transaction.id}</DialogDescription> */}
+        </DialogHeader>
 
-        {/* Body Content */}
-        <div className="space-y-3 text-sm">
-          {/* Date */}
-          <div className="grid grid-cols-3 gap-x-4">
-            <dt className="font-medium text-gray-500">Date:</dt>
-            <dd className="col-span-2 text-gray-900">{formatDdMmYyyy(transaction.timestamp)}</dd>
-          </div>
-          {/* Time */}
-          <div className="grid grid-cols-3 gap-x-4">
-            <dt className="font-medium text-gray-500">Time:</dt>
-            <dd className="col-span-2 text-gray-900">{formatTime(transaction.timestamp)}</dd>
-          </div>
-          {/* Merchant ID */}
-          <div className="grid grid-cols-3 gap-x-4">
-            <dt className="font-medium text-gray-500">Merchant ID:</dt>
-            <dd className="col-span-2 text-gray-900 font-mono">{merchantDisplay}</dd>
-          </div>
-          {/* Account ID */}
-          <div className="grid grid-cols-3 gap-x-4">
-            <dt className="font-medium text-gray-500">Account ID:</dt>
-            <dd className="col-span-2 text-gray-900 font-mono">{transaction.accountId}</dd>
-          </div>
-          {/* Transaction ID */}
-          <div className="grid grid-cols-3 gap-x-4">
-            <dt className="font-medium text-gray-500">Transaction ID:</dt>
-            <dd className="col-span-2 text-gray-900 font-mono">{transaction.id}</dd>
-          </div>
-           {/* Type */}
-          <div className="grid grid-cols-3 gap-x-4">
-            <dt className="font-medium text-gray-500">Type:</dt>
-            <dd className="col-span-2 text-gray-900">{transaction.type}</dd>
-          </div>
-           {/* Description */}
-          <div className="grid grid-cols-3 gap-x-4">
-            <dt className="font-medium text-gray-500">Description:</dt>
-            <dd className="col-span-2 text-gray-900">{transaction.description || 'N/A'}</dd>
-          </div>
-           {/* Status */}
-          <div className="grid grid-cols-3 gap-x-4 items-center">
-            <dt className="font-medium text-gray-500">Status:</dt>
-            <dd className="col-span-2">
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusClass}`}>
-                {transaction.status}
-              </span>
+        {/* Body Content - Use dl for semantic key-value pairs */}
+        <div className="p-6 space-y-4 text-sm">
+          <dl className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-3">
+            {/* Date */}
+            <dt className="font-medium text-gray-500">Date</dt>
+            <dd className="sm:col-span-2 text-gray-900">
+              {formatDdMmYyyy(transaction.timestamp)}
             </dd>
-          </div>
-           {/* Amount */}
-          <div className="grid grid-cols-3 gap-x-4">
-            <dt className="font-medium text-gray-500">Amount:</dt>
-            <dd className="col-span-2 text-gray-900 font-semibold">
-              {/* Show sign based on type */}
-              {(transaction.type === 'Credit' || (transaction.type === 'Adjustment' && transaction.amount > 0)) ? '+' : '-'}
+
+            {/* Time */}
+            <dt className="font-medium text-gray-500">Time</dt>
+            <dd className="sm:col-span-2 text-gray-900">
+              {formatTime(transaction.timestamp)}
+            </dd>
+
+            {/* Merchant ID */}
+            <dt className="font-medium text-gray-500">Merchant ID</dt>
+            <dd className="sm:col-span-2 text-gray-900 font-mono">
+              {merchantDisplay}
+            </dd>
+
+            {/* Account ID */}
+            <dt className="font-medium text-gray-500">Account ID</dt>
+            <dd className="sm:col-span-2 text-gray-900 font-mono">
+              {transaction.accountId}
+            </dd>
+
+            {/* Transaction ID */}
+            <dt className="font-medium text-gray-500">Transaction ID</dt>
+            <dd className="sm:col-span-2 text-gray-900 font-mono break-all">
+              {transaction.id}
+            </dd>
+
+            {/* Type */}
+            <dt className="font-medium text-gray-500">Type</dt>
+            <dd className="sm:col-span-2 text-gray-900">{transaction.type}</dd>
+
+            {/* Description */}
+            <dt className="font-medium text-gray-500">Description</dt>
+            <dd className="sm:col-span-2 text-gray-900">
+              {transaction.description || "N/A"}
+            </dd>
+
+            {/* Status */}
+            <dt className="font-medium text-gray-500 self-center">Status</dt>
+            <dd className="sm:col-span-2">
+              {/* Use renderStatusBadge utility */}
+              {/* REMOVED: Incorrect type assertion */}
+              {renderStatusBadge(transaction.status, "transaction")}
+            </dd>
+
+            {/* Amount */}
+            <dt className="font-medium text-gray-500">Amount</dt>
+            <dd className="sm:col-span-2 text-gray-900 font-semibold text-base">
+              {/* MODIFIED: Removed manual +/- sign. Use formatCurrency with absolute value */}
+              {/* formatCurrency defaults to THB/฿ from utils.ts */}
               {formatCurrency(Math.abs(transaction.amount))}
             </dd>
-          </div>
-           {/* Decline Reason (Optional) */}
-           {transaction.declineReason && (
-             <div className="grid grid-cols-3 gap-x-4">
-                <dt className="font-medium text-gray-500">Decline Reason:</dt>
-                <dd className="col-span-2 text-red-700">{transaction.declineReason}</dd>
-              </div>
-           )}
+
+            {/* Decline Reason (Optional) */}
+            {transaction.declineReason && (
+              <>
+                <dt className="font-medium text-gray-500">Decline Reason</dt>
+                <dd className="sm:col-span-2 text-red-700">
+                  {transaction.declineReason}
+                </dd>
+              </>
+            )}
+          </dl>
         </div>
 
         {/* Footer */}
-        <div className="mt-6 flex justify-end pt-4 border-t">
-          <button type="button" onClick={onClose} className="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300">
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
+        <DialogFooter className="p-4 border-t bg-gray-50 sm:justify-end">
+          {/* Use DialogClose for accessibility benefits */}
+          <DialogClose asChild>
+            <Button type="button" variant="outline">
+              Close
+            </Button>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 
