@@ -4,6 +4,7 @@ import { accounts, createAccountSchema } from "@/lib/db/schema";
 import { z } from "zod";
 // import { password as BunPassword } from "bun";
 import { env } from "@/lib/config";
+import { generateFallbackId } from "@/lib/utils";
 
 // POST /api/registrations - Public endpoint to create a new account without qr code
 export async function POST(request: Request, context: any) {
@@ -82,10 +83,4 @@ export async function POST(request: Request, context: any) {
       { status: 500 }
     );
   }
-}
-
-export function generateFallbackId() {
-  const year = new Date().getFullYear().toString();
-  const randomChars = Math.random().toString(36).substring(2, 6).toUpperCase();
-  return `STC-${year}-${randomChars}`;
 }

@@ -330,7 +330,7 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
                   ) : currentQrToken ? (
                     <QRCodeSVG value={currentQrToken} size={140} bgColor={"#ffffff"} fgColor={"#000000"} level={"H"} includeMargin={true} />
                   ) : (
-                    <span className="text-gray-500 text-sm text-center">Click "Generate QR Code" to display the code.</span>
+                    <span className="text-gray-500 text-sm text-center">Click &quot;Generate QR Code&quot; to display the code.</span>
                   )}
                 </div>
               </div>

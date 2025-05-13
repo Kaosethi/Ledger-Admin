@@ -10,6 +10,13 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// Generate a fallback ID for accounts
+export function generateFallbackId() {
+  const year = new Date().getFullYear().toString();
+  const randomChars = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `STC-${year}-${randomChars}`;
+}
+
 // MODIFIED: formatCurrency to default to THB and use Baht symbol
 export const formatCurrency = (
   amount: number | undefined | null,

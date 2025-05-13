@@ -357,6 +357,7 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
     // MODIFIED: Use childName and add lastActivity
     const newAccount: Account = {
       id: newAccountId,
+      displayId: newAccountId,
       childName: pending.childName, // Use childName
       guardianName: pending.guardianName,
       balance: 0,
@@ -428,6 +429,7 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
           // MODIFIED: Use childName and add lastActivity
           const newAccount: Account = {
             id: newAccountId,
+            displayId: newAccountId,
             childName: pending.childName, // Use childName
             guardianName: pending.guardianName,
             balance: 0,

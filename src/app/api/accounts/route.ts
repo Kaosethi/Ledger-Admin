@@ -4,7 +4,7 @@ import { accounts, createAccountSchema } from "@/lib/db/schema";
 import { z } from "zod";
 import mockDataInstance from "@/lib/mockData";
 // import { password as BunPassword } from "bun";
-import { generateFallbackId } from "../registrations/route";
+import { generateFallbackId } from "@/lib/utils";
 import { withAuth } from "@/lib/auth/middleware";
 import { JWTPayload } from "@/lib/auth/jwt";
 import { env } from "@/lib/config";

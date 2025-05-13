@@ -1,6 +1,6 @@
 // src/components/AdminDashboard.tsx
 // MODIFIED: Added useEffect for periodic status check, modified handleLogout
-'use client';
+"use client";
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation"; // ADDED: Import useRouter
@@ -22,7 +22,7 @@ import mockDataInstance, {
   AppData,
   Transaction,
   PendingRegistration,
-  AdminUser // ADDED: Import AdminUser type
+  AdminUser, // ADDED: Import AdminUser type
 } from "@/lib/mockData";
 
 // --- Props Interface ---
@@ -90,12 +90,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       localStorage.removeItem(ADMIN_EMAIL_STORAGE_KEY); // Clear stored admin email
       console.log("Admin email removed from localStorage.");
     } catch (storageError) {
-      console.error("Failed to remove admin email from localStorage:", storageError);
+      console.error(
+        "Failed to remove admin email from localStorage:",
+        storageError
+      );
     }
     onLogout(); // Call the original onLogout passed from parent (clears parent state)
-    router.push('/'); // Redirect to login page
+    router.push("/"); // Redirect to login page
   };
-
 
   // --- ADDED: Periodic Admin Status Check ---
   useEffect(() => {
@@ -105,7 +107,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       try {
         const currentAdminEmail = localStorage.getItem(ADMIN_EMAIL_STORAGE_KEY);
         if (!currentAdminEmail) {
-          console.log("Status Check: No admin email found in localStorage. Potential logout needed.");
+          console.log(
+            "Status Check: No admin email found in localStorage. Potential logout needed."
+          );
           // Consider forcing logout if no email is found while dashboard is active
           // handleLogout();
           return;
@@ -114,16 +118,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         // Find the admin in the current state's admin list
         // IMPORTANT: This relies on `appData.admins` being available and up-to-date.
         // In a real app, you'd likely make an API call here to get the *current* status.
-        const adminUser = appData.admins.find(admin => admin.email === currentAdminEmail);
+        const adminUser = appData.admins.find(
+          (admin) => admin.email === currentAdminEmail
+        );
 
         if (!adminUser) {
-          console.warn(`Status Check: Logged in admin (${currentAdminEmail}) not found in mock data. Forcing logout.`);
+          console.warn(
+            `Status Check: Logged in admin (${currentAdminEmail}) not found in mock data. Forcing logout.`
+          );
           handleLogout();
         } else if (!adminUser.isActive) {
-          console.log(`Status Check: Admin (${currentAdminEmail}) is inactive. Forcing logout.`);
+          console.log(
+            `Status Check: Admin (${currentAdminEmail}) is inactive. Forcing logout.`
+          );
           // Log before logging out completely
-          logAdminActivity("Forced Logout", "System", adminUser.id, "Admin account became inactive.");
-          alert("Your admin account has become inactive. You will be logged out."); // Optional user feedback
+          logAdminActivity(
+            "Forced Logout",
+            "System",
+            adminUser.id,
+            "Admin account became inactive."
+          );
+          alert(
+            "Your admin account has become inactive. You will be logged out."
+          ); // Optional user feedback
           handleLogout();
         } else {
           // console.log(`Status Check: Admin (${currentAdminEmail}) is active.`); // Optional: log for debugging
@@ -150,9 +167,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     // `logAdminActivity` uses `adminEmail`, `setAppData`
     // Need to ensure `handleLogout` is stable or memoized if dependencies grow complex.
     // For now, listing direct dependencies. Re-eval if behavior is unexpected.
-  }, [appData.admins, adminEmail, onLogout, router]); // ADDED: Dependencies for useEffect
+  }, [
+    appData.admins,
+    adminEmail,
+    onLogout,
+    router,
+    handleLogout,
+    logAdminActivity,
+  ]); // ADDED: Dependencies for useEffect
   // --- END: Periodic Admin Status Check ---
-
 
   // --- Data Update Handlers ---
   const handleAccountAdd = (newAccount: Account) => {
@@ -164,7 +187,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleAccountsUpdate = (updatedAccounts: Account[]) => {
-    console.log("AdminDashboard: handleAccountsUpdate received:", updatedAccounts);
+    console.log(
+      "AdminDashboard: handleAccountsUpdate received:",
+      updatedAccounts
+    );
     setAppData((prevData) => ({ ...prevData, accounts: updatedAccounts }));
   };
 
@@ -173,14 +199,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     console.log("AdminDashboard: handleMerchantsUpdate called.");
   };
 
-  const handlePendingRegistrationsUpdate = (updatedList: PendingRegistration[]) => {
-    console.log("AdminDashboard: handlePendingRegistrationsUpdate received:", updatedList);
-    setAppData(prevData => ({
-        ...prevData,
-        pendingRegistrations: updatedList,
+  const handlePendingRegistrationsUpdate = (
+    updatedList: PendingRegistration[]
+  ) => {
+    console.log(
+      "AdminDashboard: handlePendingRegistrationsUpdate received:",
+      updatedList
+    );
+    setAppData((prevData) => ({
+      ...prevData,
+      pendingRegistrations: updatedList,
     }));
   };
-
 
   // --- Render Active Tab Content ---
   const renderTabContent = () => {
@@ -219,6 +249,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <TransactionsTab
             transactions={appData.transactions}
             merchants={appData.merchants}
+            accounts={appData.accounts}
           />
         );
       case "merchants-tab":
@@ -244,10 +275,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // --- Component Render ---
   return (
     <div className="">
-      
-      <main className="flex-1 p-4 sm:p-6 lg:p-8">
-         {renderTabContent()}
-      </main>
+      <main className="flex-1 p-4 sm:p-6 lg:p-8">{renderTabContent()}</main>
     </div>
   );
 };

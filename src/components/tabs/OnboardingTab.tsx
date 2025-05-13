@@ -357,10 +357,10 @@ const OnboardingTab: React.FC<OnboardingTabProps> = ({
             <div className="space-y-4">
               {/* Guardian/Child Fields - Replaced with shadcn components */}
               <h3 className="text-lg font-medium text-foreground border-b pb-2">
-                Guardian's Information
+                Guardian&apos;s Information
               </h3>
               <div className="space-y-2">
-                <Label htmlFor="guardian-name">Guardian's Full Name</Label>
+                <Label htmlFor="guardian-name">Guardian&apos;s Full Name</Label>
                 <Input
                   id="guardian-name"
                   required
@@ -370,7 +370,7 @@ const OnboardingTab: React.FC<OnboardingTabProps> = ({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="guardian-email">Guardian's Email</Label>
+                <Label htmlFor="guardian-email">Guardian&apos;s Email</Label>
                 <Input
                   type="email"
                   id="guardian-email"
@@ -381,7 +381,7 @@ const OnboardingTab: React.FC<OnboardingTabProps> = ({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="guardian-dob">
-                  Guardian's Date of Birth
+                  Guardian&apos;s Date of Birth
                 </Label>
                 <div className="flex gap-2">
                   {/* Year Selector */}
@@ -463,7 +463,7 @@ const OnboardingTab: React.FC<OnboardingTabProps> = ({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="guardian-contact">
-                  Guardian's Contact Number
+                  Guardian&apos;s Contact Number
                 </Label>
                 <Input
                   type="tel"
@@ -485,10 +485,10 @@ const OnboardingTab: React.FC<OnboardingTabProps> = ({
               </div>
 
               <h3 className="text-lg font-medium text-foreground border-b pb-2 pt-4">
-                Child's Information
+                Child&apos;s Information
               </h3>
               <div className="space-y-2">
-                <Label htmlFor="child-name">Child's Full Name</Label>
+                <Label htmlFor="child-name">Child&apos;s Full Name</Label>
                 <Input
                   id="child-name"
                   required
@@ -637,7 +637,7 @@ const OnboardingTab: React.FC<OnboardingTabProps> = ({
                           </span>
                         </p>
                         <p>
-                          Child's Name:{" "}
+                          Child&apos;s Name:{" "}
                           <span className="font-medium text-foreground">
                             {childName || "N/A"}
                           </span>
