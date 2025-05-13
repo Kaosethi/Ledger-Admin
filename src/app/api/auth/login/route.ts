@@ -22,6 +22,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { email, password } = body;
 
+    console.log("Login request received:", { email, password });
+
     if (!email || !password) {
       return NextResponse.json(
         { error: "Email and password are required" },
@@ -60,7 +62,7 @@ export async function POST(request: NextRequest) {
         value: token,
         httpOnly: true,
         path: "/",
-        secure: process.env.NODE_ENV === "production",
+        // secure: process.env.NODE_ENV === "production",
         maxAge: 60 * 60 * 8, // 8 hours
       });
 
@@ -143,7 +145,7 @@ export async function POST(request: NextRequest) {
       value: token,
       httpOnly: true,
       path: "/",
-      secure: process.env.NODE_ENV === "production",
+      // secure: process.env.NODE_ENV === "production",
       maxAge: 60 * 60 * 8, // 8 hours
     });
 
