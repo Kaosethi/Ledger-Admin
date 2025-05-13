@@ -1,0 +1,43 @@
+FROM oven/bun:1.2.10 AS base
+
+COPY --from=node:22 /usr/local/bin/node /usr/local/bin/node
+
+WORKDIR /app
+
+COPY package.json package.json
+COPY apps apps
+COPY packages packages
+COPY turbo.json turbo.json
+COPY bun.lock bun.lock
+
+RUN bun install
+
+COPY tsconfig.json tsconfig.json
+COPY apps/backend/.env.example apps/backend/.env
+COPY apps/backend/.env.example .env
+
+EXPOSE 3001
+ENV BACKEND=https://backend.gehenna.sh
+ENV NEXT_PUBLIC_BACKEND=https://backend.gehenna.sh
+
+RUN bun apps/backend/src/index.ts &
+RUN cd apps/medium && bun run build
+
+# ? -------------------------
+
+FROM node:22-slim as runner
+
+WORKDIR /app
+
+# USER nonroot
+
+ENV NODE_ENV=production
+ENV PORT=3000
+
+COPY --from=base /app/node_modules ./node_modules
+COPY --from=base /app/apps/frontend/.next/standalone .
+COPY apps/medium/public apps/frontend/public
+
+CMD ["node", "./apps/frontend/server.js"]
+
+EXPOSE 3000
