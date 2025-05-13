@@ -101,3 +101,9 @@ tasks:
     desc: Start the database and application using docker-compose
     cmds:
       - docker-compose up -d
+
+  gca:
+    desc: git commit amend no edit
+    cmds:
+      - git add . && git commit --amend --no-edit
+

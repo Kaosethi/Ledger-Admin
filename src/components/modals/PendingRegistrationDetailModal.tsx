@@ -1,9 +1,10 @@
 // src/components/modals/PendingRegistrationDetailModal.tsx
-'use client';
+"use client";
 
-import React from 'react';
-import type { PendingRegistration } from '@/lib/mockData';
-import { formatDdMmYyyyHhMmSs, formatDate } from '@/lib/utils'; // Assuming formatDate can handle YYYY-MM-DD
+import React from "react";
+import { DateTime } from "luxon";
+import type { PendingRegistration } from "@/lib/mockData";
+import { formatDdMmYyyyHhMmSs, formatDate } from "@/lib/utils"; // Assuming formatDate can handle YYYY-MM-DD
 
 interface PendingRegistrationDetailModalProps {
   isOpen: boolean;
@@ -11,18 +12,21 @@ interface PendingRegistrationDetailModalProps {
   registration: PendingRegistration | null;
 }
 
-const PendingRegistrationDetailModal: React.FC<PendingRegistrationDetailModalProps> = ({
-  isOpen,
-  onClose,
-  registration,
-}) => {
+const PendingRegistrationDetailModal: React.FC<
+  PendingRegistrationDetailModalProps
+> = ({ isOpen, onClose, registration }) => {
   if (!isOpen || !registration) return null;
 
   // Helper to render definition list items
-  const renderDetailItem = (label: string, value: string | undefined | null) => (
+  const renderDetailItem = (
+    label: string,
+    value: string | undefined | null
+  ) => (
     <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
       <dt className="text-sm font-medium text-gray-500">{label}</dt>
-      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{value || 'N/A'}</dd>
+      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+        {value || "N/A"}
+      </dd>
     </div>
   );
 
@@ -36,7 +40,12 @@ const PendingRegistrationDetailModal: React.FC<PendingRegistrationDetailModalPro
     >
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
         {/* Background overlay */}
-        <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">​</span>
+        <span
+          className="hidden sm:inline-block sm:align-middle sm:h-screen"
+          aria-hidden="true"
+        >
+          ​
+        </span>
 
         {/* Modal Panel */}
         <div
@@ -46,25 +55,41 @@ const PendingRegistrationDetailModal: React.FC<PendingRegistrationDetailModalPro
           <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <div className="sm:flex sm:items-start">
               {/* Optional Icon */}
-               {/* <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
+              {/* <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
                  <svg className="h-6 w-6 text-blue-600" ... /> // Add an icon if desired
                </div> */}
               <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                <h3
+                  className="text-lg leading-6 font-medium text-gray-900"
+                  id="modal-title"
+                >
                   Pending Registration Details
                 </h3>
                 <div className="mt-4 border-t border-b border-gray-200">
                   <dl className="divide-y divide-gray-200">
-                    {renderDetailItem('Registration ID', registration.id)}
-                    {renderDetailItem('Submitted At', formatDdMmYyyyHhMmSs(registration.submittedAt))}
-                    {renderDetailItem('Guardian Name', registration.guardianName)}
+                    {renderDetailItem(
+                      "Registration ID",
+                      registration.displayId
+                    )}
+                    {renderDetailItem(
+                      "Submitted At",
+                      DateTime.fromISO(registration.createdAt).toString()
+                    )}
+                    {renderDetailItem(
+                      "Guardian Name",
+                      registration.guardianName
+                    )}
                     {/* Display DOB directly or use formatDate if it handles YYYY-MM-DD */}
-                    {renderDetailItem('Guardian DOB', registration.guardianDob)}
-                    {renderDetailItem('Guardian Contact', registration.guardianContact)}
-                    {renderDetailItem('Address', registration.address)}
-                    {renderDetailItem('Child Name', registration.childName)}
-                    {renderDetailItem('PIN Set', "****")} {/* Mask PIN */}
-                    {/* {renderDetailItem('PIN Set', registration.pin)} */} {/* Uncomment to show PIN (mock only!) */}
+                    {renderDetailItem("Guardian DOB", registration.guardianDob)}
+                    {renderDetailItem(
+                      "Guardian Contact",
+                      registration.guardianContact
+                    )}
+                    {renderDetailItem("Address", registration.address)}
+                    {renderDetailItem("Child Name", registration.childName)}
+                    {renderDetailItem("PIN Set", "****")} {/* Mask PIN */}
+                    {/* {renderDetailItem('PIN Set', registration.pin)} */}{" "}
+                    {/* Uncomment to show PIN (mock only!) */}
                   </dl>
                 </div>
               </div>

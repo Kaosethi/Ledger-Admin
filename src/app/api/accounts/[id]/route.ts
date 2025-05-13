@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { accounts } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, isNull, and } from "drizzle-orm";
 import { withAuth } from "@/lib/auth/middleware";
 import { JWTPayload } from "@/lib/auth/jwt";
 
@@ -12,7 +12,10 @@ export const GET = withAuth(
       const account = await db
         .select()
         .from(accounts)
-        .where(eq(accounts.id, context.params.id));
+        // filter soft deleted accounts
+        .where(
+          and(isNull(accounts.deletedAt), eq(accounts.id, context.params.id))
+        );
 
       if (!account.length) {
         return NextResponse.json(

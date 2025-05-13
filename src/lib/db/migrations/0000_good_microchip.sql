@@ -1,4 +1,4 @@
-CREATE TYPE "public"."account_status" AS ENUM('Active', 'Inactive', 'Suspended');--> statement-breakpoint
+CREATE TYPE "public"."account_status" AS ENUM('Pending', 'Active', 'Inactive', 'Suspended');--> statement-breakpoint
 CREATE TYPE "public"."merchant_status" AS ENUM('pending_approval', 'active', 'rejected', 'suspended');--> statement-breakpoint
 CREATE TYPE "public"."transaction_status" AS ENUM('Completed', 'Pending', 'Failed', 'Declined');--> statement-breakpoint
 CREATE TYPE "public"."transaction_type" AS ENUM('Debit', 'Credit', 'Adjustment');--> statement-breakpoint
@@ -6,9 +6,9 @@ CREATE TABLE "account_permissions" (
 	"account_id" uuid NOT NULL,
 	"admin_id" uuid NOT NULL,
 	"permission" text NOT NULL,
-	"granted_at" timestamp DEFAULT now() NOT NULL,
-	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp NOT NULL,
+	"granted_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
 	CONSTRAINT "account_permissions_account_id_admin_id_permission_pk" PRIMARY KEY("account_id","admin_id","permission")
 );
 --> statement-breakpoint
@@ -20,22 +20,22 @@ CREATE TABLE "accounts" (
 	"status" "account_status" DEFAULT 'Active' NOT NULL,
 	"balance" numeric(10, 2) DEFAULT '0.00' NOT NULL,
 	"hashed_pin" text,
-	"last_activity" timestamp DEFAULT now() NOT NULL,
+	"last_activity" timestamp with time zone DEFAULT now() NOT NULL,
 	"current_qr_token" text,
 	"guardian_dob" text,
 	"guardian_contact" text,
 	"email" text,
 	"address" text,
 	"notes" text,
-	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp NOT NULL,
-	"deleted_at" timestamp,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"deleted_at" timestamp with time zone,
 	CONSTRAINT "accounts_display_id_unique" UNIQUE("display_id")
 );
 --> statement-breakpoint
 CREATE TABLE "admin_logs" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"timestamp" timestamp DEFAULT now() NOT NULL,
+	"timestamp" timestamp with time zone DEFAULT now() NOT NULL,
 	"admin_id" uuid,
 	"admin_email" text NOT NULL,
 	"action" text NOT NULL,
@@ -44,8 +44,8 @@ CREATE TABLE "admin_logs" (
 	"details" text,
 	"ip_address" text,
 	"user_agent" text,
-	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp NOT NULL
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "administrators" (
@@ -55,10 +55,10 @@ CREATE TABLE "administrators" (
 	"first_name" text,
 	"last_name" text,
 	"role" text DEFAULT 'admin' NOT NULL,
-	"last_login_at" timestamp,
-	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp NOT NULL,
-	"deleted_at" timestamp,
+	"last_login_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"deleted_at" timestamp with time zone,
 	CONSTRAINT "administrators_email_unique" UNIQUE("email")
 );
 --> statement-breakpoint
@@ -71,22 +71,22 @@ CREATE TABLE "merchants" (
 	"store_address" text,
 	"hashed_password" text,
 	"status" "merchant_status" DEFAULT 'pending_approval' NOT NULL,
-	"submitted_at" timestamp DEFAULT now() NOT NULL,
+	"submitted_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"decline_reason" text,
 	"pin_verified" boolean DEFAULT false,
 	"category" text,
 	"website" text,
 	"description" text,
 	"logo_url" text,
-	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp NOT NULL,
-	"deleted_at" timestamp,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL,
+	"deleted_at" timestamp with time zone,
 	CONSTRAINT "merchants_contact_email_unique" UNIQUE("contact_email")
 );
 --> statement-breakpoint
 CREATE TABLE "transactions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"timestamp" timestamp DEFAULT now() NOT NULL,
+	"timestamp" timestamp with time zone DEFAULT now() NOT NULL,
 	"amount" numeric(10, 2) NOT NULL,
 	"type" "transaction_type" NOT NULL,
 	"account_id" uuid NOT NULL,
@@ -97,8 +97,8 @@ CREATE TABLE "transactions" (
 	"description" text,
 	"reference" text,
 	"metadata" text,
-	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp NOT NULL
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone NOT NULL
 );
 --> statement-breakpoint
 ALTER TABLE "account_permissions" ADD CONSTRAINT "account_permissions_account_id_accounts_id_fk" FOREIGN KEY ("account_id") REFERENCES "public"."accounts"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

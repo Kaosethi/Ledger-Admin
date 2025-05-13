@@ -360,3 +360,106 @@
 .toast * {
   background-color: transparent !important;
 }
+
+/* Add styles for the print-only-container */
+.print-only-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Make print container visible when printing */
+.printing-active {
+  visibility: visible !important;
+  opacity: 1 !important;
+  z-index: 9999 !important;
+  background: white !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: auto !important;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  /* Override for our specific printing container */
+  .print-only-container.printing-active,
+  .print-only-container.printing-active * {
+    visibility: visible !important;
+    display: block !important;
+    opacity: 1 !important;
+  }
+
+  .print-only-container.printing-active {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    z-index: 9999 !important;
+    background-color: white !important;
+  }
+
+  .print-section,
+  .print-section * {
+    visibility: visible;
+  }
+  .print-section {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  /* Ensure interactive elements and modals are hidden when printing */
+  button,
+  input,
+  select,
+  textarea,
+  .modal-container,
+  .bulk-print-controls {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  .bulk-print-preview-container {
+    background-color: transparent;
+    padding: 0;
+  }
+  .bulk-print-page,
+  .bulk-print-page * {
+    visibility: visible;
+  }
+  .bulk-print-page {
+    width: 100%; /* Use full printable area */
+    height: auto;
+    min-height: 0;
+    margin: 0;
+    padding: 0; /* Use @page margins */
+    box-shadow: none;
+    border: none;
+    page-break-after: always; /* Ensure each A4 div is on a new page */
+  }
+  .bulk-print-grid {
+    min-height: 0; /* Reset min-height for printing */
+  }
+  .bulk-print-item {
+    border: 1px solid #eee; /* Lighter border for print */
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 15mm; /* Printer margins */
+  }
+}

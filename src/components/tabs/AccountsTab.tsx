@@ -1,7 +1,3 @@
-// src/components/tabs/AccountsTab.tsx
-// FIXED: Addressed TS errors using 'childName' instead of 'name' and 'lastActivity' instead of 'lastTransactionAt'.
-// FIXED: Added initialization for 'lastActivity' when creating new accounts.
-
 import React, { useState, useRef, useMemo, useEffect } from "react";
 import type {
   Account,
@@ -22,7 +18,7 @@ import { useReactToPrint } from "react-to-print";
 import BulkQrPrintView from "../print/BulkQrPrintView"; // Ensure path is correct
 import ConfirmActionModal from "../modals/ConfirmActionModal"; // Ensure path is correct
 import PendingRegistrationDetailModal from "../modals/PendingRegistrationDetailModal"; // Ensure path is correct
-import { Loader2 } from "lucide-react"; // Import loading icon
+import { DateTime } from "luxon";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface AccountsTabProps {
@@ -39,7 +35,16 @@ interface AccountsTabProps {
   pendingRegistrations: PendingRegistration[];
   onPendingRegistrationsUpdate: (updatedList: PendingRegistration[]) => void;
   onAccountAdd: (newAccount: Account) => void;
-  isLoading?: boolean; // Add isLoading prop
+  isLoading?: boolean; // Initial page loading state
+  isRefreshing?: { accounts: boolean; pending: boolean }; // Background refresh state
+  isMutating?: boolean; // Mutations in progress
+  onAccountSearch?: (searchTerm: string) => void; // Add search callback
+  onAccountStatusFilter?: (status: string) => void; // Add status filter callback
+  accountsFilter?: { status: string; search: string }; // Add current filter state
+  onPendingRegistrationsSearch?: (searchTerm: string) => void; // Add pending registration search callback
+  pendingRegistrationsSearch?: string; // Add current pending registration search term
+  onBulkApprove?: (selectedIds: Set<string>) => Promise<boolean>; // Add bulk approve callback
+  onBulkReject?: (selectedIds: Set<string>) => Promise<boolean>; // Add bulk reject callback
 }
 
 // Helper to generate unique account IDs (remains unchanged)
@@ -65,7 +70,16 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
   pendingRegistrations = [],
   onPendingRegistrationsUpdate,
   onAccountAdd,
-  isLoading = false, // Default to false
+  isLoading = false, // Initial loading state
+  isRefreshing = { accounts: false, pending: false }, // Background refresh state
+  isMutating = false, // Mutations in progress
+  onAccountSearch,
+  onAccountStatusFilter,
+  accountsFilter = { status: "", search: "" },
+  onPendingRegistrationsSearch,
+  pendingRegistrationsSearch = "",
+  onBulkApprove,
+  onBulkReject,
 }) => {
   // --- State for Managed Accounts ---
   const [isBulkEditModalOpen, setIsBulkEditModalOpen] = useState(false);
@@ -101,6 +115,12 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
 
   // --- Filtered & Derived State ---
   const filteredAccounts = useMemo(() => {
+    // If we're using API filtering, just return all accounts
+    if (onAccountSearch || onAccountStatusFilter) {
+      return accounts;
+    }
+
+    // Otherwise, do client-side filtering
     const lowerCaseSearchTerm = searchTerm.toLowerCase();
     if (!lowerCaseSearchTerm) {
       return accounts;
@@ -113,7 +133,7 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
           account.guardianName.toLowerCase().includes(lowerCaseSearchTerm)) ||
         account.childName.toLowerCase().includes(lowerCaseSearchTerm) // Use childName
     );
-  }, [accounts, searchTerm]);
+  }, [accounts, searchTerm, onAccountSearch, onAccountStatusFilter]);
 
   // --- Selection State Logic ---
   const isAllSelected = useMemo(
@@ -173,7 +193,23 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
 
   // --- Event Handlers for Managed Accounts ---
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(e.target.value);
+    const newSearchTerm = e.target.value;
+    setSearchTerm(newSearchTerm);
+
+    // Call the parent component's search handler if provided
+    if (onAccountSearch) {
+      onAccountSearch(newSearchTerm);
+    }
+  };
+
+  // Handle status filter change
+  const handleStatusFilterChange = (
+    e: React.ChangeEvent<HTMLSelectElement>
+  ) => {
+    const status = e.target.value;
+    if (onAccountStatusFilter) {
+      onAccountStatusFilter(status);
+    }
   };
   const handleSelectAllChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const isChecked = e.target.checked;
@@ -204,102 +240,214 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
     setSelectedAccountsForModal(selected);
     setIsBulkEditModalOpen(true);
   };
-  const handleApplyBulkUpdates = (payload: BulkUpdatePayload) => {
-    const { balanceAction, amount, statusAction } = payload;
-    const idsToUpdate = selectedAccountIds;
-    if (idsToUpdate.size === 0) return;
-    if (balanceAction === "nochange" && statusAction === "nochange") {
+  const handleApplyBulkUpdates = (
+    payload: BulkUpdatePayload,
+    updatedAccounts: Account[] = []
+  ) => {
+    if (selectedAccountIds.size === 0) {
       setIsBulkEditModalOpen(false);
       return;
     }
 
-    const updatesToApply = new Map<string, Account>();
-    const now = new Date().toISOString(); // For consistent timestamps
-
-    idsToUpdate.forEach((id) => {
-      const original = accounts.find((acc) => acc.id === id);
-      if (!original) return;
-      const updated = { ...original };
-      let changed = false;
-
-      if (balanceAction === "add" && amount !== undefined) {
-        updated.balance += amount;
-        changed = true;
-      } else if (balanceAction === "set" && amount !== undefined) {
-        updated.balance = amount;
-        changed = true;
-      }
-
-      // Make sure status values match Account['status'] type: 'Active' | 'Inactive' | 'Suspended'
-      if (statusAction === "activate" && updated.status !== "Active") {
-        updated.status = "Active";
-        changed = true;
-      } else if (statusAction === "suspend" && updated.status !== "Suspended") {
-        updated.status = "Suspended";
-        changed = true;
-      }
-      // Note: 'Inactive' is not handled by the bulk modal's 'activate/suspend' actions
-
-      if (changed) {
-        updated.updatedAt = now;
-        updated.lastActivity = now; // Update lastActivity on any change
-        updatesToApply.set(id, updated);
-      }
-    });
-
-    if (updatesToApply.size === 0) {
-      alert("Selected accounts already reflect the requested state.");
-      setIsBulkEditModalOpen(false);
-      return;
-    }
-
-    const finalUpdatedAccounts = accounts.map(
-      (acc) => updatesToApply.get(acc.id) || acc
-    );
-    onAccountsUpdate?.(finalUpdatedAccounts);
-
-    const logDetails: string[] = [];
-    if (balanceAction !== "nochange" && amount !== undefined)
-      logDetails.push(
-        `Balance ${
-          balanceAction === "add" ? "adjusted by" : "set to"
-        } ${formatCurrency(amount)}.`
+    // If we received updated accounts from the API, update the UI
+    if (updatedAccounts.length > 0) {
+      // Create a map of id -> updatedAccount for easy lookup
+      const updatedAccountsMap = new Map(
+        updatedAccounts.map((acc) => [acc.id, acc])
       );
-    if (statusAction !== "nochange")
-      logDetails.push(
-        `Status set to ${statusAction === "activate" ? "Active" : "Suspended"}.`
-      ); // Use correct status names
-    logAdminActivity?.(
-      "Bulk Update Accounts",
-      "Account",
-      `${updatesToApply.size} accounts`,
-      `${logDetails.join(" ")} Applied to IDs: ${Array.from(
-        updatesToApply.keys()
-      ).join(", ")}`
-    );
+
+      // Update all accounts, replacing those that were updated
+      const finalAccountsList = accounts.map((acc) =>
+        updatedAccountsMap.has(acc.id) ? updatedAccountsMap.get(acc.id)! : acc
+      );
+
+      onAccountsUpdate?.(finalAccountsList);
+
+      // Clear selection after successful update
+      setSelectedAccountIds(new Set());
+    }
 
     setIsBulkEditModalOpen(false);
-    setSelectedAccountIds(new Set());
-    alert(`${updatesToApply.size} account(s) updated successfully.`);
   };
-  const handleBulkPrintClick = () => {
+  const handleBulkPrintClick = async () => {
     if (selectedAccountIds.size === 0) {
       alert("Please select one or more accounts from the table to print.");
       return;
     }
+
+    // Filter accounts based on selection
     const filteredAccountsForPrint = accounts.filter((acc) =>
       selectedAccountIds.has(acc.id)
     );
+
+    // Log activity
     logAdminActivity?.(
       "Bulk Print QR",
       "Account",
       `${filteredAccountsForPrint.length} accounts`,
       `Preparing to print QR for ${filteredAccountsForPrint.length} selected accounts.`
     );
-    setSelectedAccountsToPrint(filteredAccountsForPrint);
-    setTimeout(() => {
-      setTriggerPrint(true);
-    }, 50);
+
+    // Create copies of the accounts to avoid modifying the original data
+    const accountsWithQrCodes = [...filteredAccountsForPrint];
+
+    // Check and generate QR codes if needed
+    for (let i = 0; i < accountsWithQrCodes.length; i++) {
+      const account = accountsWithQrCodes[i];
+
+      // If account already has a QR code, continue
+      if (account.currentQrToken) {
+        continue;
+      }
+
+      try {
+        // Create QR payload using the qr-sign API
+        const response = await fetch("/api/qr-sign", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            type: "pay",
+            account: account.displayId,
+            ver: "1.0",
+          }),
+        });
+
+        if (!response.ok) {
+          console.warn(
+            `Failed to generate QR code for account ${account.displayId}: ${response.statusText}`
+          );
+          continue;
+        }
+
+        const qrPayload = await response.json();
+        const jsonString = JSON.stringify(qrPayload);
+        const base64Encoded = btoa(jsonString);
+
+        // Update the account with the new QR code
+        accountsWithQrCodes[i] = {
+          ...account,
+          currentQrToken: base64Encoded,
+        };
+      } catch (error) {
+        console.error(
+          `Error generating QR code for account ${account.displayId}:`,
+          error
+        );
+      }
+    }
+
+    // Calculate pages (8 QR codes per page)
+    const itemsPerPage = 8;
+    const pageCount = Math.ceil(accountsWithQrCodes.length / itemsPerPage);
+
+    // Build HTML for printing
+    let pagesHtml = "";
+
+    for (let pageIndex = 0; pageIndex < pageCount; pageIndex++) {
+      // Get accounts for this page
+      const pageAccounts = accountsWithQrCodes.slice(
+        pageIndex * itemsPerPage,
+        (pageIndex + 1) * itemsPerPage
+      );
+
+      // Calculate empty slots needed
+      const emptySlots = itemsPerPage - pageAccounts.length;
+
+      // Start page
+      pagesHtml += `
+        <div class="a4-page" style="page-break-after: always; width: 210mm; height: 297mm; position: relative; margin: 0 auto;">
+          <div class="grid-layout" style="display: grid; grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(4, 1fr); gap: 8mm; padding: 8mm; height: 100%; box-sizing: border-box;">
+      `;
+
+      // Add QR codes for this page
+      for (const account of pageAccounts) {
+        const qrValue = account.currentQrToken || account.id;
+
+        pagesHtml += `
+          <div class="qr-card" style="border: 1px dashed #bbb; border-radius: 4px; padding: 3mm; display: flex; flex-direction: column; justify-content: center; align-items: center; background-color: #ffffff; box-sizing: border-box;">
+            <div style="font-size: 12px; font-weight: bold; margin-bottom: 1mm; text-align: center; overflow: hidden; text-overflow: ellipsis; width: 100%;">
+              ${account.displayId || account.id}
+            </div>
+            <div style="font-size: 10px; margin-bottom: 2mm; text-align: center; overflow: hidden; text-overflow: ellipsis; width: 100%;">
+              ${account.childName || "N/A"} / ${account.guardianName || "N/A"}
+            </div>
+            <div style="display: flex; justify-content: center; align-items: center; padding: 1mm; background-color: #f9f9f9; border-radius: 4px; margin-bottom: 1mm;">
+              <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(
+                qrValue
+              )}" width="120" height="120" alt="QR Code" />
+            </div>
+          </div>
+        `;
+      }
+
+      // Add empty placeholders if needed
+      for (let i = 0; i < emptySlots; i++) {
+        pagesHtml += `
+          <div style="border: 1px dashed #eee; border-radius: 5px;"></div>
+        `;
+      }
+
+      // Add page footer and close page
+      pagesHtml += `
+          </div>
+          <div style="position: absolute; bottom: 5mm; left: 0; width: 100%; text-align: center; font-size: 8px; color: #999;">
+            Page ${
+              pageIndex + 1
+            } of ${pageCount} • Generated on ${new Date().toLocaleDateString()} • Ledger Admin
+          </div>
+        </div>
+      `;
+    }
+
+    // Open a new window and print the QR codes
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>QR Codes</title>
+            <style>
+              body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+              @media print {
+                @page { size: A4 portrait; margin: 0; }
+                body { background-color: #ffffff; }
+                .a4-page { page-break-after: always; }
+                /* Fix for Firefox to ensure content fits page */
+                .grid-layout { height: auto !important; min-height: 0 !important; }
+                /* Ensure scaled appropriately for all browsers */
+                img { max-width: 100%; height: auto; }
+              }
+              /* For preview mode */
+              @media screen {
+                body { background-color: #f0f0f0; padding: 20px; }
+                .a4-page { 
+                  margin-bottom: 20px !important; 
+                  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                  background-color: white;
+                }
+              }
+            </style>
+          </head>
+          <body>
+            ${pagesHtml}
+            <script>
+              // Auto print when loaded
+              window.onload = function() {
+                setTimeout(function() {
+                  window.print();
+                  setTimeout(function() {
+                    window.close();
+                  }, 500);
+                }, 300);
+              };
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
   };
   const handleViewEditClick = (accountToEdit: Account) => {
     setEditingAccount(accountToEdit);
@@ -349,53 +497,81 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
       return newSet;
     });
   };
-  const performApprove = (pendingId: string) => {
+  const performApprove = async (pendingId: string) => {
     const pending = pendingRegistrations.find((p) => p.id === pendingId);
     if (!pending) return;
-    const newAccountId = generateUniqueAccountId(accounts);
-    const now = new Date().toISOString();
-    // MODIFIED: Use childName and add lastActivity
-    const newAccount: Account = {
-      id: newAccountId,
-      displayId: newAccountId,
-      childName: pending.childName, // Use childName
-      guardianName: pending.guardianName,
-      balance: 0,
-      status: "Active", // Ensure this matches Account status type
-      pin: pending.pin,
-      createdAt: now,
-      updatedAt: now,
-      lastActivity: now, // Initialize lastActivity
-      // Add optional fields from PendingRegistration
-      guardianDob: pending.guardianDob,
-      guardianContact: pending.guardianContact,
-      address: pending.address,
-    };
-    onAccountAdd(newAccount);
-    const updatedPendingList = pendingRegistrations.filter(
-      (p) => p.id !== pendingId
-    );
-    onPendingRegistrationsUpdate(updatedPendingList);
-    logAdminActivity?.(
-      "Approve Registration",
-      "Account",
-      newAccountId,
-      `Approved registration for ${pending.childName} (Guardian: ${pending.guardianName})`
-    );
+
+    try {
+      // Call the approve API endpoint
+      const response = await fetch(`/api/accounts/${pending.id}/approve`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to approve account: ${response.statusText}`);
+      }
+
+      // Get the updated account from the response
+      const updatedAccount = await response.json();
+
+      // Update local state by filtering out the pending registration
+      const updatedPendingList = pendingRegistrations.filter(
+        (p) => p.id !== pendingId
+      );
+
+      onPendingRegistrationsUpdate(updatedPendingList);
+
+      // Log the activity
+      logAdminActivity?.(
+        "Approve Registration",
+        "Account",
+        updatedAccount.id,
+        `Approved registration for ${pending.childName} (Guardian: ${pending.guardianName})`
+      );
+    } catch (error) {
+      console.error("Error approving registration:", error);
+      alert(`Failed to approve registration: ${error}`);
+    }
   };
-  const performReject = (pendingId: string) => {
+
+  const performReject = async (pendingId: string) => {
     const pending = pendingRegistrations.find((p) => p.id === pendingId);
     if (!pending) return;
-    const updatedPendingList = pendingRegistrations.filter(
-      (p) => p.id !== pendingId
-    );
-    onPendingRegistrationsUpdate(updatedPendingList);
-    logAdminActivity?.(
-      "Reject Registration",
-      "PendingRegistration",
-      pendingId,
-      `Rejected registration for ${pending.childName} (Guardian: ${pending.guardianName})`
-    );
+
+    try {
+      // Call the reject API endpoint
+      const response = await fetch(`/api/accounts/${pending.id}/reject`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to reject account: ${response.statusText}`);
+      }
+
+      // Update local state by filtering out the pending registration
+      const updatedPendingList = pendingRegistrations.filter(
+        (p) => p.id !== pendingId
+      );
+
+      onPendingRegistrationsUpdate(updatedPendingList);
+
+      // Log the activity
+      logAdminActivity?.(
+        "Reject Registration",
+        "PendingRegistration",
+        pendingId,
+        `Rejected registration for ${pending.childName} (Guardian: ${pending.guardianName})`
+      );
+    } catch (error) {
+      console.error("Error rejecting registration:", error);
+      alert(`Failed to reject registration: ${error}`);
+    }
   };
   const handleApproveClick = (pendingId: string) => {
     setConfirmMessage(
@@ -413,108 +589,283 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
   };
   const handleBulkApprove = () => {
     if (selectedPendingIds.size === 0) return;
+
     setConfirmMessage(
       `Are you sure you want to approve ${selectedPendingIds.size} selected registration(s)?`
     );
-    setConfirmAction(() => () => {
-      let approvedCount = 0;
-      const idsToProcess = Array.from(selectedPendingIds);
-      const currentAccounts = [...accounts]; // Base for generating unique IDs
-      const now = new Date().toISOString();
 
-      idsToProcess.forEach((pendingId) => {
-        const pending = pendingRegistrations.find((p) => p.id === pendingId);
-        if (pending) {
-          const newAccountId = generateUniqueAccountId(currentAccounts);
-          // MODIFIED: Use childName and add lastActivity
-          const newAccount: Account = {
-            id: newAccountId,
-            displayId: newAccountId,
-            childName: pending.childName, // Use childName
-            guardianName: pending.guardianName,
-            balance: 0,
-            status: "Active",
-            pin: pending.pin,
-            createdAt: now,
-            updatedAt: now,
-            lastActivity: now, // Initialize lastActivity
-            // Add optional fields from PendingRegistration
-            guardianDob: pending.guardianDob,
-            guardianContact: pending.guardianContact,
-            address: pending.address,
-          };
-          onAccountAdd(newAccount);
-          currentAccounts.push(newAccount); // Add to list for subsequent ID checks
-          approvedCount++;
+    setConfirmAction(() => async () => {
+      // If we have the modern bulk approve API
+      if (onBulkApprove) {
+        const success = await onBulkApprove(selectedPendingIds);
+        if (success) {
+          logAdminActivity?.(
+            "Bulk Approve Registrations",
+            "Account",
+            `${selectedPendingIds.size} accounts`,
+            `Approved ${selectedPendingIds.size} registration(s) via API.`
+          );
+          setSelectedPendingIds(new Set());
         }
-      });
+      } else {
+        // Legacy implementation (fallback)
+        let approvedCount = 0;
+        const idsToProcess = Array.from(selectedPendingIds);
+        const currentAccounts = [...accounts]; // Base for generating unique IDs
+        const now = new Date().toISOString();
 
-      const finalPendingList = pendingRegistrations.filter(
-        (p) => !selectedPendingIds.has(p.id)
-      );
-      onPendingRegistrationsUpdate(finalPendingList);
-      logAdminActivity?.(
-        "Bulk Approve Registrations",
-        "Account",
-        `${approvedCount} accounts`,
-        `Approved ${approvedCount} registration(s).`
-      );
-      setSelectedPendingIds(new Set());
+        idsToProcess.forEach((pendingId) => {
+          const pending = pendingRegistrations.find((p) => p.id === pendingId);
+          if (pending) {
+            const newAccountId = generateUniqueAccountId(currentAccounts);
+            // MODIFIED: Use childName and add lastActivity
+            const newAccount: Account = {
+              id: newAccountId,
+              displayId: newAccountId,
+              childName: pending.childName,
+              guardianName: pending.guardianName,
+              balance: 0,
+              status: "Active",
+              pin: pending.pin,
+              createdAt: now,
+              updatedAt: now,
+              lastActivity: now, // Initialize lastActivity
+              // Add optional fields from PendingRegistration
+              guardianDob: pending.guardianDob,
+              guardianContact: pending.guardianContact,
+              address: pending.address,
+            };
+            onAccountAdd(newAccount);
+            currentAccounts.push(newAccount); // Add to list for subsequent ID checks
+            approvedCount++;
+          }
+        });
+
+        const finalPendingList = pendingRegistrations.filter(
+          (p) => !selectedPendingIds.has(p.id)
+        );
+        onPendingRegistrationsUpdate(finalPendingList);
+        logAdminActivity?.(
+          "Bulk Approve Registrations",
+          "Account",
+          `${approvedCount} accounts`,
+          `Approved ${approvedCount} registration(s).`
+        );
+        setSelectedPendingIds(new Set());
+      }
     });
+
     setIsConfirmModalOpen(true);
   };
+
   const handleBulkReject = () => {
     if (selectedPendingIds.size === 0) return;
+
     setConfirmMessage(
       `Are you sure you want to reject ${selectedPendingIds.size} selected registration(s)? This action cannot be undone.`
     );
-    setConfirmAction(() => () => {
-      const rejectedCount = selectedPendingIds.size;
-      const updatedPendingList = pendingRegistrations.filter(
-        (p) => !selectedPendingIds.has(p.id)
-      );
-      onPendingRegistrationsUpdate(updatedPendingList);
-      logAdminActivity?.(
-        "Bulk Reject Registrations",
-        "PendingRegistration",
-        `${rejectedCount} requests`,
-        `Rejected ${rejectedCount} registration(s).`
-      );
-      setSelectedPendingIds(new Set());
+
+    setConfirmAction(() => async () => {
+      // If we have the modern bulk reject API
+      if (onBulkReject) {
+        const success = await onBulkReject(selectedPendingIds);
+        if (success) {
+          logAdminActivity?.(
+            "Bulk Reject Registrations",
+            "PendingRegistration",
+            `${selectedPendingIds.size} requests`,
+            `Rejected ${selectedPendingIds.size} registration(s) via API.`
+          );
+          setSelectedPendingIds(new Set());
+        }
+      } else {
+        // Legacy implementation (fallback)
+        const rejectedCount = selectedPendingIds.size;
+        const updatedPendingList = pendingRegistrations.filter(
+          (p) => !selectedPendingIds.has(p.id)
+        );
+        onPendingRegistrationsUpdate(updatedPendingList);
+        logAdminActivity?.(
+          "Bulk Reject Registrations",
+          "PendingRegistration",
+          `${rejectedCount} requests`,
+          `Rejected ${rejectedCount} registration(s).`
+        );
+        setSelectedPendingIds(new Set());
+      }
     });
+
     setIsConfirmModalOpen(true);
   };
+
   const handleViewDetailsClick = (pending: PendingRegistration) => {
     setViewingPendingRegistration(pending);
     setIsDetailModalOpen(true);
   };
+  const handlePendingSearchChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const searchValue = e.target.value;
+    if (onPendingRegistrationsSearch) {
+      onPendingRegistrationsSearch(searchValue);
+    }
+  };
+
+  // Update search term when external filter changes
+  useEffect(() => {
+    if (accountsFilter?.search !== undefined) {
+      setSearchTerm(accountsFilter.search);
+    }
+  }, [accountsFilter?.search]);
 
   // --- Component Render ---
   return (
     <>
       {/* --- Pending Registrations Section --- */}
       <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-        <h2 className="text-xl font-semibold text-gray-800 mb-4">
+        <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
           Pending Registration Requests (
           {isLoading ? "..." : pendingRegistrations.length})
+          {isRefreshing.pending && (
+            <span className="ml-2 inline-block">
+              <svg
+                className="animate-spin h-4 w-4 text-primary"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+            </span>
+          )}
         </h2>
-        {/* Bulk Action Buttons */}
-        {!isLoading && pendingRegistrations.length > 0 && (
-          <div className="flex justify-start mb-4 space-x-2">
-            <button
-              onClick={handleBulkApprove}
-              disabled={selectedPendingIds.size === 0}
-              className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
-            >
-              Bulk Approve ({selectedPendingIds.size})
-            </button>
-            <button
-              onClick={handleBulkReject}
-              disabled={selectedPendingIds.size === 0}
-              className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
-            >
-              Bulk Reject ({selectedPendingIds.size})
-            </button>
+        {/* Search and Bulk Action Buttons */}
+        {!isLoading && (
+          <div className="flex justify-between mb-4">
+            <div className="flex space-x-2">
+              <button
+                onClick={handleBulkApprove}
+                disabled={selectedPendingIds.size === 0 || isMutating}
+                className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 flex items-center"
+              >
+                {isMutating ? (
+                  <svg
+                    className="animate-spin h-4 w-4 mr-1 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                ) : null}
+                Bulk Approve ({selectedPendingIds.size})
+              </button>
+              <button
+                onClick={handleBulkReject}
+                disabled={selectedPendingIds.size === 0 || isMutating}
+                className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 flex items-center"
+              >
+                {isMutating ? (
+                  <svg
+                    className="animate-spin h-4 w-4 mr-1 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                ) : null}
+                Bulk Reject ({selectedPendingIds.size})
+              </button>
+            </div>
+
+            {/* Pending Registration Search Input */}
+            <div className="relative rounded-md shadow-sm max-w-md">
+              <input
+                type="text"
+                id="pending-search"
+                className="block w-full pr-10 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm placeholder-gray-400"
+                placeholder="Search pending registrations..."
+                value={pendingRegistrationsSearch}
+                onChange={handlePendingSearchChange}
+                aria-label="Search pending registrations"
+                disabled={isLoading}
+              />
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                {isRefreshing.pending ? (
+                  <svg
+                    className="animate-spin h-4 w-4 text-gray-400"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                ) : (
+                  <svg
+                    className="h-5 w-5 text-gray-400"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                )}
+              </div>
+            </div>
           </div>
         )}
         {/* Pending Table */}
@@ -644,7 +995,11 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
                     </td>{" "}
                     {/* Use childName */}
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      {formatDdMmYyyyHhMmSs(pending.submittedAt)}
+                      {formatDdMmYyyyHhMmSs(
+                        DateTime.fromISO(pending.createdAt)
+                          .setZone("Asia/Bangkok")
+                          .toISO()
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-center">
                       <button
@@ -712,11 +1067,51 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
       <div className="bg-white p-6 rounded-lg shadow-md">
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 space-y-3 md:space-y-0">
-          <h2 className="text-xl font-semibold text-gray-800">
+          <h2 className="text-xl font-semibold text-gray-800 flex items-center">
             Managed Accounts ({isLoading ? "..." : accounts.length})
+            {isRefreshing.accounts && (
+              <span className="ml-2 inline-block">
+                <svg
+                  className="animate-spin h-4 w-4 text-primary"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+              </span>
+            )}
           </h2>
           {/* Search and bulk actions */}
           <div className="flex flex-wrap gap-2">
+            {/* Status Filter Dropdown */}
+            <div className="relative rounded-md shadow-sm">
+              <select
+                id="account-status-filter"
+                className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm"
+                value={accountsFilter?.status || ""}
+                onChange={handleStatusFilterChange}
+                disabled={isLoading}
+              >
+                <option value="">All Statuses</option>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+                <option value="Suspended">Suspended</option>
+                <option value="Pending">Pending</option>
+              </select>
+            </div>
             {/* Search Input */}
             <div className="relative rounded-md shadow-sm">
               <input
@@ -730,28 +1125,75 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
                 disabled={isLoading}
               />
               <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                <svg
-                  className="h-5 w-5 text-gray-400"
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  aria-hidden="true"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
-                    clipRule="evenodd"
-                  />
-                </svg>
+                {isRefreshing.accounts ? (
+                  <svg
+                    className="animate-spin h-4 w-4 text-gray-400"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                ) : (
+                  <svg
+                    className="h-5 w-5 text-gray-400"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                )}
               </div>
             </div>
             {/* Bulk Update Button */}
             <button
               id="bulk-update-btn"
-              className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
+              className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 flex items-center"
               onClick={handleOpenBulkUpdateModal}
-              disabled={isLoading || selectedAccountIds.size === 0}
+              disabled={
+                isLoading || selectedAccountIds.size === 0 || isMutating
+              }
             >
+              {isMutating ? (
+                <svg
+                  className="animate-spin h-4 w-4 mr-1 text-white"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+              ) : null}
               Bulk Update ({selectedAccountIds.size})
             </button>
             {/* Bulk Print Button */}
@@ -759,7 +1201,9 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
               id="bulk-print-qr-btn"
               className="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
               onClick={handleBulkPrintClick}
-              disabled={isLoading || selectedAccountIds.size === 0}
+              disabled={
+                isLoading || selectedAccountIds.size === 0 || isMutating
+              }
             >
               Bulk Print QR ({selectedAccountIds.size})
             </button>
@@ -908,7 +1352,7 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
                       />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                      {account.id}
+                      {account.displayId}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                       {account.childName}
@@ -1018,7 +1462,21 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
         registration={viewingPendingRegistration}
       />
       {/* Hidden print view */}
-      <div style={{ display: "none" }}>
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          pointerEvents: "none", // Prevents interaction with elements
+          zIndex: -1, // Behind everything
+          visibility: "hidden", // Hidden visually but still rendered
+          opacity: 0, // Transparent
+          overflow: "auto", // Allow scrolling for multiple pages
+        }}
+        className="print-only-container"
+      >
         <BulkQrPrintView
           ref={printComponentRef}
           accountsToPrint={selectedAccountsToPrint}

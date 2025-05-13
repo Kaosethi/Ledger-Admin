@@ -1,92 +1,204 @@
 // src/components/print/BulkQrPrintView.tsx
-// FIXED: Used 'childName' instead of 'name'.
+// Enhanced with multi-page support and grid layout for A4 printing
 
-import React from 'react';
-import { QRCodeSVG } from 'qrcode.react';
-import type { Account } from '@/lib/mockData'; // Ensure path is correct
+import React from "react";
+import { QRCodeSVG } from "qrcode.react";
+import type { Account } from "@/lib/mockData"; // Ensure path is correct
 
 interface BulkQrPrintViewProps {
   accountsToPrint: Account[];
 }
 
+// Define a type for our filled account array that may contain null placeholders
+type FilledAccountArray = (Account | null)[];
+
 const BulkQrPrintView = React.forwardRef<HTMLDivElement, BulkQrPrintViewProps>(
   ({ accountsToPrint }, ref) => {
-    // Basic styling for print layout
-    const printStyles: React.CSSProperties = {
-      margin: '20px',
-    };
+    // No accounts selected
+    if (accountsToPrint.length === 0) {
+      return (
+        <div ref={ref} style={{ padding: "20px", textAlign: "center" }}>
+          <p>No accounts selected for printing.</p>
+        </div>
+      );
+    }
 
-    const accountBlockStyles: React.CSSProperties = {
-      border: '1px solid #ccc',
-      padding: '15px',
-      marginBottom: '20px',
-      pageBreakInside: 'avoid',
-      width: '100%',
-      boxSizing: 'border-box',
-      textAlign: 'center'
-    };
+    // Calculate number of pages needed (8 QR codes per page)
+    const itemsPerPage = 8;
+    const pageCount = Math.ceil(accountsToPrint.length / itemsPerPage);
 
-    const qrCodeContainerStyles: React.CSSProperties = {
-      marginTop: '10px',
-      marginBottom: '10px',
-    };
+    // Create an array of pages
+    const pages = Array.from({ length: pageCount }, (_, pageIndex) => {
+      // Get accounts for this page
+      const pageAccounts = accountsToPrint.slice(
+        pageIndex * itemsPerPage,
+        (pageIndex + 1) * itemsPerPage
+      );
 
-    const textStyles: React.CSSProperties = {
-        fontSize: '14px',
-        fontWeight: 'bold',
-        marginBottom: '5px'
-    };
+      // Fill remaining slots with empty placeholders to maintain grid layout
+      const emptySlots = itemsPerPage - pageAccounts.length;
+      const filledPageAccounts: FilledAccountArray = [...pageAccounts];
 
-    // Decide what data to encode in the QR code.
-    // For the "Unique Token per Generation" strategy, this component wouldn't
-    // be suitable because the token is generated just-in-time in the modal.
-    // For the simpler "ID only" strategy, encoding account.id is correct.
-    // If you implemented the backend token generation, printing QR codes this way
-    // would likely print *old/invalid* tokens unless this component fetched
-    // the *current* token for each account right before printing, which is complex.
-    // For now, assuming we print the static ID:
-    const getQrValue = (account: Account): string => {
-        return account.id;
-        // OR if you had a persistent qrCodeUrl field in Account:
-        // return account.qrCodeUrl || account.id;
-    };
+      if (emptySlots > 0 && emptySlots < itemsPerPage) {
+        for (let i = 0; i < emptySlots; i++) {
+          filledPageAccounts.push(null);
+        }
+      }
 
+      return (
+        <div
+          key={`page-${pageIndex}`}
+          className="a4-page print-page"
+          style={{
+            width: "210mm",
+            height: "297mm",
+            margin: "0 auto",
+            marginBottom: "20mm", // Space between pages when previewing
+            boxSizing: "border-box",
+            fontFamily: "Arial, sans-serif",
+            backgroundColor: "white",
+            position: "relative",
+            pageBreakAfter: "always",
+            border: "1px solid #e0e0e0", // Make visible in preview
+          }}
+        >
+          <div
+            className="grid-layout"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, 1fr)",
+              gridTemplateRows: "repeat(4, 1fr)",
+              gap: "10mm",
+              padding: "10mm",
+              height: "100%",
+            }}
+          >
+            {filledPageAccounts.map((account, index) => {
+              if (!account) {
+                // Empty placeholder for grid alignment
+                return (
+                  <div
+                    key={`empty-${index}`}
+                    style={{ border: "1px dashed #eee", borderRadius: "5px" }}
+                  ></div>
+                );
+              }
+
+              // Determine QR code value - use account QR code if available, otherwise use ID
+              let qrValue = account.id;
+              let qrPayload = null;
+
+              if (account.currentQrToken) {
+                const qrString = account.currentQrToken || "";
+                qrValue = qrString;
+
+                // Try to decode for debugging purposes
+                try {
+                  const decodedString = atob(qrString);
+                  qrPayload = JSON.parse(decodedString);
+                } catch (e) {
+                  // Silent fail - just use the raw string if can't decode
+                }
+              }
+
+              return (
+                <div
+                  key={`qr-${account.id}`}
+                  className="qr-card"
+                  style={{
+                    border: "1px dashed #bbb",
+                    borderRadius: "5px",
+                    padding: "5mm",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    backgroundColor: "#ffffff",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "14px",
+                      fontWeight: "bold",
+                      marginBottom: "3mm",
+                      textAlign: "center",
+                    }}
+                  >
+                    {account.displayId || account.id}
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      marginBottom: "5mm",
+                      textAlign: "center",
+                    }}
+                  >
+                    {account.childName || "N/A"} /{" "}
+                    {account.guardianName || "N/A"}
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      padding: "2mm",
+                      backgroundColor: "#f9f9f9",
+                      borderRadius: "5px",
+                      marginBottom: "3mm",
+                    }}
+                  >
+                    <QRCodeSVG
+                      value={qrValue}
+                      size={150} // Larger size for better scanning
+                      bgColor={"#ffffff"}
+                      fgColor={"#000000"}
+                      level={"H"}
+                      includeMargin={true}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Page footer */}
+          <div
+            style={{
+              position: "absolute",
+              bottom: "5mm",
+              left: 0,
+              width: "100%",
+              textAlign: "center",
+              fontSize: "8px",
+              color: "#999",
+            }}
+          >
+            Page {pageIndex + 1} of {pageCount} • Generated on{" "}
+            {new Date().toLocaleDateString()} • Ledger Admin
+          </div>
+        </div>
+      );
+    });
 
     return (
-      <div ref={ref} style={printStyles}>
-        <h1 style={{ textAlign: 'center', marginBottom: '30px', fontSize: '20px' }}>Account QR Codes</h1>
-        {accountsToPrint.map((account) => (
-          <div key={account.id} style={accountBlockStyles}>
-            <p style={textStyles}>Account ID: {account.id}</p>
-            {/* MODIFIED: Use childName */}
-            <p style={textStyles}>Child Name: {account.childName || 'N/A'}</p>
-            {/* Optionally display Guardian Name */}
-            <p style={textStyles}>Guardian: {account.guardianName || 'N/A'}</p>
-            {/* Balance might not be appropriate for a printed QR card */}
-            {/* <p style={textStyles}>Balance: {formatCurrency(account.balance)}</p> */}
-
-            <div style={qrCodeContainerStyles}>
-              <QRCodeSVG
-                value={getQrValue(account)} // Use helper function for clarity
-                size={128}
-                bgColor={"#ffffff"}
-                fgColor={"#000000"}
-                level={"H"} // Higher error correction for printing
-                includeMargin={true} // Add margin for better scanning from print
-              />
-            </div>
-             {/* Optional placeholder */}
-             {/* <p style={{fontSize: '10px', color: '#555'}}>Scan for details</p> */}
-          </div>
-        ))}
-        {accountsToPrint.length === 0 && (
-            <p style={{textAlign: 'center', color: '#666'}}>No accounts selected for printing.</p>
-        )}
+      <div
+        ref={ref}
+        className="bulk-print-container print-section"
+        style={{
+          display: "block", // Ensure it's visible
+          width: "100%",
+          backgroundColor: "#fff",
+          visibility: "visible", // Override any CSS that might hide it
+        }}
+      >
+        {pages}
       </div>
     );
   }
 );
 
-BulkQrPrintView.displayName = 'BulkQrPrintView';
+BulkQrPrintView.displayName = "BulkQrPrintView";
 
 export default BulkQrPrintView;

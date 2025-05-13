@@ -3,6 +3,7 @@ import {
   serial,
   text,
   timestamp,
+  time,
   uuid,
   varchar,
   numeric,
@@ -40,17 +41,21 @@ export const transactionTypeEnum = pgEnum("transaction_type", [
   "Adjustment",
 ]);
 
-// Base timestamp mixin
+// time2: time({ withTimezone: true }),
+
+// Base timestamp mixin - use timestamp with timezone
 const timestampFields = {
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at")
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
     .$defaultFn(() => new Date())
     .notNull(),
 };
 
 // Soft delete mixin
 const softDeleteField = {
-  deletedAt: timestamp("deleted_at"),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
 };
 
 // Define the administrators table
@@ -63,7 +68,7 @@ export const administrators = pgTable(
     firstName: text("first_name"),
     lastName: text("last_name"),
     role: text("role").default("admin").notNull(),
-    lastLoginAt: timestamp("last_login_at"),
+    lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
     ...timestampFields,
     ...softDeleteField,
   },
@@ -87,7 +92,9 @@ export const accounts = pgTable(
       .default("0.00")
       .notNull(),
     hashedPin: text("hashed_pin"),
-    lastActivity: timestamp("last_activity").defaultNow().notNull(),
+    lastActivity: timestamp("last_activity", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     currentQrToken: text("current_qr_token"),
     guardianDob: text("guardian_dob"),
     guardianContact: text("guardian_contact"),
@@ -120,7 +127,9 @@ export const merchants = pgTable(
     storeAddress: text("store_address"),
     hashedPassword: text("hashed_password"),
     status: merchantStatusEnum("status").default("pending_approval").notNull(),
-    submittedAt: timestamp("submitted_at").defaultNow().notNull(),
+    submittedAt: timestamp("submitted_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     declineReason: text("decline_reason"),
     pinVerified: boolean("pin_verified").default(false),
     category: text("category"),
@@ -146,7 +155,9 @@ export const transactions = pgTable(
   "transactions",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    timestamp: timestamp("timestamp").defaultNow().notNull(),
+    timestamp: timestamp("timestamp", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
     type: transactionTypeEnum("type").notNull(),
     accountId: uuid("account_id")
@@ -179,7 +190,9 @@ export const adminLogs = pgTable(
   "admin_logs",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    timestamp: timestamp("timestamp").defaultNow().notNull(),
+    timestamp: timestamp("timestamp", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     adminId: uuid("admin_id").references(() => administrators.id, {
       onDelete: "set null",
     }),
@@ -214,7 +227,9 @@ export const accountPermissions = pgTable(
       .notNull()
       .references(() => administrators.id, { onDelete: "cascade" }),
     permission: text("permission").notNull(),
-    grantedAt: timestamp("granted_at").defaultNow().notNull(),
+    grantedAt: timestamp("granted_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     ...timestampFields,
   },
   (table) => {

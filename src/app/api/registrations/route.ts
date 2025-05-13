@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { accounts, createAccountSchema } from "@/lib/db/schema";
 import { z } from "zod";
-// import { password as BunPassword } from "bun";
+import { hashPassword } from "@/lib/auth/password";
 import { env } from "@/lib/config";
 import { generateFallbackId } from "@/lib/utils";
 
@@ -42,8 +42,7 @@ export async function POST(request: Request, context: any) {
 
     // Hash PIN if provided
     if (pin) {
-      // accountData.hashedPin = await BunPassword.hash(pin);
-      accountData.hashedPin = pin;
+      accountData.hashedPin = await hashPassword(pin);
     }
 
     try {
@@ -53,7 +52,13 @@ export async function POST(request: Request, context: any) {
         .values(accountData)
         .returning();
 
-      return NextResponse.json(newAccount[0], { status: 201 });
+      // Add the pin to the response for frontend compatibility
+      const responseAccount = { ...newAccount[0] };
+      if (pin) {
+        (responseAccount as any).pin = pin;
+      }
+
+      return NextResponse.json(responseAccount, { status: 201 });
     } catch (dbError) {
       console.warn("Database error on POST, returning mock response:", dbError);
 
@@ -65,6 +70,11 @@ export async function POST(request: Request, context: any) {
         lastActivity: new Date().toISOString(),
         balance: 0,
       };
+
+      // Add the pin to the mock response for frontend compatibility
+      if (pin) {
+        (mockResponse as any).pin = pin;
+      }
 
       return NextResponse.json(mockResponse, { status: 201 });
     }
