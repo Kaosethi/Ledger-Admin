@@ -1,0 +1,31 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": ["**/.env.*local"],
+  "tasks": {
+    "next:build": {
+      "dependsOn": ["^next:build"],
+      "outputs": [".next/**", "!.next/cache/**"],
+      "inputs": ["src/**/*.tsx", "src/**/*.ts", "public/**/*", "!.env.*"]
+    },
+    "next:dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "next:start": {
+      "dependsOn": ["next:build"]
+    },
+    "next:lint": {},
+    "drizzle:generate": {
+      "cache": false
+    },
+    "drizzle:push": {
+      "cache": false
+    },
+    "drizzle:migrate": {
+      "cache": false
+    },
+    "drizzle:studio": {
+      "cache": false
+    }
+  }
+}

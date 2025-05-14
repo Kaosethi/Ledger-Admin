@@ -2,15 +2,24 @@
   "name": "aid-distribution-admin",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "bun@1.2.12",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "db:generate": "drizzle-kit generate",
-    "db:push": "drizzle-kit push",
-    "db:migrate": "bun run -e .env.local drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "next:dev": "next dev",
+    "next:build": "next build",
+    "next:start": "next start",
+    "next:lint": "next lint",
+    "drizzle:generate": "drizzle-kit generate",
+    "drizzle:push": "drizzle-kit push",
+    "drizzle:migrate": "bun run -e .env.local drizzle-kit migrate",
+    "drizzle:studio": "drizzle-kit studio",
+    "dev": "bun turbo run next:dev --filter=.",
+    "build": "bun turbo run next:build --filter=.",
+    "start": "bun turbo run next:start --filter=.",
+    "lint": "bun turbo run next:lint --filter=.",
+    "db:generate": "bun turbo run drizzle:generate --filter=.",
+    "db:push": "bun turbo run drizzle:push --filter=.",
+    "db:migrate": "bun turbo run drizzle:migrate --filter=.",
+    "db:studio": "bun turbo run drizzle:studio --filter=."
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.11",
@@ -70,6 +79,7 @@
     "eslint-config-next": "15.3.0",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
+    "turbo": "^2.5.3",
     "typescript": "^5.0.0"
   }
 }

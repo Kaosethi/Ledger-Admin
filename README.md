@@ -132,3 +132,39 @@ bun run db:studio
 - If you encounter database connection issues, ensure Docker is running and the PostgreSQL container is started
 - Check `.env.local` for correct environment variables
 - For permission issues with Docker, you may need to run commands with `sudo`
+
+## Turborepo
+
+This project uses [Turborepo](https://turbo.build/) for build system optimization. Turborepo helps optimize the build process by caching outputs and running tasks in parallel.
+
+### Available Commands
+
+#### Default Commands (Using Turborepo)
+
+- `bun dev` - Start the development server with Turborepo
+- `bun build` - Build the application with Turborepo
+- `bun start` - Start the production server with Turborepo
+- `bun lint` - Run linting with Turborepo
+- `bun db:generate` - Generate database schema with Turborepo
+- `bun db:push` - Push database schema with Turborepo
+- `bun db:migrate` - Run database migrations with Turborepo
+- `bun db:studio` - Open database studio with Turborepo
+
+#### Direct Commands (Bypassing Turborepo)
+
+- `bun next:dev` - Start the development server directly
+- `bun next:build` - Build the application directly
+- `bun next:start` - Start the production server directly
+- `bun next:lint` - Run linting directly
+- `bun drizzle:generate` - Generate database schema directly
+- `bun drizzle:push` - Push database schema directly
+- `bun drizzle:migrate` - Run database migrations directly
+- `bun drizzle:studio` - Open database studio directly
+
+### Turborepo Cache
+
+Turborepo will cache your builds to speed up subsequent builds. To clear the cache:
+
+```bash
+bun turbo clean
+```
