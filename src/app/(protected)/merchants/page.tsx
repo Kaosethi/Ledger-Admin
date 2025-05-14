@@ -1,33 +1,52 @@
+// MerchantsPage.tsx (e.g., src/app/admin/merchants/page.tsx or similar)
 "use client";
 
 import { useEffect, useState } from "react";
-import MerchantsTab from "@/components/tabs/MerchantsTab";
-import { Merchant, Transaction } from "@/lib/mockData";
+import MerchantsTab from "@/components/tabs/MerchantsTab"; // Adjust path as needed
+
+// MODIFIED: Import types from @/lib/mockData
+// Ensure MockMerchant (or your equivalent API-aligned Merchant type), Transaction,
+// and BackendMerchantStatus are EXPORTED from your src/lib/mockData.ts file.
+import { 
+  MockMerchant, // Or 'Merchant' if you used that name for the API-aligned type
+  Transaction,  // Or your API-aligned transaction type
+  BackendMerchantStatus // Ensure this is exported and matches backend
+} from "@/lib/mockData"; 
 
 export default function MerchantsPage() {
-  const [merchants, setMerchants] = useState<Merchant[]>([]);
+  // MODIFIED: Use the imported types for state
+  const [merchants, setMerchants] = useState<MockMerchant[]>([]); 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Fetch data
   useEffect(() => {
     const fetchData = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        // Fetch merchants data
         const merchantsResponse = await fetch("/api/merchants");
-        if (merchantsResponse.ok) {
-          const merchantsData = await merchantsResponse.json();
-          setMerchants(merchantsData);
+        if (!merchantsResponse.ok) {
+          throw new Error(`Failed to fetch merchants: ${merchantsResponse.status} ${merchantsResponse.statusText}`);
         }
+        // Ensure the JSON response matches the MockMerchant[] structure
+        const merchantsData: MockMerchant[] = await merchantsResponse.json();
+        setMerchants(merchantsData);
 
-        // Fetch transactions data
-        const transactionsResponse = await fetch("/api/transactions");
-        if (transactionsResponse.ok) {
-          const transactionsData = await transactionsResponse.json();
-          setTransactions(transactionsData);
+        // Assuming you fetch transactions
+        const transactionsResponse = await fetch("/api/transactions"); // Adjust if needed
+        if (!transactionsResponse.ok) {
+          throw new Error(`Failed to fetch transactions: ${transactionsResponse.status} ${transactionsResponse.statusText}`);
         }
-      } catch (error) {
-        console.error("Error fetching data:", error);
+        // Ensure the JSON response matches the Transaction[] structure
+        const transactionsData: Transaction[] = await transactionsResponse.json();
+        setTransactions(transactionsData);
+
+      } catch (err: any) {
+        console.error("Error fetching data:", err);
+        setError(err.message || "An unknown error occurred while fetching data.");
+        setMerchants([]);
+        setTransactions([]);
       } finally {
         setLoading(false);
       }
@@ -36,29 +55,37 @@ export default function MerchantsPage() {
     fetchData();
   }, []);
 
-  // Handler for merchant updates
-  const handleMerchantsUpdate = (updatedMerchants: Merchant[]) => {
+  const handleMerchantsUpdate = (updatedMerchants: MockMerchant[]) => { // MODIFIED type
     setMerchants(updatedMerchants);
   };
 
-  // Log admin activity
   const logAdminActivity = (
     action: string,
     targetType?: string,
     targetId?: string,
     details?: string
   ) => {
-    console.log(`Admin activity: ${action}`, { targetType, targetId, details });
-    // In a real app, this would call an API to log the activity
+    console.log(`Admin activity logged (client-side): ${action}`, { targetType, targetId, details });
+    // Implement API call for logging if needed
   };
 
+  if (error && !loading) {
+    return (
+      <div className="container mx-auto p-4">
+        <p className="text-red-500 text-center">Error loading data: {error}</p>
+      </div>
+    );
+  }
+
   return (
-    <MerchantsTab
-      merchants={merchants}
-      transactions={transactions}
-      onMerchantsUpdate={handleMerchantsUpdate}
-      logAdminActivity={logAdminActivity}
-      merchantsLoading={loading}
-    />
+    <div className="container mx-auto p-4">
+      <MerchantsTab
+        merchants={merchants} // merchants is MockMerchant[]
+        transactions={transactions} // transactions is Transaction[]
+        onMerchantsUpdate={handleMerchantsUpdate}
+        logAdminActivity={logAdminActivity}
+        merchantsLoading={loading}
+      />
+    </div>
   );
 }
