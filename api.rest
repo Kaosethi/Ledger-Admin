@@ -2,7 +2,7 @@
 # Ledger Admin API Tests
 ###
 
-@baseUrl = https://stc.treewalkr.dev/api
+@baseUrl = localhost:3000/api
 @contentType = application/json
 
 ### Authentication

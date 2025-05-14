@@ -1,36 +1,48 @@
 // src/app/api/merchant-app/auth/register/route.ts
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db"; // Assuming this is the correct path to your db instance
-import { merchants } from "@/lib/db/schema"; // Assuming this is the correct path to your schema
+import { db } from "@/lib/db";
+import { merchants } from "@/lib/db/schema"; // Assuming this is 'merchantsTable' or similar from your actual schema file
 import { eq } from "drizzle-orm";
 import { hash } from "bcryptjs";
 
-const SALT_ROUNDS = 10; // Standard salt rounds for bcrypt
+const SALT_ROUNDS = 10;
 
 export async function POST(request: Request) {
   console.log("[API /merchant-app/auth/register] Request received");
   try {
     const body = await request.json();
+    // MODIFIED: Destructure fields with names that clearly map to their purpose.
+    // App should send these field names.
     const {
-      name, // This will be mapped to businessName
-      email, // This will be mapped to contactEmail
-      password, // Plain text password from app
-      location, // This will be mapped to storeAddress
+      storeName, // Renamed from 'name' for clarity, maps to businessName
+      email,
+      password,
+      location, // Maps to storeAddress
       category,
-      // contactEmail is not directly used from request body if `email` is primary,
-      // but your schema has a `contactEmail` field which we'll use `email` for.
+      contactPerson, // ADDED: Expect contactPerson
+      contactPhoneNumber, // ADDED: Expect contactPhoneNumber
     } = body;
 
     console.log(
-      "[API /merchant-app/auth/register] Request body parsed successfully"
+      "[API /merchant-app/auth/register] Request body parsed:",
+      { // Log all expected fields for debugging
+        storeName,
+        email,
+        // Do not log password
+        location,
+        category,
+        contactPerson,
+        contactPhoneNumber
+      }
     );
 
     // --- Basic Validation ---
-    if (!name || !email || !password || !location || !category) {
+    // MODIFIED: Updated required fields list
+    if (!storeName || !email || !password || !location || !category) {
       console.warn(
         "[API /merchant-app/auth/register] Missing required fields",
         {
-          hasName: !!name,
+          hasStoreName: !!storeName, // MODIFIED
           hasEmail: !!email,
           hasPassword: !!password,
           hasLocation: !!location,
@@ -40,14 +52,13 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            "Missing required fields: name, email, password, location, and category are required.",
+            "Missing required fields: storeName, email, password, location, and category are required.", // MODIFIED
         },
         { status: 400 }
       );
     }
 
     // --- More Specific Validation (Optional but Recommended) ---
-    // Validate email format (basic regex example)
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       console.warn("[API /merchant-app/auth/register] Invalid email format", {
@@ -59,7 +70,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validate password strength (example: min 8 characters)
     if (password.length < 8) {
       console.warn("[API /merchant-app/auth/register] Password too short");
       return NextResponse.json(
@@ -69,25 +79,19 @@ export async function POST(request: Request) {
     }
 
     console.log(
-      "[API /merchant-app/auth/register] Validation passed, processing registration data:",
-      {
-        name,
-        email,
-        location,
-        category,
-      }
-    ); // Don't log password
+      "[API /merchant-app/auth/register] Validation passed, processing registration data"
+    );
 
     // --- Database Operations ---
-    // 1. Check if a merchant with this email already exists
     console.log(
       "[API /merchant-app/auth/register] Checking for existing merchant with email:",
       email
     );
+    // REMINDER: Ensure 'merchants.contactEmail' matches your schema column name
     const existingMerchant = await db
       .select()
-      .from(merchants)
-      .where(eq(merchants.contactEmail, email.toLowerCase())) // Case-insensitive check often good for emails
+      .from(merchants) // Ensure 'merchants' is the correct Drizzle table object from your schema
+      .where(eq(merchants.contactEmail, email.toLowerCase()))
       .limit(1);
 
     if (existingMerchant.length > 0) {
@@ -96,7 +100,7 @@ export async function POST(request: Request) {
       );
       return NextResponse.json(
         { error: "A merchant with this email already exists." },
-        { status: 409 } // 409 Conflict
+        { status: 409 }
       );
     }
 
@@ -104,27 +108,39 @@ export async function POST(request: Request) {
       "[API /merchant-app/auth/register] No existing merchant found, proceeding with registration"
     );
 
-    // 2. Hash the received plain text password
     console.log("[API /merchant-app/auth/register] Hashing password");
     const hashedPassword = await hash(password, SALT_ROUNDS);
 
-    // 3. Create a new merchant record in the database
-    //    The `id`, `submittedAt`, `createdAt`, `updatedAt`, and `status` (to 'pending_approval')
-    //    will be handled by Drizzle defaults as per your schema.
-    const newMerchantData = {
-      businessName: name,
-      contactEmail: email.toLowerCase(), // Store email in lowercase for consistency
+    // MODIFIED: Construct new merchant data with correct mappings
+    // REMINDER: Ensure these field names (businessName, contactEmail, etc.)
+    // match the column names in your Drizzle 'merchants' schema.
+    const newMerchantData: any = { // Use 'any' for flexibility or define a proper type
+      businessName: storeName, // MODIFIED: Use storeName from request
+      contactEmail: email.toLowerCase(),
       hashedPassword: hashedPassword,
       storeAddress: location,
       category: category,
-      // contactPerson: name, // Optional: if you want to populate this
-      // Other fields like contactPhone, website, description, logoUrl are optional
-      // and not provided by the current Android app request.
+      // ADDED: Include contactPerson and contactPhoneNumber if provided
+      // These will be null/undefined if not in request body, Drizzle handles this for nullable columns.
     };
 
+    if (contactPerson) {
+      newMerchantData.contactPerson = contactPerson;
+    }
+    if (contactPhoneNumber) {
+      // You might want to add validation for phone number format here
+      newMerchantData.contactPhone = contactPhoneNumber; // Assuming DB column is 'contactPhone'
+    }
+    
+    // Default status will be applied by DB schema or Drizzle if defined there
+    // Default timestamps (submittedAt, createdAt, updatedAt) also typically handled by schema/DB
+
     console.log(
-      "[API /merchant-app/auth/register] Inserting new merchant record"
+      "[API /merchant-app/auth/register] Inserting new merchant record:",
+      newMerchantData // Log the data going into the DB (excluding password)
     );
+
+    // REMINDER: Ensure 'merchants' is the correct Drizzle table object
     const insertedMerchant = await db
       .insert(merchants)
       .values(newMerchantData)
@@ -133,9 +149,11 @@ export async function POST(request: Request) {
         businessName: merchants.businessName,
         contactEmail: merchants.contactEmail,
         status: merchants.status,
-        submittedAt: merchants.submittedAt,
+        submittedAt: merchants.submittedAt, // Ensure this column exists or remove
         category: merchants.category,
         storeAddress: merchants.storeAddress,
+        contactPerson: merchants.contactPerson, // ADDED: Return contactPerson
+        contactPhone: merchants.contactPhone,   // ADDED: Return contactPhone
       });
 
     if (!insertedMerchant || insertedMerchant.length === 0) {
@@ -154,22 +172,23 @@ export async function POST(request: Request) {
       registeredMerchant
     );
 
-    // 5. Return a success response
     console.log("[API /merchant-app/auth/register] Returning success response");
     return NextResponse.json(
       {
         message: "Merchant registration successful. Awaiting admin approval.",
         merchant: {
           id: registeredMerchant.id,
-          name: registeredMerchant.businessName, // Map back to 'name' for consistency with Android request/mock
+          name: registeredMerchant.businessName, // Keep 'name' here if Android expects it in response
           email: registeredMerchant.contactEmail,
           location: registeredMerchant.storeAddress,
           category: registeredMerchant.category,
           status: registeredMerchant.status,
           submittedAt: registeredMerchant.submittedAt,
+          contactPerson: registeredMerchant.contactPerson, // ADDED
+          contactPhoneNumber: registeredMerchant.contactPhone, // ADDED (assuming DB column is contactPhone)
         },
       },
-      { status: 201 } // 201 Created
+      { status: 201 }
     );
   } catch (error) {
     console.error(
@@ -177,14 +196,12 @@ export async function POST(request: Request) {
       error
     );
     if (error instanceof SyntaxError) {
-      // JSON parsing error
       console.error("[API /merchant-app/auth/register] JSON parsing error");
       return NextResponse.json(
         { error: "Invalid request body. Ensure JSON is well-formed." },
         { status: 400 }
       );
     }
-    // Catch Drizzle/DB specific errors if needed for more granular responses
     return NextResponse.json(
       { error: "Internal Server Error during registration." },
       { status: 500 }
