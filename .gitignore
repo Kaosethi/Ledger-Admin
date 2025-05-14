@@ -20,6 +20,7 @@ next-env.d.ts
 .env.production
 .env.production.local
 !.env.example
+dot.env.*
 
 # Debug logs
 npm-debug.log*
