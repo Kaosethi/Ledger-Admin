@@ -372,7 +372,7 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
                     {/* Transaction Table Rows */}
                     {accountTransactions.map((tx) => {
                       const merchant = merchants.find((m) => m.id === tx.merchantId);
-                      const merchantDisplay = merchant?.name || tx.merchantId || "N/A";
+                      const merchantDisplay = merchant?.businessName || tx.merchantId || "N/A";
                       const { date, time } = formatDateTime(tx.timestamp);
                       return (
                         <tr key={tx.id}>
