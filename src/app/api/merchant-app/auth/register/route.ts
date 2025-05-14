@@ -1,21 +1,23 @@
 // src/app/api/merchant-app/auth/register/route.ts
 import { NextResponse } from 'next/server';
-// TODO: (Backend Developer) Import Drizzle client and merchant schema
-// import { db } from '@/lib/db'; // Assuming your db client is here
-// import { merchants } from '@/lib/db/schema'; // Assuming your merchants schema is here
-// import { hash } from 'bcryptjs'; // Or your preferred password hashing library
+import { db } from '@/lib/db'; // Assuming this is the correct path to your db instance
+import { merchants } from '@/lib/db/schema'; // Assuming this is the correct path to your schema
+import { eq } from 'drizzle-orm';
+import { hash } from 'bcryptjs';
+
+const SALT_ROUNDS = 10; // Standard salt rounds for bcrypt
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const {
-      name,
-      email,
+      name, // This will be mapped to businessName
+      email, // This will be mapped to contactEmail
       password, // Plain text password from app
-      location,
+      location, // This will be mapped to storeAddress
       category,
-      contactEmail // Optional, could be same as login email
-      // Add any other fields your Android registration form will send
+      // contactEmail is not directly used from request body if `email` is primary,
+      // but your schema has a `contactEmail` field which we'll use `email` for.
     } = body;
 
     // --- Basic Validation ---
@@ -26,46 +28,96 @@ export async function POST(request: Request) {
       );
     }
 
-    // Optional: More specific validation (email format, password strength) can be added here
+    // --- More Specific Validation (Optional but Recommended) ---
+    // Validate email format (basic regex example)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json({ error: 'Invalid email format.' }, { status: 400 });
+    }
 
-    console.log('[API /merchant-app/auth/register] Received registration data:', body);
+    // Validate password strength (example: min 8 characters)
+    if (password.length < 8) {
+      return NextResponse.json({ error: 'Password must be at least 8 characters long.' }, { status: 400 });
+    }
 
-    // --- Placeholder Logic: Log and return success ---
-    // TODO: (Backend Developer)
-    // 1. Check if a merchant with this email already exists in the database.
-    //    If yes, return an error (e.g., 409 Conflict).
-    // 2. Hash the received plain text password.
-    // 3. Create a new merchant record in the database using Drizzle.
-    //    - Decide on initial status (e.g., 'Pending' for admin approval, or 'Active' directly).
-    //    - `submittedAt` should be the current timestamp.
-    // 4. Handle any database errors.
-    // 5. Return a success response, possibly with some data of the newly created merchant (excluding sensitive info).
+    console.log('[API /merchant-app/auth/register] Received registration data:', { name, email, location, category }); // Don't log password
 
-    const newMockMerchant = {
-      id: `MER-MOCK-${Date.now()}`, // Generate a mock ID
-      name,
-      email,
-      location,
-      category,
-      contactEmail: contactEmail || email,
-      status: 'Pending', // Example: new registrations are pending approval
-      submittedAt: new Date().toISOString(),
+    // --- Database Operations ---
+    // 1. Check if a merchant with this email already exists
+    const existingMerchant = await db
+      .select()
+      .from(merchants)
+      .where(eq(merchants.contactEmail, email.toLowerCase())) // Case-insensitive check often good for emails
+      .limit(1);
+
+    if (existingMerchant.length > 0) {
+      return NextResponse.json(
+        { error: 'A merchant with this email already exists.' },
+        { status: 409 } // 409 Conflict
+      );
+    }
+
+    // 2. Hash the received plain text password
+    const hashedPassword = await hash(password, SALT_ROUNDS);
+
+    // 3. Create a new merchant record in the database
+    //    The `id`, `submittedAt`, `createdAt`, `updatedAt`, and `status` (to 'pending_approval')
+    //    will be handled by Drizzle defaults as per your schema.
+    const newMerchantData = {
+      businessName: name,
+      contactEmail: email.toLowerCase(), // Store email in lowercase for consistency
+      hashedPassword: hashedPassword,
+      storeAddress: location,
+      category: category,
+      // contactPerson: name, // Optional: if you want to populate this
+      // Other fields like contactPhone, website, description, logoUrl are optional
+      // and not provided by the current Android app request.
     };
 
+    const insertedMerchant = await db
+      .insert(merchants)
+      .values(newMerchantData)
+      .returning({
+        id: merchants.id,
+        businessName: merchants.businessName,
+        contactEmail: merchants.contactEmail,
+        status: merchants.status,
+        submittedAt: merchants.submittedAt,
+        category: merchants.category,
+        storeAddress: merchants.storeAddress,
+      });
+
+    if (!insertedMerchant || insertedMerchant.length === 0) {
+      console.error('[API /merchant-app/auth/register] Failed to insert merchant into database.');
+      return NextResponse.json({ error: 'Failed to register merchant. Please try again.' }, { status: 500 });
+    }
+
+    const registeredMerchant = insertedMerchant[0];
+    console.log('[API /merchant-app/auth/register] Merchant registered successfully:', registeredMerchant);
+
+    // 5. Return a success response
     return NextResponse.json(
       {
-        message: 'Merchant registration request received (mock). Awaiting admin approval.',
-        merchant: newMockMerchant,
+        message: 'Merchant registration successful. Awaiting admin approval.',
+        merchant: {
+          id: registeredMerchant.id,
+          name: registeredMerchant.businessName, // Map back to 'name' for consistency with Android request/mock
+          email: registeredMerchant.contactEmail,
+          location: registeredMerchant.storeAddress,
+          category: registeredMerchant.category,
+          status: registeredMerchant.status,
+          submittedAt: registeredMerchant.submittedAt,
+        },
       },
       { status: 201 } // 201 Created
     );
-    // --- End Placeholder Logic ---
 
   } catch (error) {
     console.error('[API /merchant-app/auth/register] Error:', error);
     if (error instanceof SyntaxError) { // JSON parsing error
         return NextResponse.json({ error: 'Invalid request body. Ensure JSON is well-formed.' }, { status: 400 });
     }
+    // Catch Drizzle/DB specific errors if needed for more granular responses
     return NextResponse.json({ error: 'Internal Server Error during registration.' }, { status: 500 });
   }
 }
