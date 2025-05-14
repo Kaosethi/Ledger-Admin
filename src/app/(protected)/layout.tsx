@@ -13,7 +13,8 @@ export default function ProtectedLayout({
   const pathname = usePathname();
 
   // Determine active tab based on current pathname
-  const getActiveTabId = (path: string) => {
+  const getActiveTabId = (path: string | null) => {
+    if (!path) return "dashboard-tab"; // Default if path is null
     if (path.includes("/dashboard")) return "dashboard-tab";
     if (path.includes("/accounts")) return "accounts-tab";
     if (path.includes("/merchants")) return "merchants-tab";
