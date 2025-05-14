@@ -1,190 +1,154 @@
 // src/components/modals/MerchantDetailModal.tsx
-// FIXED: Corrected final closing structure of the component and return statement.
-
 import React, { useMemo } from 'react';
-import type { Merchant, Transaction, MerchantStatus } from '@/lib/mockData';
-import { formatDate, formatCurrency, renderStatusBadge, formatDateTime } from '@/lib/utils';
+import type { 
+  Merchant, 
+  Transaction, 
+  BackendMerchantStatus // Ensure this is correctly imported
+} from '@/lib/mockData'; // Adjust path if needed
+import { formatDate, formatCurrency, renderStatusBadge, formatDateTime } from '@/lib/utils'; // Adjust path
 
-// Type for all possible actions
 export type MerchantActionType = 'approve' | 'reject' | 'suspend' | 'reactivate' | 'deactivate';
-
-// Define allowed actions for this modal's buttons
-type AllowedModalAction = Exclude<MerchantActionType, 'deactivate'>;
 
 interface MerchantDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onRequestConfirm: (actionType: MerchantActionType, merchant: Merchant) => void;
   merchant: Merchant | null;
   transactions: Transaction[];
-  onRequestConfirm: (actionType: AllowedModalAction, merchant: Merchant) => void;
 }
-
-// Table styling constants
-const tableHeaderClasses = "px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider";
-const tableCellClasses = "px-2 py-2 whitespace-nowrap text-sm text-gray-700";
-const tableContainerClasses = "max-h-72 overflow-y-auto border border-gray-200 rounded-md";
 
 const MerchantDetailModal: React.FC<MerchantDetailModalProps> = ({
   isOpen,
   onClose,
+  onRequestConfirm,
   merchant,
   transactions,
-  onRequestConfirm,
 }) => {
-  const merchantTransactions = useMemo(() => {
-    if (!merchant) return [];
-    return transactions
-      .filter(tx => tx.merchantId === merchant.id)
-      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  }, [merchant, transactions]);
-
-  // --- Button Rendering Logic ---
-  const renderApplicationActionButtons = (currentMerchant: Merchant | null) => {
-    if (!currentMerchant || currentMerchant.status !== 'Pending') return null;
-    const actionApprove: AllowedModalAction = 'approve';
-    const actionReject: AllowedModalAction = 'reject';
-    return (
-        <div className="pt-5 mt-5 border-t border-gray-200">
-            <h4 className="text-base font-semibold text-gray-800 mb-3">Application Actions</h4>
-            <div className="flex space-x-3">
-                 <button
-                    onClick={() => onRequestConfirm(actionApprove, currentMerchant)}
-                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition duration-150 ease-in-out"
-                > Approve Application </button>
-                 <button
-                    onClick={() => onRequestConfirm(actionReject, currentMerchant)}
-                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition duration-150 ease-in-out"
-                > Reject Application </button>
-            </div>
-        </div>
-    );
-  };
-
-  const renderStatusActionButtons = (currentMerchant: Merchant | null) => {
-    if (!currentMerchant) return null;
-    const actionSuspend: AllowedModalAction = 'suspend';
-    const actionReactivate: AllowedModalAction = 'reactivate';
-    const actionButtons: React.ReactNode[] = [];
-
-    if (currentMerchant.status === 'Active') {
-      actionButtons.push(
-        <button key="suspend" onClick={() => onRequestConfirm(actionSuspend, currentMerchant)} className={`w-full px-4 py-2 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition duration-150 ease-in-out bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500`}>
-            Suspend Merchant
-        </button>
-      );
-    } else if (currentMerchant.status === 'Suspended') {
-       actionButtons.push(
-        <button key="reactivate" onClick={() => onRequestConfirm(actionReactivate, currentMerchant)} className={`w-full px-4 py-2 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition duration-150 ease-in-out bg-green-600 hover:bg-green-700 focus:ring-green-500`}>
-            Reactivate Merchant
-        </button>
-      );
-    }
-
-    if (actionButtons.length === 0) return null;
-
-    return (
-         <div className="pt-5 mt-5 border-t border-gray-200">
-            <h4 className="text-base font-semibold text-gray-800 mb-3">Merchant Status Actions</h4>
-             <div className="space-y-2">
-                {actionButtons}
-             </div>
-         </div>
-    );
-  };
-  // --- End Button Rendering Logic ---
-
-  // Check if modal should be open and if merchant data exists
+  // If the modal is not open, or no merchant is selected, render nothing
   if (!isOpen || !merchant) {
-    return null;
+    return null; // <--- Explicitly return null
   }
 
-  // If merchant data exists, render the modal
-  return ( // <--- Start of main return statement's JSX
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 flex justify-center items-start py-10 px-4">
-        <div className={`relative mx-auto p-6 border w-full max-w-6xl shadow-lg rounded-md bg-white my-auto`}>
-          {/* Modal Header */}
-          <div className="flex justify-between items-center mb-4 pb-3 border-b">
-            <h3 className="text-lg font-semibold text-gray-900" id="merchant-details-title"> Merchant Details </h3>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+  // Memoize transactions for the selected merchant
+  const merchantTransactions = useMemo(() => {
+    if (!merchant) return [];
+    return transactions.filter(tx => tx.merchantId === merchant.id);
+  }, [merchant, transactions]);
+
+  // Example logic using BackendMerchantStatus
+  const canApprove = merchant.status === 'pending_approval';
+  const canReject = merchant.status === 'pending_approval';
+  const canSuspend = merchant.status === 'active';
+  const canReactivate = merchant.status === 'suspended';
+  // Deactivate might depend on 'active' or 'suspended'
+  const canDeactivate = merchant.status === 'active' || merchant.status === 'suspended';
+
+
+  // --- Render the modal content ONLY if isOpen and merchant are true ---
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 transition-opacity duration-300 ease-in-out" /* Modal backdrop */ >
+      <div className="flex items-center justify-center min-h-screen p-4 text-center">
+        {/* Modal Panel */}
+        <div 
+          className="relative w-full max-w-2xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-lg"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="merchant-detail-modal-title"
+        >
+          {/* Header */}
+          <div className="flex items-start justify-between pb-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold leading-6 text-gray-900" id="merchant-detail-modal-title">
+              Merchant Details: {merchant.businessName}
+            </h3>
+            <button
+              onClick={onClose}
+              className="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 ml-auto inline-flex items-center"
+              aria-label="Close modal"
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"></path></svg>
             </button>
           </div>
 
-          {/* Modal Body - Grid Layout (1/3 + 2/3) */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          {/* Body */}
+          <div className="mt-5 space-y-4">
+            <p><strong>ID:</strong> {merchant.id}</p>
+            <p><strong>Contact Email:</strong> {merchant.contactEmail || 'N/A'}</p>
+            <p><strong>Category:</strong> {merchant.category || 'N/A'}</p>
+            <p><strong>Location/Address:</strong> {merchant.storeAddress || 'N/A'}</p>
+            <p><strong>Status:</strong> {renderStatusBadge(merchant.status, "merchant")}</p>
+            <p><strong>Submitted:</strong> {formatDate(merchant.submittedAt)}</p>
+            {merchant.updatedAt && <p><strong>Last Updated:</strong> {formatDate(merchant.updatedAt)}</p>}
+            
+            {/* Add other merchant details you want to display */}
+            {/* e.g., contactPerson, contactPhone, etc. from the Merchant interface */}
 
-             {/* Merchant Information Section (Column 1 - 1/3 width) */}
-             <div className="md:col-span-1 space-y-6">
-                <div>
-                    <h4 className="text-md font-semibold text-gray-700 mb-2">Merchant Information</h4>
-                    <dl className="divide-y divide-gray-100 border border-gray-200 rounded-md p-4 text-sm">
-                        {/* Merchant details using dl, dt, dd */}
-                         <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4"> <dt className="font-medium text-gray-500">Merchant ID</dt> <dd className="mt-1 text-gray-900 sm:mt-0 sm:col-span-2 font-mono">{merchant.id}</dd> </div>
-                        <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4"> <dt className="font-medium text-gray-500">Name</dt> <dd className="mt-1 text-gray-900 sm:mt-0 sm:col-span-2">{merchant.name}</dd> </div>
-                        <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4"> <dt className="font-medium text-gray-500">Location</dt> <dd className="mt-1 text-gray-900 sm:mt-0 sm:col-span-2">{merchant.location || 'N/A'}</dd> </div>
-                        <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4"> <dt className="font-medium text-gray-500">Category</dt> <dd className="mt-1 text-gray-900 sm:mt-0 sm:col-span-2">{merchant.category || 'N/A'}</dd> </div>
-                        <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4"> <dt className="font-medium text-gray-500">Contact</dt> <dd className="mt-1 sm:mt-0 sm:col-span-2">{merchant.contactEmail ? (<a href={`mailto:${merchant.contactEmail}`} className="text-primary hover:underline truncate">{merchant.contactEmail}</a>) : (<span>N/A</span>)}</dd> </div>
-                        <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4 items-center"> <dt className="font-medium text-gray-500">Status</dt> <dd className="mt-1 sm:mt-0 sm:col-span-2">{renderStatusBadge(merchant.status, 'merchant')}</dd> </div>
-                        <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4"> <dt className="font-medium text-gray-500">Submitted</dt> <dd className="mt-1 text-gray-900 sm:mt-0 sm:col-span-2">{formatDate(merchant.submittedAt) || 'N/A'}</dd> </div>
-                        <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4"> <dt className="font-medium text-gray-500">Updated</dt> <dd className="mt-1 text-gray-900 sm:mt-0 sm:col-span-2">{formatDate(merchant.updatedAt) || 'N/A'}</dd> </div>
-                    </dl>
-                </div>
-                {/* Actions Section */}
-                 <div className="p-4 border rounded-md">
-                    {renderApplicationActionButtons(merchant)}
-                    {renderStatusActionButtons(merchant)}
-                 </div>
-            </div> {/* End Left Column */}
+            <h4 className="text-md font-semibold mt-6 mb-2">Actions:</h4>
+            <div className="flex flex-wrap gap-2">
+              {canApprove && (
+                <button onClick={() => onRequestConfirm('approve', merchant)} className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700">Approve</button>
+              )}
+              {canReject && (
+                <button onClick={() => onRequestConfirm('reject', merchant)} className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700">Reject</button>
+              )}
+              {canSuspend && (
+                <button onClick={() => onRequestConfirm('suspend', merchant)} className="px-4 py-2 text-sm font-medium text-white bg-yellow-500 rounded-md hover:bg-yellow-600">Suspend</button>
+              )}
+              {canReactivate && (
+                <button onClick={() => onRequestConfirm('reactivate', merchant)} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">Reactivate</button>
+              )}
+              {/* Add deactivate button if needed, e.g.,
+              {canDeactivate && (
+                <button onClick={() => onRequestConfirm('deactivate', merchant)} className="px-4 py-2 text-sm font-medium text-white bg-gray-500 rounded-md hover:bg-gray-600">Deactivate</button>
+              )}
+              */}
+            </div>
 
-            {/* Transaction History Section (Column 2 - 2/3 width) */}
-            <div className="md:col-span-2 space-y-3">
-                 <h4 className="text-md font-semibold text-gray-700 mb-2">Transaction History ({merchantTransactions.length})</h4>
-                 <div className={`${tableContainerClasses} shadow-sm`}>
-                    <table className="min-w-full divide-y divide-gray-200 text-sm">
-                        <thead className="bg-gray-50 sticky top-0 z-10">
-                            <tr>
-                                <th scope="col" className={tableHeaderClasses}>Date</th>
-                                <th scope="col" className={tableHeaderClasses}>Time</th>
-                                <th scope="col" className={tableHeaderClasses}>Account ID</th>
-                                <th scope="col" className={tableHeaderClasses}>Txn ID</th>
-                                <th scope="col" className={`${tableHeaderClasses} text-right`}>Amount</th>
-                                <th scope="col" className={`${tableHeaderClasses} text-center`}>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {merchantTransactions.length === 0 ? (
-                                <tr><td colSpan={6} className={`${tableCellClasses} text-center text-gray-500 py-4`}>No transactions found for this merchant.</td></tr>
-                            ) : (
-                                merchantTransactions.map((tx) => {
-                                    const { date, time } = formatDateTime(tx.timestamp);
-                                    return (
-                                        <tr key={tx.id}>
-                                            <td className={tableCellClasses}>{date}</td>
-                                            <td className={`${tableCellClasses} text-xs`}>{time}</td>
-                                            <td className={`${tableCellClasses} font-mono text-xs`}>{tx.accountId}</td>
-                                            <td className={`${tableCellClasses} font-mono text-xs truncate max-w-[100px]`} title={tx.id}>{tx.id}</td>
-                                            <td className={`${tableCellClasses} text-right font-medium`}>{formatCurrency(tx.amount)}</td>
-                                            <td className={`${tableCellClasses} text-center`}>{renderStatusBadge(tx.status, 'transaction')}</td>
-                                        </tr>
-                                    );
-                                })
-                            )}
-                        </tbody>
-                    </table>
-                 </div>
-            </div> {/* End Right Column */}
+            <h4 className="text-md font-semibold mt-6 mb-2">Recent Transactions ({merchantTransactions.length}):</h4>
+            {merchantTransactions.length > 0 ? (
+              <div className="overflow-x-auto max-h-60 border rounded-md">
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Date & Time</th>
+                      <th className="px-3 py-2 text-left">Type</th>
+                      <th className="px-3 py-2 text-right">Amount</th>
+                      <th className="px-3 py-2 text-left">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {merchantTransactions.map(tx => {
+                      const { date, time } = formatDateTime(tx.timestamp);
+                      return (
+                        <tr key={tx.id}>
+                          <td className="px-3 py-2">{date} <span className="text-xs text-gray-500">{time}</span></td>
+                          <td className="px-3 py-2">{tx.type}</td>
+                          <td className="px-3 py-2 text-right">{formatCurrency(tx.amount)}</td>
+                          <td className="px-3 py-2">{renderStatusBadge(tx.status, "transaction")}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">No transactions found for this merchant.</p>
+            )}
+          </div>
 
-          </div> {/* End Grid */}
-
-          {/* Modal Footer */}
-          <div className="mt-6 flex justify-end space-x-3 pt-4 border-t">
-            <button type="button" onClick={onClose} className="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300">
+          {/* Footer (Optional) */}
+          <div className="mt-6 flex justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
+            >
               Close
             </button>
           </div>
-        </div> {/* End Modal Content Box */}
-    </div> // <--- End Modal Backdrop div
-  ); // <--- *** FIXED: This is the closing parenthesis for the main return JSX block ***
-}; // <--- *** FIXED: This is the closing brace for the component function body ***
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default MerchantDetailModal;
