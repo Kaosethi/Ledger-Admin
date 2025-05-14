@@ -6,12 +6,7 @@ import React, { useState, useMemo } from "react"; // Removed useEffect as it was
 // MODIFIED: Import types from @/lib/mockData
 // Ensure these types are exported from your src/lib/mockData.ts file
 // and that MockMerchant (or your equivalent) is aligned with your API response.
-import type { 
-  MockMerchant, // Or 'Merchant' if that's the name of your API-aligned type in mockData.ts
-  Transaction,  // Or your API-aligned transaction type
-  BackendMerchantStatus 
-} from "@/lib/mockData"; 
-
+import type { Merchant, Transaction, BackendMerchantStatus } from "@/lib/mockData";
 import { formatDate, renderStatusBadge } from "@/lib/utils"; // Adjust path as needed
 import MerchantDetailModal, { MerchantActionType } from "../modals/MerchantDetailModal"; // Adjust path
 import ConfirmActionModal from "../modals/ConfirmActionModal"; // Adjust path
@@ -19,9 +14,9 @@ import { Skeleton } from "@/components/ui/skeleton"; // Adjust path
 
 interface MerchantsTabProps {
   // MODIFIED: Use types imported from mockData (which should be API-aligned)
-  merchants: MockMerchant[];
+  merchants: Merchant[];
   transactions: Transaction[];
-  onMerchantsUpdate?: (updatedMerchants: MockMerchant[]) => void;
+  onMerchantsUpdate?: (updatedMerchants: Merchant[]) => void;
   logAdminActivity?: (
     action: string,
     targetType?: string,
@@ -49,12 +44,12 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
 }) => {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   // MODIFIED: Use MockMerchant type
-  const [selectedMerchant, setSelectedMerchant] = useState<MockMerchant | null>(null);
+  const [selectedMerchant, setSelectedMerchant] = useState<Merchant | null>(null);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [confirmActionDetails, setConfirmActionDetails] = useState<{
     actionType: AllowedMerchantAction | null;
     // MODIFIED: Use MockMerchant type
-    merchant: MockMerchant | null;
+    merchant: Merchant | null;
   }>({ actionType: null, merchant: null });
 
   const pendingMerchants = useMemo(
@@ -81,7 +76,7 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
     setSelectedMerchant(null);
   };
 
-  const handleRequestConfirm = (actionType: AllowedMerchantAction, merchant: MockMerchant) => { // MODIFIED type
+  const handleRequestConfirm = (actionType: AllowedMerchantAction, merchant: Merchant) => { // MODIFIED type
     setConfirmActionDetails({ actionType, merchant });
     setIsConfirmModalOpen(true);
     if (isDetailModalOpen) handleCloseDetailModal();

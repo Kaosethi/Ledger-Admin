@@ -7,15 +7,10 @@ import MerchantsTab from "@/components/tabs/MerchantsTab"; // Adjust path as nee
 // MODIFIED: Import types from @/lib/mockData
 // Ensure MockMerchant (or your equivalent API-aligned Merchant type), Transaction,
 // and BackendMerchantStatus are EXPORTED from your src/lib/mockData.ts file.
-import { 
-  MockMerchant, // Or 'Merchant' if you used that name for the API-aligned type
-  Transaction,  // Or your API-aligned transaction type
-  BackendMerchantStatus // Ensure this is exported and matches backend
-} from "@/lib/mockData"; 
-
+import { Merchant, Transaction, BackendMerchantStatus, Account /*, other types as needed */ } from "@/lib/mockData";
 export default function MerchantsPage() {
   // MODIFIED: Use the imported types for state
-  const [merchants, setMerchants] = useState<MockMerchant[]>([]); 
+  const [merchants, setMerchants] = useState<Merchant[]>([]); 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +25,7 @@ export default function MerchantsPage() {
           throw new Error(`Failed to fetch merchants: ${merchantsResponse.status} ${merchantsResponse.statusText}`);
         }
         // Ensure the JSON response matches the MockMerchant[] structure
-        const merchantsData: MockMerchant[] = await merchantsResponse.json();
+        const merchantsData: Merchant[] = await merchantsResponse.json();
         setMerchants(merchantsData);
 
         // Assuming you fetch transactions
@@ -55,7 +50,7 @@ export default function MerchantsPage() {
     fetchData();
   }, []);
 
-  const handleMerchantsUpdate = (updatedMerchants: MockMerchant[]) => { // MODIFIED type
+  const handleMerchantsUpdate = (updatedMerchants: Merchant[]) => { // MODIFIED type
     setMerchants(updatedMerchants);
   };
 
