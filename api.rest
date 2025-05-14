@@ -156,10 +156,14 @@ POST {{baseUrl}}/merchant-app/auth/register
 Content-Type: {{contentType}}
 
 {
-  "name": "Store Owner",
-  "email": "store@example.com",
-  "password": "123passwd",
-  "location": "Bangkok",
-  "category": "123 Main St",
-  "contactEmail": "store@example.com"
+  "name": "Coffee Shop Example",
+  "email": "coffee@example.com",
+  "password": "password123",
+  "location": "123 Coffee Street, Bangkok",
+  "category": "Food & Beverage",
+  "contactPerson": "John Barista",
+  "contactPhone": "0812345678",
+  "website": "https://coffeeshop.example.com",
+  "description": "A cozy coffee shop serving specialty coffee and pastries",
+  "logoUrl": "https://example.com/logo.png"
 }
