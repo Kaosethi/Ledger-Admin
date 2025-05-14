@@ -1,18 +1,19 @@
 // src/components/modals/MerchantDetailModal.tsx
-import React, { useMemo } from 'react'; // Removed useState if not used elsewhere
+import React, { useMemo } from 'react';
 import type { 
   Merchant, 
   Transaction, 
   BackendMerchantStatus 
-} from '@/lib/mockData'; // Or from '@/lib/types'
+} from '@/lib/mockData'; // Ensure Merchant type here is API-aligned
 import { formatDate, formatCurrency, renderStatusBadge, formatDateTime } from '@/lib/utils';
 
-export type MerchantActionType = 'approve' | 'reject' | 'suspend' | 'reactivate' | 'deactivate';
+export type FullMerchantActionType = 'approve' | 'reject' | 'suspend' | 'reactivate' | 'deactivate';
+export type AllowedMerchantActionForModal = Exclude<FullMerchantActionType, "deactivate">;
 
 interface MerchantDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onRequestConfirm: (actionType: MerchantActionType, merchant: Merchant) => void;
+  onRequestConfirm: (actionType: AllowedMerchantActionForModal, merchant: Merchant) => void; 
   merchant: Merchant | null;
   transactions: Transaction[];
 }
@@ -24,35 +25,24 @@ const MerchantDetailModal: React.FC<MerchantDetailModalProps> = ({
   merchant,
   transactions,
 }) => {
-  // --- HOOKS CALLED AT THE TOP LEVEL ---
   const merchantTransactions = useMemo(() => {
-    // Handle null merchant case inside useMemo if merchant can be null when isOpen is true
-    // (though the early return below makes this less critical for this specific hook)
     if (!merchant) return []; 
     return transactions.filter(tx => tx.merchantId === merchant.id);
-  }, [merchant, transactions]); // Dependencies are merchant and transactions
+  }, [merchant, transactions]);
 
-  // --- DERIVED STATE / CONDITIONS (after hooks) ---
-  // These can be calculated here because `merchant` might be null.
-  // The JSX rendering below will only happen if merchant is not null.
-  const canApprove = merchant?.status === 'pending_approval';
-  const canReject = merchant?.status === 'pending_approval';
-  const canSuspend = merchant?.status === 'active';
-  const canReactivate = merchant?.status === 'suspended';
-  const canDeactivate = merchant?.status === 'active' || merchant?.status === 'suspended';
-
-  // --- CONDITIONAL RENDERING (Early return for modal visibility) ---
-  // If the modal is not open, or no merchant is selected (even if isOpen is true), render nothing.
   if (!isOpen || !merchant) {
     return null;
   }
 
-  // --- RENDER MODAL CONTENT (Now we know merchant is not null) ---
-  // At this point, `merchant` is guaranteed to be non-null due to the check above.
-  // So, we can safely access its properties like merchant.businessName.
+  // Define these constants now that 'merchant' is guaranteed to be non-null
+  const canApprove = merchant.status === 'pending_approval';
+  const canReject = merchant.status === 'pending_approval';
+  const canSuspend = merchant.status === 'active';
+  const canReactivate = merchant.status === 'suspended';
+  // const canDeactivate = merchant.status === 'active' || merchant.status === 'suspended'; // Example
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 transition-opacity duration-300 ease-in-out" /* Modal backdrop */ >
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 transition-opacity duration-300 ease-in-out">
       <div className="flex items-center justify-center min-h-screen p-4 text-center">
         <div 
           className="relative w-full max-w-2xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-white shadow-xl rounded-lg"
@@ -62,8 +52,7 @@ const MerchantDetailModal: React.FC<MerchantDetailModalProps> = ({
         >
           <div className="flex items-start justify-between pb-4 border-b border-gray-200">
             <h3 className="text-lg font-semibold leading-6 text-gray-900" id="merchant-detail-modal-title">
-              {/* merchant is guaranteed non-null here */}
-              Merchant Details: {merchant.businessName} 
+              Merchant Details: {merchant.businessName}
             </h3>
             <button
               onClick={onClose}
@@ -103,7 +92,27 @@ const MerchantDetailModal: React.FC<MerchantDetailModalProps> = ({
             {merchantTransactions.length > 0 ? (
               <div className="overflow-x-auto max-h-60 border rounded-md">
                 <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  {/* ... table content ... */}
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Date & Time</th>
+                      <th className="px-3 py-2 text-left">Type</th>
+                      <th className="px-3 py-2 text-right">Amount</th>
+                      <th className="px-3 py-2 text-left">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {merchantTransactions.map(tx => {
+                      const { date, time } = formatDateTime(tx.timestamp);
+                      return (
+                        <tr key={tx.id}>
+                          <td className="px-3 py-2">{date} <span className="text-xs text-gray-500">{time}</span></td>
+                          <td className="px-3 py-2">{tx.type}</td>
+                          <td className="px-3 py-2 text-right">{formatCurrency(tx.amount)}</td>
+                          <td className="px-3 py-2">{renderStatusBadge(tx.status, "transaction")}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
                 </table>
               </div>
             ) : (
@@ -112,7 +121,9 @@ const MerchantDetailModal: React.FC<MerchantDetailModalProps> = ({
           </div>
 
           <div className="mt-6 flex justify-end">
-            <button type="button" onClick={onClose} /* ... */ > Close </button>
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500">
+              Close
+            </button>
           </div>
         </div>
       </div>
