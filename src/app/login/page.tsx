@@ -9,12 +9,14 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const router = useRouter();
 
   // Check if user is already logged in
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        setCheckingAuth(true);
         const response = await fetch("/api/auth/check", {
           method: "GET",
           headers: {
@@ -23,11 +25,16 @@ export default function LoginPage() {
         });
 
         if (response.ok) {
-          // User is already logged in, redirect to dashboard
-          router.push("/");
+          const data = await response.json();
+          if (data.authenticated) {
+            // User is already logged in, redirect to dashboard
+            router.push("/dashboard");
+          }
         }
       } catch (error) {
         console.error("Error checking authentication:", error);
+      } finally {
+        setCheckingAuth(false);
       }
     };
 
@@ -62,14 +69,32 @@ export default function LoginPage() {
         return;
       }
 
-      // Login successful, redirect to dashboard
-      router.push("/");
+      // Login successful, redirect directly to dashboard
+      // instead of going through the root page
+      setLoading(false);
+      router.push("/dashboard");
     } catch (error) {
       console.error("Login error:", error);
       setError("An unexpected error occurred. Please try again.");
       setLoading(false);
     }
   };
+
+  // Show loading state while checking authentication
+  if (checkingAuth) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-50">
+        <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-xl shadow-lg">
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-primary">
+              Aid Distribution System
+            </h1>
+            <p className="mt-2 text-gray-600">Checking authentication...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-50">
