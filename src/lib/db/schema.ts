@@ -125,7 +125,7 @@ export const merchants = pgTable(
     contactEmail: text("contact_email").unique(),
     contactPhone: text("contact_phone"),
     storeAddress: text("store_address"),
-    hashedPassword: text("hashed_password"),
+    hashedPassword: text("hashed_password").notNull(),
     status: merchantStatusEnum("status").default("pending_approval").notNull(),
     submittedAt: timestamp("submitted_at", { withTimezone: true })
       .defaultNow()
