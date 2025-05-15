@@ -1,9 +1,12 @@
 // MODIFIED: src/app/api/merchant-app/auth/register/route.ts
-import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { merchants } from "@/lib/db/schema"; // Assuming this is 'merchantsTable' or similar
-import { eq } from "drizzle-orm";
-import { hashPassword } from "@/lib/auth/password";
+import { NextResponse } from 'next/server';
+import { db } from '@/lib/db';
+import { merchants, accounts, accountTypeEnum, accountStatusEnum } from '@/lib/db/schema'; // Added accounts, accountTypeEnum, accountStatusEnum
+import { eq, and } from 'drizzle-orm';
+import { hash } from 'bcryptjs';
+import { v4 as uuidv4 } from 'uuid'; // For generating a unique displayId for internal account if needed
+
+const SALT_ROUNDS = 10;
 
 export async function POST(request: Request) {
   console.log("[API /merchant-app/auth/register] Request received");
@@ -14,181 +17,140 @@ export async function POST(request: Request) {
       email,
       password,
       location, // Maps to storeAddress
-      // REMOVED: category from required destructuring. It will be handled as optional.
+      category, // Optional, as per last schema discussion
       contactPerson,
       contactPhoneNumber,
-      category, // ADDED: Destructure category here, but it will be optional
+      // Removed: website, description, logoUrl from direct destructuring for now, handle if present
     } = body;
 
-    console.log("[API /merchant-app/auth/register] Request body parsed:", {
-      storeName,
-      email,
-      // Do not log password
-      location,
-      category, // Log if present
-      contactPerson,
-      contactPhoneNumber,
-    });
+    console.log(
+      "[API /merchant-app/auth/register] Request body parsed:",
+      { storeName, email, /* no password */ location, category, contactPerson, contactPhoneNumber }
+    );
 
     // --- Basic Validation ---
-    // REMOVED: category from this primary validation check
-    if (
-      !storeName ||
-      !email ||
-      !password ||
-      !location ||
-      !contactPerson ||
-      !contactPhoneNumber
-    ) {
-      console.warn(
-        "[API /merchant-app/auth/register] Missing required fields",
-        {
-          hasStoreName: !!storeName,
-          hasEmail: !!email,
-          hasPassword: !!password,
-          hasLocation: !!location,
-          // hasCategory: !!category, // REMOVED from mandatory check
-          hasContactPerson: !!contactPerson,
-          hasContactPhoneNumber: !!contactPhoneNumber,
-        }
-      );
+    if (!storeName || !email || !password || !location || !contactPerson || !contactPhoneNumber) {
       return NextResponse.json(
-        {
-          // MODIFIED: Updated error message
-          error:
-            "Missing required fields: storeName, email, password, location, contactPerson, and contactPhoneNumber are required.",
-        },
+        { error: "Missing required fields: storeName, email, password, location, contactPerson, and contactPhoneNumber are required." },
         { status: 400 }
       );
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      console.warn("[API /merchant-app/auth/register] Invalid email format", {
-        email,
-      });
-      return NextResponse.json(
-        { error: "Invalid email format." },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Invalid email format." }, { status: 400 });
     }
-
     if (password.length < 8) {
-      console.warn("[API /merchant-app/auth/register] Password too short");
-      return NextResponse.json(
-        { error: "Password must be at least 8 characters long." },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Password must be at least 8 characters long." }, { status: 400 });
     }
 
-    console.log(
-      "[API /merchant-app/auth/register] Validation passed, processing registration data"
-    );
+    // Start Database Transaction
+    const registrationResult = await db.transaction(async (tx) => {
+      // 1. Check if a merchant with this email already exists
+      const existingMerchantByEmail = await tx
+        .select({ id: merchants.id })
+        .from(merchants)
+        .where(eq(merchants.contactEmail, email.toLowerCase()))
+        .limit(1);
 
-    const existingMerchant = await db
-      .select()
-      .from(merchants)
-      .where(eq(merchants.contactEmail, email.toLowerCase()))
-      .limit(1);
+      if (existingMerchantByEmail.length > 0) {
+        console.warn("[API /merchant-app/auth/register] Merchant with email already exists in tx");
+        // To make db.transaction return a specific response, we can throw a custom error
+        // or return a specific structure that the outer code interprets.
+        // For simplicity, let's throw an error that we can catch and interpret.
+        const err = new Error("A merchant with this email already exists.");
+        (err as any).statusCode = 409; // Attach statusCode to error
+        throw err;
+      }
 
-    if (existingMerchant.length > 0) {
-      console.warn(
-        "[API /merchant-app/auth/register] Merchant with email already exists"
-      );
-      return NextResponse.json(
-        { error: "A merchant with this email already exists." },
-        { status: 409 }
-      );
-    }
+      // 2. Create the Merchant's Internal Account in the 'accounts' table
+      const internalAccountDisplayId = `MERCH_INT_${uuidv4()}`; // Ensure uniqueness
+      const [newInternalAccount] = await tx
+        .insert(accounts)
+        .values({
+          displayId: internalAccountDisplayId,
+          // These fields might not be relevant for MERCHANT_INTERNAL type, set to sensible defaults or null
+          childName: storeName, // Or "Internal Account"
+          guardianName: "System", // Or merchant's contact person
+          status: accountStatusEnum.enumValues[1], // "Active"
+          balance: "0.00",
+          hashedPin: null, // Not applicable for merchant internal account
+          accountType: accountTypeEnum.enumValues[1], // "MERCHANT_INTERNAL"
+          email: email.toLowerCase(), // Can store merchant's email here too
+          // Fill other NOT NULL fields in 'accounts' if any, or ensure they have defaults
+        })
+        .returning({ id: accounts.id });
 
-    const hashedPassword = await hashPassword(password);
+      if (!newInternalAccount || !newInternalAccount.id) {
+        console.error("[API /merchant-app/auth/register] Failed to create internal account for merchant in tx.");
+        throw new Error("Failed to set up merchant account structure."); // Generic error
+      }
+      const merchantInternalAccountId = newInternalAccount.id;
 
-    const newMerchantData: any = {
-      businessName: storeName,
-      contactEmail: email.toLowerCase(),
-      hashedPassword: hashedPassword,
-      storeAddress: location,
-      // MODIFIED: category is now conditional.
-      // If 'category' is provided in the body and is not empty, use it. Otherwise, it won't be set,
-      // relying on the DB column being nullable or having a default.
-      contactPerson: contactPerson,
-      contactPhone: contactPhoneNumber,
-    };
+      // 3. Hash the received plain text password
+      const hashedPassword = await hash(password, SALT_ROUNDS);
 
-    if (category && typeof category === "string" && category.trim() !== "") {
-      newMerchantData.category = category;
-    }
-    // If category is not in the request body, or is empty, it's simply not added to newMerchantData.
-    // Drizzle will attempt to insert NULL if the column is nullable, or DB default will apply.
+      // 4. Create the new merchant record, linking to the internal account
+      const newMerchantData: any = {
+        businessName: storeName,
+        contactEmail: email.toLowerCase(),
+        hashedPassword: hashedPassword,
+        storeAddress: location,
+        internalAccountId: merchantInternalAccountId, // CRITICAL: Link to the created internal account
+        contactPerson: contactPerson,
+        contactPhone: contactPhoneNumber,
+        // Optional fields from request body if present and schema supports them
+        category: category || null, // Set to null if not provided
+        website: body.website || null,
+        description: body.description || null,
+        logoUrl: body.logoUrl || null,
+        // status will default to "pending_approval" as per schema
+        // submittedAt, createdAt, updatedAt will default as per schema
+      };
 
-    console.log(
-      "[API /merchant-app/auth/register] Inserting new merchant record:",
-      newMerchantData
-    );
+      const [insertedMerchant] = await tx
+        .insert(merchants)
+        .values(newMerchantData)
+        .returning({
+          id: merchants.id,
+          businessName: merchants.businessName,
+          contactEmail: merchants.contactEmail,
+          status: merchants.status,
+          // Return other fields as needed
+        });
 
-    const insertedMerchant = await db
-      .insert(merchants)
-      .values(newMerchantData)
-      .returning({
-        id: merchants.id,
-        businessName: merchants.businessName,
-        contactEmail: merchants.contactEmail,
-        status: merchants.status,
-        submittedAt: merchants.submittedAt,
-        category: merchants.category, // Keep returning it to see what DB sets if not provided
-        storeAddress: merchants.storeAddress,
-        contactPerson: merchants.contactPerson,
-        contactPhone: merchants.contactPhone,
-      });
+      if (!insertedMerchant) {
+        console.error("[API /merchant-app/auth/register] Failed to insert merchant into database in tx.");
+        throw new Error("Failed to register merchant entity.");
+      }
+      
+      console.log("[API /merchant-app/auth/register] Merchant registered successfully in tx:", insertedMerchant);
+      return insertedMerchant; // Return the successfully created merchant from the transaction
+    });
 
-    if (!insertedMerchant || insertedMerchant.length === 0) {
-      console.error(
-        "[API /merchant-app/auth/register] Failed to insert merchant into database."
-      );
-      return NextResponse.json(
-        { error: "Failed to register merchant. Please try again." },
-        { status: 500 }
-      );
-    }
-
-    const registeredMerchant = insertedMerchant[0];
-    console.log(
-      "[API /merchant-app/auth/register] Merchant registered successfully:",
-      registeredMerchant
-    );
-
+    // If db.transaction was successful
     return NextResponse.json(
       {
         message: "Merchant registration successful. Awaiting admin approval.",
-        merchant: {
-          id: registeredMerchant.id,
-          name: registeredMerchant.businessName,
-          email: registeredMerchant.contactEmail,
-          location: registeredMerchant.storeAddress,
-          category: registeredMerchant.category, // Return it
-          status: registeredMerchant.status,
-          submittedAt: registeredMerchant.submittedAt,
-          contactPerson: registeredMerchant.contactPerson,
-          contactPhoneNumber: registeredMerchant.contactPhone,
+        merchant: { // Map to a consistent response structure if needed
+          id: registrationResult.id,
+          name: registrationResult.businessName,
+          email: registrationResult.contactEmail,
+          status: registrationResult.status,
         },
       },
       { status: 201 }
     );
-  } catch (error) {
-    console.error(
-      "[API /merchant-app/auth/register] Error processing request:",
-      error
-    );
-    if (error instanceof SyntaxError) {
-      console.error("[API /merchant-app/auth/register] JSON parsing error");
-      return NextResponse.json(
-        { error: "Invalid request body. Ensure JSON is well-formed." },
-        { status: 400 }
-      );
+
+  } catch (error: any) {
+    console.error("[API /merchant-app/auth/register] Error processing request:", error.message, error.stack);
+    if (error.statusCode) { // Check for custom statusCode attached to thrown error
+      return NextResponse.json({ error: error.message }, { status: error.statusCode });
     }
-    return NextResponse.json(
-      { error: "Internal Server Error during registration." },
-      { status: 500 }
-    );
+    if (error instanceof SyntaxError) {
+      return NextResponse.json({ error: "Invalid request body. Ensure JSON is well-formed." }, { status: 400 });
+    }
+    // The generic message you saw before
+    return NextResponse.json({ error: "Internal Server Error during registration." }, { status: 500 });
   }
 }
