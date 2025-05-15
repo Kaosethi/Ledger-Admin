@@ -52,6 +52,8 @@ export const POST = withAuth(
             ...validatedData,
             // Set the reference field
             reference,
+            // Generate a random UUID for paymentId
+            paymentId: crypto.randomUUID(),
             // Convert number to string for the database's numeric field
             amount: validatedData.amount.toString(),
           })
