@@ -131,11 +131,12 @@ export async function POST(request: NextRequest) {
       if (beneficiaryAccounts.length === 0) {
         console.warn(`[TX PaymentID: ${paymentId}] Beneficiary account (CHILD_DISPLAY) with displayId '${beneficiaryDisplayId}' not found.`);
         // Log only one "Failed" transaction for this attempt
+        // Insert a failed transaction with a placeholder accountId (e.g., 'system' or a known fallback account)
         await tx.insert(transactions).values({
             paymentId: paymentId,
             amount: amount.toString(),
             type: transactionTypeEnum.enumValues[0], // "Debit" (attempted)
-            accountId: null, // Can't link if not found, or use a placeholder system account ID
+            accountId: 'system', // Use a valid fallback accountId string
             merchantId: merchantId,
             status: transactionStatusEnum.enumValues[2], // "Failed"
             declineReason: `Beneficiary account '${beneficiaryDisplayId}' not found.`,
