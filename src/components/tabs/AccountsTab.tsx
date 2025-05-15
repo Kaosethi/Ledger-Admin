@@ -992,7 +992,8 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                       {pending.childName}
-                    </td>{" "}
+                    </td>
+                    {}
                     {/* Use childName */}
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                       {formatDdMmYyyyHhMmSs(
@@ -1061,7 +1062,8 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
             </tbody>
           </table>
         </div>
-      </div>{" "}
+      </div>
+      {}
       {/* End Pending Section */}
       {/* --- Managed Accounts Section --- */}
       <div className="bg-white p-6 rounded-lg shadow-md">
@@ -1390,16 +1392,19 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
           <div className="text-sm text-gray-700">
             {!isLoading && (
               <>
-                Showing{" "}
+                Showing{}
                 <span id="pagination-start">
                   {filteredAccounts.length > 0 ? 1 : 0}
-                </span>{" "}
-                to{" "}
+                </span>
+                {}
+                to{}
                 <span id="pagination-end">
                   {Math.min(10, filteredAccounts.length)}
-                </span>{" "}
-                of <span id="pagination-total">{filteredAccounts.length}</span>{" "}
-                accounts{" "}
+                </span>
+                {}
+                of <span id="pagination-total">{filteredAccounts.length}</span>
+                {}
+                accounts{}
                 {searchTerm && ` (filtered from ${accounts.length} total)`}
               </>
             )}
@@ -1419,7 +1424,8 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
             </button>
           </div>
         </div>
-      </div>{" "}
+      </div>
+      {}
       {/* End Managed Accounts Section */}
       {/* --- Render Modals --- */}
       <BulkEditModal

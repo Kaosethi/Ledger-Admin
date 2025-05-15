@@ -6,13 +6,17 @@ import React, { useState, useMemo } from "react";
 // Import types from @/lib/mockData
 // Ensure Merchant, Transaction, and BackendMerchantStatus are correctly defined and exported in mockData.ts
 // and that Merchant type uses 'businessName' and 'BackendMerchantStatus' for its 'status'.
-import type { Merchant, Transaction, BackendMerchantStatus } from "@/lib/mockData"; 
+import type {
+  Merchant,
+  Transaction,
+  BackendMerchantStatus,
+} from "@/lib/mockData";
 
 import { formatDate, renderStatusBadge } from "@/lib/utils"; // Adjust path as needed
 // Import MerchantDetailModal and its action types
-import MerchantDetailModal, { 
+import MerchantDetailModal, {
   FullMerchantActionType, // The full list of actions the modal *could* support
-  AllowedMerchantActionForModal // The subset of actions this modal instance will emit
+  AllowedMerchantActionForModal, // The subset of actions this modal instance will emit
 } from "../modals/MerchantDetailModal"; // Adjust path
 import ConfirmActionModal from "../modals/ConfirmActionModal"; // Adjust path
 import { Skeleton } from "@/components/ui/skeleton"; // Adjust path
@@ -28,12 +32,22 @@ interface MerchantsTabProps {
     details?: string
   ) => void;
   merchantsLoading?: boolean;
+  // Updated prop types for React Query mutations
+  approveMerchant?: (id: string, closeModal?: () => void) => void;
+  rejectMerchant?: (
+    id: string,
+    reason?: string,
+    closeModal?: () => void
+  ) => void;
+  approvalLoading?: boolean;
+  rejectionLoading?: boolean;
 }
 
 // This type in MerchantsTab will match what MerchantDetailModal's onRequestConfirm expects
-type ActionToConfirm = AllowedMerchantActionForModal; 
+type ActionToConfirm = AllowedMerchantActionForModal;
 
-const tableHeaderClasses = "px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider";
+const tableHeaderClasses =
+  "px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider";
 const tableCellClasses = "px-4 py-4 whitespace-nowrap text-sm text-gray-700";
 const tableCellCenterClasses = `${tableCellClasses} text-center`;
 const tableCellActionsClasses = `${tableCellClasses} text-center`;
@@ -44,9 +58,15 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
   onMerchantsUpdate,
   logAdminActivity,
   merchantsLoading = false,
+  approveMerchant,
+  rejectMerchant,
+  approvalLoading,
+  rejectionLoading,
 }) => {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [selectedMerchant, setSelectedMerchant] = useState<Merchant | null>(null);
+  const [selectedMerchant, setSelectedMerchant] = useState<Merchant | null>(
+    null
+  );
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [confirmActionDetails, setConfirmActionDetails] = useState<{
     actionType: ActionToConfirm | null; // Uses the subset of actions
@@ -58,7 +78,10 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
     [merchants]
   );
   const managedMerchants = useMemo(
-    () => merchants.filter((m) => ["active", "suspended"].includes(m.status as BackendMerchantStatus)),
+    () =>
+      merchants.filter((m) =>
+        ["active", "suspended"].includes(m.status as BackendMerchantStatus)
+      ),
     [merchants]
   );
 
@@ -78,7 +101,10 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
   };
 
   // This function receives an actionType that is AllowedMerchantActionForModal from MerchantDetailModal
-  const handleRequestConfirm = (actionType: ActionToConfirm, merchant: Merchant) => { 
+  const handleRequestConfirm = (
+    actionType: ActionToConfirm,
+    merchant: Merchant
+  ) => {
     setConfirmActionDetails({ actionType, merchant });
     setIsConfirmModalOpen(true);
     if (isDetailModalOpen) handleCloseDetailModal();
@@ -86,62 +112,168 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
 
   const handleCloseConfirmModal = () => {
     setIsConfirmModalOpen(false);
-    setTimeout(() => setConfirmActionDetails({ actionType: null, merchant: null }), 300);
+    setTimeout(
+      () => setConfirmActionDetails({ actionType: null, merchant: null }),
+      300
+    );
   };
 
   const handleConfirmAction = async () => {
     const { actionType, merchant } = confirmActionDetails;
     if (!actionType || !merchant || !logAdminActivity) {
-      console.error("Confirmation details, merchant, or logActivity callback missing.");
+      console.error(
+        "Confirmation details, merchant, or logActivity callback missing."
+      );
       handleCloseConfirmModal();
       return;
     }
 
-    let newStatus: BackendMerchantStatus | null = null;
     let logActionText: string = "";
 
     // actionType here is of type ActionToConfirm (which excludes 'deactivate')
     switch (actionType) {
-      case "approve": if (merchant.status === "pending_approval") newStatus = "active"; logActionText = "Approve Merchant"; break;
-      case "reject":  if (merchant.status === "pending_approval") newStatus = "rejected"; logActionText = "Reject Merchant"; break;
-      case "suspend": if (merchant.status === "active") newStatus = "suspended"; logActionText = "Suspend Merchant"; break;
-      case "reactivate": if (merchant.status === "suspended") newStatus = "active"; logActionText = "Reactivate Merchant"; break;
-      // No 'deactivate' case needed here as actionType cannot be 'deactivate'
-      default: 
+      case "approve":
+        if (merchant.status === "pending_approval") {
+          if (approveMerchant) {
+            approveMerchant(merchant.id, handleCloseConfirmModal);
+            logActionText = "Approve Merchant";
+            // Don't close modal - it will close when mutation completes or fails
+          } else {
+            // Fallback to the old approach if the mutation function is not provided
+            updateMerchantStatus(merchant, "active");
+            logActionText = "Approve Merchant";
+            handleCloseConfirmModal();
+          }
+        }
+        break;
+      case "reject":
+        if (merchant.status === "pending_approval") {
+          if (rejectMerchant) {
+            // We could get the decline reason from a form here
+            rejectMerchant(
+              merchant.id,
+              "No reason provided",
+              handleCloseConfirmModal
+            );
+            logActionText = "Reject Merchant";
+            // Don't close modal - it will close when mutation completes or fails
+          } else {
+            // Fallback to the old approach if the mutation function is not provided
+            updateMerchantStatus(merchant, "rejected");
+            logActionText = "Reject Merchant";
+            handleCloseConfirmModal();
+          }
+        }
+        break;
+      case "suspend":
+        if (merchant.status === "active") {
+          updateMerchantStatus(merchant, "suspended");
+          logActionText = "Suspend Merchant";
+          handleCloseConfirmModal();
+        }
+        break;
+      case "reactivate":
+        if (merchant.status === "suspended") {
+          updateMerchantStatus(merchant, "active");
+          logActionText = "Reactivate Merchant";
+          handleCloseConfirmModal();
+        }
+        break;
+      default:
         // This should ideally not be reached if types are correct
-        const exhaustiveCheck: never = actionType; 
-        console.error("Unknown or unhandled action type in MerchantsTab:", exhaustiveCheck); 
-        handleCloseConfirmModal(); 
+        const exhaustiveCheck: never = actionType;
+        console.error(
+          "Unknown or unhandled action type in MerchantsTab:",
+          exhaustiveCheck
+        );
+        handleCloseConfirmModal();
         return;
     }
 
-    if (newStatus) {
-      // TODO: Implement backend API call here to update status
-      if (onMerchantsUpdate) {
-        const updatedMerchants = merchants.map((m) =>
-          m.id === merchant.id ? { ...m, status: newStatus!, updatedAt: new Date().toISOString() } : m
-        );
-        onMerchantsUpdate(updatedMerchants);
-      }
-      logAdminActivity(logActionText, "Merchant", merchant.id, `Status changed to ${newStatus} for merchant: ${merchant.businessName}`);
-    } else {
-      console.log("No status change for action:", actionType, "on merchant status:", merchant.status);
+    if (logActionText) {
+      logAdminActivity(
+        logActionText,
+        "Merchant",
+        merchant.id,
+        `Status changed for merchant: ${merchant.businessName}`
+      );
     }
-    handleCloseConfirmModal();
+
+    // Only close the modal for non-mutation actions
+    // For mutations (approve, reject with provided functions), closing is handled by the parent component
+    if (
+      !(actionType === "approve" && approveMerchant) &&
+      !(actionType === "reject" && rejectMerchant)
+    ) {
+      handleCloseConfirmModal();
+    }
+  };
+
+  // Helper function to update merchant status with the old approach
+  const updateMerchantStatus = (
+    merchant: Merchant,
+    newStatus: BackendMerchantStatus
+  ) => {
+    if (onMerchantsUpdate) {
+      const updatedMerchants = merchants.map((m) =>
+        m.id === merchant.id
+          ? { ...m, status: newStatus, updatedAt: new Date().toISOString() }
+          : m
+      );
+      onMerchantsUpdate(updatedMerchants);
+    }
   };
 
   const getConfirmModalProps = () => {
     const { actionType, merchant } = confirmActionDetails;
     if (!actionType || !merchant) return null;
-    const merchantName = merchant.businessName; 
+    const merchantName = merchant.businessName;
 
     switch (actionType) {
-      case "approve": return { title: "Confirm Approval", message: `Approve application for "${merchantName}"?`, confirmButtonText: "Approve", confirmButtonVariant: "success" as const };
-      case "reject": return { title: "Confirm Rejection", message: <><p className="mb-2">Reject application for “{merchantName}”?</p><p className="font-semibold text-red-700">This action cannot be undone.</p></>, confirmButtonText: "Reject Application", confirmButtonVariant: "danger" as const };
-      case "suspend": return { title: "Confirm Suspension", message: `Suspend merchant "${merchantName}"?`, confirmButtonText: "Suspend Merchant", confirmButtonVariant: "danger" as const };
-      case "reactivate": return { title: "Confirm Reactivation", message: `Reactivate merchant "${merchantName}"?`, confirmButtonText: "Reactivate", confirmButtonVariant: "success" as const };
+      case "approve":
+        return {
+          title: "Confirm Approval",
+          message: `Approve application for "${merchantName}"?`,
+          confirmButtonText: approvalLoading ? "Approving..." : "Approve",
+          confirmButtonVariant: "success" as const,
+          isLoading: approvalLoading,
+        };
+      case "reject":
+        return {
+          title: "Confirm Rejection",
+          message: (
+            <>
+              <p className="mb-2">
+                Reject application for &quot;{merchantName}&quot;?
+              </p>
+              <p className="font-semibold text-red-700">
+                This action cannot be undone.
+              </p>
+            </>
+          ),
+          confirmButtonText: rejectionLoading
+            ? "Rejecting..."
+            : "Reject Application",
+          confirmButtonVariant: "danger" as const,
+          isLoading: rejectionLoading,
+        };
+      case "suspend":
+        return {
+          title: "Confirm Suspension",
+          message: `Suspend merchant "${merchantName}"?`,
+          confirmButtonText: "Suspend Merchant",
+          confirmButtonVariant: "danger" as const,
+        };
+      case "reactivate":
+        return {
+          title: "Confirm Reactivation",
+          message: `Reactivate merchant "${merchantName}"?`,
+          confirmButtonText: "Reactivate",
+          confirmButtonVariant: "success" as const,
+        };
       // No 'deactivate' case
-      default: return null;
+      default:
+        return null;
     }
   };
   const confirmModalProps = getConfirmModalProps();
@@ -151,29 +283,62 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
       {/* Pending Merchants Section */}
       <div className="bg-white p-6 rounded-lg shadow-md">
         <h3 className="text-lg font-semibold mb-4 text-gray-800">
-          Pending Merchant Applications ({merchantsLoading ? "..." : pendingMerchants.length})
+          Pending Merchant Applications (
+          {merchantsLoading ? "..." : pendingMerchants.length})
         </h3>
         <div className="overflow-x-auto border border-gray-200 rounded-md">
-          <table id="pending-merchants-table" className="min-w-full divide-y divide-gray-200">
+          <table
+            id="pending-merchants-table"
+            className="min-w-full divide-y divide-gray-200"
+          >
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className={tableHeaderClasses}>Store Name</th>
-                <th scope="col" className={tableHeaderClasses}>Contact Email</th>
-                <th scope="col" className={tableHeaderClasses}>Submitted</th>
-                <th scope="col" className={`${tableHeaderClasses} text-center`}>Actions</th>
+                <th scope="col" className={tableHeaderClasses}>
+                  Store Name
+                </th>
+                <th scope="col" className={tableHeaderClasses}>
+                  Contact Email
+                </th>
+                <th scope="col" className={tableHeaderClasses}>
+                  Submitted
+                </th>
+                <th scope="col" className={`${tableHeaderClasses} text-center`}>
+                  Actions
+                </th>
               </tr>
             </thead>
-            <tbody id="pending-merchants-table-body" className="bg-white divide-y divide-gray-200">
+            <tbody
+              id="pending-merchants-table-body"
+              className="bg-white divide-y divide-gray-200"
+            >
               {merchantsLoading ? (
-                Array.from({ length: 3 }).map((_, i) => ( <tr key={`pending-skeleton-${i}`}> {/* ... skeleton cells ... */} </tr> ))
+                Array.from({ length: 3 }).map((_, i) => (
+                  <tr key={`pending-skeleton-${i}`}>
+                    {}
+                    {/* ... skeleton cells ... */}
+                    {}
+                  </tr>
+                ))
               ) : pendingMerchants.length === 0 ? (
-                <tr><td colSpan={4} className={`${tableCellClasses} text-center`}>No pending applications.</td></tr>
+                <tr>
+                  <td colSpan={4} className={`${tableCellClasses} text-center`}>
+                    No pending applications.
+                  </td>
+                </tr>
               ) : (
                 pendingMerchants.map((merchant) => (
                   <tr key={merchant.id}>
-                    <td className={`${tableCellClasses} font-semibold text-gray-900`}>{merchant.businessName}</td>
-                    <td className={tableCellClasses}>{merchant.contactEmail || "N/A"}</td>
-                    <td className={tableCellClasses}>{formatDate(merchant.submittedAt)}</td>
+                    <td
+                      className={`${tableCellClasses} font-semibold text-gray-900`}
+                    >
+                      {merchant.businessName}
+                    </td>
+                    <td className={tableCellClasses}>
+                      {merchant.contactEmail || "N/A"}
+                    </td>
+                    <td className={tableCellClasses}>
+                      {formatDate(merchant.submittedAt)}
+                    </td>
                     <td className={`${tableCellActionsClasses}`}>
                       <button
                         onClick={() => handleViewDetails(merchant.id)}
@@ -193,37 +358,83 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
       {/* All Managed Merchants Section */}
       <div className="bg-white p-6 rounded-lg shadow-md">
         <h3 className="text-lg font-semibold mb-4 text-gray-800">
-          Managed Merchants ({merchantsLoading ? "..." : managedMerchants.length})
+          Managed Merchants (
+          {merchantsLoading ? "..." : managedMerchants.length})
         </h3>
         {/* ... Table for managed merchants, using merchant.businessName etc. ... */}
-         <div className="overflow-x-auto border border-gray-200 rounded-md">
-          <table id="merchants-table" className="min-w-full divide-y divide-gray-200">
+        <div className="overflow-x-auto border border-gray-200 rounded-md">
+          <table
+            id="merchants-table"
+            className="min-w-full divide-y divide-gray-200"
+          >
             <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className={tableHeaderClasses}>Merchant ID</th>
-                <th scope="col" className={tableHeaderClasses}>Merchant Name</th>
-                <th scope="col" className={tableHeaderClasses}>Contact Email</th>
-                <th scope="col" className={`${tableHeaderClasses} text-center`}>Status</th>
-                <th scope="col" className={tableHeaderClasses}>Last Updated / Submitted</th>
-                <th scope="col" className={`${tableHeaderClasses} text-center`}>Transactions</th>
-                <th scope="col" className={`${tableHeaderClasses} text-center`}>Actions</th>
+                <th scope="col" className={tableHeaderClasses}>
+                  Merchant ID
+                </th>
+                <th scope="col" className={tableHeaderClasses}>
+                  Merchant Name
+                </th>
+                <th scope="col" className={tableHeaderClasses}>
+                  Contact Email
+                </th>
+                <th scope="col" className={`${tableHeaderClasses} text-center`}>
+                  Status
+                </th>
+                <th scope="col" className={tableHeaderClasses}>
+                  Last Updated / Submitted
+                </th>
+                <th scope="col" className={`${tableHeaderClasses} text-center`}>
+                  Transactions
+                </th>
+                <th scope="col" className={`${tableHeaderClasses} text-center`}>
+                  Actions
+                </th>
               </tr>
             </thead>
-            <tbody id="merchants-table-body" className="bg-white divide-y divide-gray-200">
+            <tbody
+              id="merchants-table-body"
+              className="bg-white divide-y divide-gray-200"
+            >
               {merchantsLoading ? (
-                Array.from({ length: 6 }).map((_, i) => ( <tr key={`managed-skeleton-${i}`}> {/* ... skeleton cells ... */} </tr>))
+                Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={`managed-skeleton-${i}`}>
+                    {}
+                    {/* ... skeleton cells ... */}
+                    {}
+                  </tr>
+                ))
               ) : managedMerchants.length === 0 ? (
-                <tr><td colSpan={7} className={`${tableCellClasses} text-center`}>No active or suspended merchants found.</td></tr>
+                <tr>
+                  <td colSpan={7} className={`${tableCellClasses} text-center`}>
+                    No active or suspended merchants found.
+                  </td>
+                </tr>
               ) : (
                 managedMerchants.map((merchant) => {
-                  const txCount = transactions.filter((tx) => tx.merchantId === merchant.id && tx.status === "Completed").length;
+                  const txCount = transactions.filter(
+                    (tx) =>
+                      tx.merchantId === merchant.id && tx.status === "Completed"
+                  ).length;
                   return (
                     <tr key={merchant.id}>
-                      <td className={`${tableCellClasses} font-semibold text-gray-900`}>{merchant.id}</td>
-                      <td className={tableCellClasses}>{merchant.businessName}</td>
-                      <td className={tableCellClasses}>{merchant.contactEmail || "N/A"}</td>
-                      <td className={tableCellCenterClasses}>{renderStatusBadge(merchant.status, "merchant")}</td>
-                      <td className={tableCellClasses}>{formatDate(merchant.updatedAt || merchant.submittedAt)}</td>
+                      <td
+                        className={`${tableCellClasses} font-semibold text-gray-900`}
+                      >
+                        {merchant.id}
+                      </td>
+                      <td className={tableCellClasses}>
+                        {merchant.businessName}
+                      </td>
+                      <td className={tableCellClasses}>
+                        {merchant.contactEmail || "N/A"}
+                      </td>
+                      <td className={tableCellCenterClasses}>
+                        {renderStatusBadge(merchant.status, "merchant")}
+                      </td>
+                      <td className={tableCellClasses}>
+                        {formatDate(merchant.updatedAt || merchant.submittedAt)}
+                      </td>
                       <td className={tableCellCenterClasses}>{txCount}</td>
                       <td className={tableCellActionsClasses}>
                         <button
@@ -259,6 +470,7 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
           message={confirmModalProps.message}
           confirmButtonText={confirmModalProps.confirmButtonText}
           confirmButtonVariant={confirmModalProps.confirmButtonVariant}
+          isLoading={confirmModalProps.isLoading}
         />
       )}
     </div>

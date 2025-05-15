@@ -88,7 +88,8 @@ const PendingRegistrationDetailModal: React.FC<
                     {renderDetailItem("Address", registration.address)}
                     {renderDetailItem("Child Name", registration.childName)}
                     {renderDetailItem("PIN Set", "****")} {/* Mask PIN */}
-                    {/* {renderDetailItem('PIN Set', registration.pin)} */}{" "}
+                    {/* {renderDetailItem('PIN Set', registration.pin)} */}
+                    {}
                     {/* Uncomment to show PIN (mock only!) */}
                   </dl>
                 </div>
