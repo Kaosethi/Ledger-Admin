@@ -229,7 +229,8 @@ const RemoteRegistrationForm: React.FC<RemoteRegistrationFormProps> = ({
               htmlFor="guardianName"
               className="block text-sm font-medium text-gray-700 mb-1"
             >
-              {t.guardianNameLabel}{" "}
+              {t.guardianNameLabel}
+              {}
               <span className="text-red-500">{t.requiredIndicator}</span>
             </Label>
             <Input
@@ -248,7 +249,8 @@ const RemoteRegistrationForm: React.FC<RemoteRegistrationFormProps> = ({
           {/* MODIFIED: Guardian's Date of Birth - Replaced with Select components */}
           <div>
             <Label className="block text-sm font-medium text-gray-700 mb-1">
-              {t.guardianDobLabel}{" "}
+              {t.guardianDobLabel}
+              {}
               <span className="text-red-500">{t.requiredIndicator}</span>
             </Label>
             <div className="flex gap-2">
@@ -339,7 +341,8 @@ const RemoteRegistrationForm: React.FC<RemoteRegistrationFormProps> = ({
               htmlFor="guardianContact"
               className="block text-sm font-medium text-gray-700 mb-1"
             >
-              {t.guardianContactLabel}{" "}
+              {t.guardianContactLabel}
+              {}
               <span className="text-red-500">{t.requiredIndicator}</span>
             </Label>
             <Input
@@ -362,7 +365,8 @@ const RemoteRegistrationForm: React.FC<RemoteRegistrationFormProps> = ({
               htmlFor="address"
               className="block text-sm font-medium text-gray-700 mb-1"
             >
-              {t.addressLabel}{" "}
+              {t.addressLabel}
+              {}
               <span className="text-red-500">{t.requiredIndicator}</span>
             </Label>
             <textarea
@@ -392,7 +396,8 @@ const RemoteRegistrationForm: React.FC<RemoteRegistrationFormProps> = ({
             htmlFor="childName"
             className="block text-sm font-medium text-gray-700 mb-1"
           >
-            {t.childNameLabel}{" "}
+            {t.childNameLabel}
+            {}
             <span className="text-red-500">{t.requiredIndicator}</span>
           </Label>
           <Input
@@ -422,7 +427,8 @@ const RemoteRegistrationForm: React.FC<RemoteRegistrationFormProps> = ({
               htmlFor="pin"
               className="block text-sm font-medium text-gray-700 mb-1"
             >
-              {t.pinLabel}{" "}
+              {t.pinLabel}
+              {}
               <span className="text-red-500">{t.requiredIndicator}</span>
             </Label>
             <Input
@@ -447,7 +453,8 @@ const RemoteRegistrationForm: React.FC<RemoteRegistrationFormProps> = ({
               htmlFor="confirmPin"
               className="block text-sm font-medium text-gray-700 mb-1"
             >
-              {t.confirmPinLabel}{" "}
+              {t.confirmPinLabel}
+              {}
               <span className="text-red-500">{t.requiredIndicator}</span>
             </Label>
             <Input
@@ -475,7 +482,8 @@ const RemoteRegistrationForm: React.FC<RemoteRegistrationFormProps> = ({
           <p className="text-red-600 mb-4 text-center font-medium" role="alert">
             {submitError}
           </p>
-        )}{" "}
+        )}
+        {}
         {/* Added role="alert" */}
         <button
           type="submit"

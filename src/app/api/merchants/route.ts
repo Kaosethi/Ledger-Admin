@@ -1,19 +1,19 @@
 // src/app/api/merchants/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { merchants, merchantStatusEnum, createMerchantSchema } from "@/lib/db/schema";
+import {
+  merchants,
+  merchantStatusEnum,
+  createMerchantSchema,
+} from "@/lib/db/schema";
 import { z } from "zod";
 import { withAuth } from "@/lib/auth/middleware"; // Assuming this handles admin authentication
 import { JWTPayload } from "@/lib/auth/jwt";
+import { hashPassword } from "@/lib/auth/password";
 
 // Drizzle imports
 import { eq, SQL, desc } from "drizzle-orm";
 import { PgSelect } from "drizzle-orm/pg-core"; // General select type for explicit typing
-
-// bcryptjs import for POST handler
-import { hash as passHash } from 'bcryptjs';
-
-const SALT_ROUNDS_POST = 10;
 
 // GET /api/merchants - Get merchants, optionally filtered by status (protected)
 export const GET = withAuth(
@@ -22,12 +22,17 @@ export const GET = withAuth(
       const { searchParams } = request.nextUrl;
       const statusParam = searchParams.get("status");
 
-      let validatedStatus: typeof merchantStatusEnum.enumValues[number] | undefined;
+      let validatedStatus:
+        | (typeof merchantStatusEnum.enumValues)[number]
+        | undefined;
       if (statusParam) {
         if (merchantStatusEnum.enumValues.includes(statusParam as any)) {
-          validatedStatus = statusParam as typeof merchantStatusEnum.enumValues[number];
+          validatedStatus =
+            statusParam as (typeof merchantStatusEnum.enumValues)[number];
         } else {
-          console.warn(`Invalid status parameter received: ${statusParam}. Fetching without status filter or as per default.`);
+          console.warn(
+            `Invalid status parameter received: ${statusParam}. Fetching without status filter or as per default.`
+          );
         }
       }
 
@@ -38,12 +43,15 @@ export const GET = withAuth(
       let finalQuery; // Let TypeScript infer the type
 
       if (validatedStatus) {
-        finalQuery = db.select().from(merchants).where(eq(merchants.status, validatedStatus));
+        finalQuery = db
+          .select()
+          .from(merchants)
+          .where(eq(merchants.status, validatedStatus));
       } else {
         finalQuery = db.select().from(merchants);
       }
-      
-      if (validatedStatus === 'pending_approval') {
+
+      if (validatedStatus === "pending_approval") {
         finalQuery = finalQuery.orderBy(desc(merchants.submittedAt));
       } else {
         finalQuery = finalQuery.orderBy(desc(merchants.createdAt));
@@ -52,7 +60,6 @@ export const GET = withAuth(
       const fetchedMerchants = await finalQuery;
 
       return NextResponse.json(fetchedMerchants);
-
     } catch (dbError) {
       console.error("Error fetching merchants:", dbError);
       return NextResponse.json(
@@ -70,13 +77,8 @@ export const POST = withAuth(
       const body = await request.json();
       const validatedData = createMerchantSchema.parse(body);
 
-      const dataToInsert: {
-        businessName: string;
-        contactEmail?: string | null;
-        category?: string | null;
-        hashedPassword?: string;
-        // storeAddress?: string | null; // Example if needed
-      } = {
+      // Use 'any' type to avoid TypeScript errors with optional fields
+      const dataToInsert: any = {
         businessName: validatedData.businessName,
       };
 
@@ -86,41 +88,47 @@ export const POST = withAuth(
       if (validatedData.category) {
         dataToInsert.category = validatedData.category;
       }
-      // if ('storeAddress' in validatedData && typeof validatedData.storeAddress === 'string') { // Example
-      //   dataToInsert.storeAddress = validatedData.storeAddress;
-      // }
 
       if (validatedData.password) {
-        dataToInsert.hashedPassword = await passHash(validatedData.password, SALT_ROUNDS_POST);
+        dataToInsert.hashedPassword = await hashPassword(
+          validatedData.password
+        );
       }
 
       const newMerchant = await db
         .insert(merchants)
-        .values(dataToInsert) 
+        .values(dataToInsert)
         .returning();
 
       if (!newMerchant || newMerchant.length === 0) {
-        console.error("[API POST /merchants] Merchant insertion failed to return a result.");
+        console.error(
+          "[API POST /merchants] Merchant insertion failed to return a result."
+        );
         throw new Error("Merchant insertion failed to return a result.");
       }
 
       return NextResponse.json(newMerchant[0], { status: 201 });
-
-    } catch (error: any) { 
-        console.error("Error creating merchant:", error);
-        if (error instanceof z.ZodError) {
-          return NextResponse.json(
-            { error: "Validation error", details: error.format() },
-            { status: 400 }
-          );
-        }
-        if (error.code === '23505') { 
-            return NextResponse.json({ error: "A merchant with this email or other unique identifier already exists." }, { status: 409 });
-        }
+    } catch (error: any) {
+      console.error("Error creating merchant:", error);
+      if (error instanceof z.ZodError) {
         return NextResponse.json(
-          { error: error.message || "Failed to create merchant" },
-          { status: 500 }
+          { error: "Validation error", details: error.format() },
+          { status: 400 }
         );
+      }
+      if (error.code === "23505") {
+        return NextResponse.json(
+          {
+            error:
+              "A merchant with this email or other unique identifier already exists.",
+          },
+          { status: 409 }
+        );
+      }
+      return NextResponse.json(
+        { error: error.message || "Failed to create merchant" },
+        { status: 500 }
+      );
     }
   }
 );

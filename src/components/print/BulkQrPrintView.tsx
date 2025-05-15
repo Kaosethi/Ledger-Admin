@@ -134,7 +134,7 @@ const BulkQrPrintView = React.forwardRef<HTMLDivElement, BulkQrPrintViewProps>(
                       textAlign: "center",
                     }}
                   >
-                    {account.childName || "N/A"} /{" "}
+                    {account.childName || "N/A"} /{}
                     {account.guardianName || "N/A"}
                   </div>
 
@@ -175,7 +175,7 @@ const BulkQrPrintView = React.forwardRef<HTMLDivElement, BulkQrPrintViewProps>(
               color: "#999",
             }}
           >
-            Page {pageIndex + 1} of {pageCount} • Generated on{" "}
+            Page {pageIndex + 1} of {pageCount} • Generated on{}
             {new Date().toLocaleDateString()} • Ledger Admin
           </div>
         </div>

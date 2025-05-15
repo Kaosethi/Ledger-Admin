@@ -39,7 +39,6 @@ import { useMutation } from "@tanstack/react-query";
 // though current changes are direct string replacements.
 import { formatCurrency } from "@/lib/utils";
 
-
 interface OnboardingTabProps {
   accounts: Account[];
   onAccountAdd: (newAccount: Account) => void;
@@ -588,7 +587,7 @@ const OnboardingTab: React.FC<OnboardingTabProps> = ({
 
               {/* QR Code Section */}
               <Card className="mt-6 bg-muted/30">
-                {" "}
+                {}
                 <CardHeader>
                   <CardTitle className="text-lg">Account QR Code</CardTitle>
                 </CardHeader>
@@ -631,26 +630,26 @@ const OnboardingTab: React.FC<OnboardingTabProps> = ({
                       {/* Details */}
                       <div className="space-y-1 text-center text-sm text-muted-foreground">
                         <p>
-                          Account ID:{" "}
+                          Account ID:{}
                           <span className="font-medium text-foreground break-all">
                             {accountId}
                           </span>
                         </p>
                         <p>
-                          Child&apos;s Name:{" "}
+                          Child&apos;s Name:{}
                           <span className="font-medium text-foreground">
                             {childName || "N/A"}
                           </span>
                         </p>
                         <p>
-                          Guardian:{" "}
+                          Guardian:{}
                           <span className="font-medium text-foreground">
                             {guardianName || "N/A"}
                           </span>
                         </p>
                         <p>
-                          Initial Balance:{" "}
-                           {/* MODIFIED: Changed $ to ฿ */}
+                          Initial Balance:{}
+                          {/* MODIFIED: Changed $ to ฿ */}
                           <span className="font-medium text-foreground">
                             ฿
                             {(initialBalanceStr === ""

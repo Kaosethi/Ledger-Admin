@@ -78,7 +78,7 @@ const QrCodePrintable = forwardRef<HTMLDivElement, QrCodePrintableProps>(
                 className="mt-4 text-xs text-center text-gray-500"
                 style={{ fontSize: "10px" }}
               >
-                Ledger Admin • QR Code Generated on{" "}
+                Ledger Admin • QR Code Generated on{}
                 {new Date().toLocaleDateString()}
               </div>
               <div className="text-center mt-2" style={{ fontSize: "12px" }}>
@@ -99,7 +99,7 @@ const QrCodePrintable = forwardRef<HTMLDivElement, QrCodePrintableProps>(
             color: "#999",
           }}
         >
-          Page 1 of 1 • QR Codes for {account.displayId} •{" "}
+          Page 1 of 1 • QR Codes for {account.displayId} •{}
           {new Date().toISOString().split("T")[0]}
         </div>
       </div>

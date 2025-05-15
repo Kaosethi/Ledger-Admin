@@ -294,7 +294,7 @@ const BulkEditModal: React.FC<BulkEditModalProps> = ({
                     normalizeAccountStatus(account.status), // Normalize status for display
                     "account",
                     true // Use small badge
-                  )}{" "}
+                  )}{}
                   {formatCurrency(account.balance)})
                 </p>
               ))
