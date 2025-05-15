@@ -12,7 +12,7 @@ import type {
   BackendMerchantStatus,
 } from "@/lib/mockData";
 
-import { formatDate, renderStatusBadge } from "@/lib/utils"; // Adjust path as needed
+import { formatDate, renderStatusBadge, tuncateUUID } from "@/lib/utils"; // Adjust path as needed
 // Import MerchantDetailModal and its action types
 import MerchantDetailModal, {
   FullMerchantActionType, // The full list of actions the modal *could* support
@@ -39,8 +39,16 @@ interface MerchantsTabProps {
     reason?: string,
     closeModal?: () => void
   ) => void;
+  suspendMerchant?: (
+    id: string,
+    reason?: string,
+    closeModal?: () => void
+  ) => void;
+  reactivateMerchant?: (id: string, closeModal?: () => void) => void;
   approvalLoading?: boolean;
   rejectionLoading?: boolean;
+  suspensionLoading?: boolean;
+  reactivationLoading?: boolean;
 }
 
 // This type in MerchantsTab will match what MerchantDetailModal's onRequestConfirm expects
@@ -60,8 +68,12 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
   merchantsLoading = false,
   approveMerchant,
   rejectMerchant,
+  suspendMerchant,
+  reactivateMerchant,
   approvalLoading,
   rejectionLoading,
+  suspensionLoading,
+  reactivationLoading,
 }) => {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedMerchant, setSelectedMerchant] = useState<Merchant | null>(
@@ -167,16 +179,34 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
         break;
       case "suspend":
         if (merchant.status === "active") {
-          updateMerchantStatus(merchant, "suspended");
-          logActionText = "Suspend Merchant";
-          handleCloseConfirmModal();
+          if (suspendMerchant) {
+            suspendMerchant(
+              merchant.id,
+              "No reason provided",
+              handleCloseConfirmModal
+            );
+            logActionText = "Suspend Merchant";
+            // Don't close modal - it will close when mutation completes or fails
+          } else {
+            // Fallback to the old approach if the mutation function is not provided
+            updateMerchantStatus(merchant, "suspended");
+            logActionText = "Suspend Merchant";
+            handleCloseConfirmModal();
+          }
         }
         break;
       case "reactivate":
         if (merchant.status === "suspended") {
-          updateMerchantStatus(merchant, "active");
-          logActionText = "Reactivate Merchant";
-          handleCloseConfirmModal();
+          if (reactivateMerchant) {
+            reactivateMerchant(merchant.id, handleCloseConfirmModal);
+            logActionText = "Reactivate Merchant";
+            // Don't close modal - it will close when mutation completes or fails
+          } else {
+            // Fallback to the old approach if the mutation function is not provided
+            updateMerchantStatus(merchant, "active");
+            logActionText = "Reactivate Merchant";
+            handleCloseConfirmModal();
+          }
         }
         break;
       default:
@@ -203,7 +233,9 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
     // For mutations (approve, reject with provided functions), closing is handled by the parent component
     if (
       !(actionType === "approve" && approveMerchant) &&
-      !(actionType === "reject" && rejectMerchant)
+      !(actionType === "reject" && rejectMerchant) &&
+      !(actionType === "suspend" && suspendMerchant) &&
+      !(actionType === "reactivate" && reactivateMerchant)
     ) {
       handleCloseConfirmModal();
     }
@@ -261,15 +293,21 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
         return {
           title: "Confirm Suspension",
           message: `Suspend merchant "${merchantName}"?`,
-          confirmButtonText: "Suspend Merchant",
+          confirmButtonText: suspensionLoading
+            ? "Suspending..."
+            : "Suspend Merchant",
           confirmButtonVariant: "danger" as const,
+          isLoading: suspensionLoading,
         };
       case "reactivate":
         return {
           title: "Confirm Reactivation",
           message: `Reactivate merchant "${merchantName}"?`,
-          confirmButtonText: "Reactivate",
+          confirmButtonText: reactivationLoading
+            ? "Reactivating..."
+            : "Reactivate",
           confirmButtonVariant: "success" as const,
+          isLoading: reactivationLoading,
         };
       // No 'deactivate' case
       default:
@@ -421,7 +459,7 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
                       <td
                         className={`${tableCellClasses} font-semibold text-gray-900`}
                       >
-                        {merchant.id}
+                        {tuncateUUID(merchant.id)}
                       </td>
                       <td className={tableCellClasses}>
                         {merchant.businessName}

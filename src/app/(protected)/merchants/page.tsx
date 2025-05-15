@@ -9,12 +9,7 @@ import {
   QueryClientProvider,
 } from "@tanstack/react-query";
 import MerchantsTab from "@/components/tabs/MerchantsTab";
-import {
-  Merchant,
-  Transaction,
-  BackendMerchantStatus,
-  Account,
-} from "@/lib/mockData";
+import { Merchant, Transaction } from "@/lib/mockData";
 
 // Query client setup to manage cache
 const queryClient = new QueryClient();
@@ -88,6 +83,45 @@ const rejectMerchant = async ({
   return response.json();
 };
 
+const suspendMerchant = async ({
+  id,
+  reason,
+}: {
+  id: string;
+  reason?: string;
+}): Promise<Merchant> => {
+  const response = await fetch(`/api/merchants/${id}/suspend`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      reason: reason || "No reason provided",
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to suspend merchant: ${response.status} ${response.statusText}`
+    );
+  }
+
+  return response.json();
+};
+
+const reactivateMerchant = async (id: string): Promise<Merchant> => {
+  const response = await fetch(`/api/merchants/${id}/reactive`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to reactivate merchant: ${response.status} ${response.statusText}`
+    );
+  }
+
+  return response.json();
+};
+
 function MerchantsPage() {
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
@@ -154,6 +188,48 @@ function MerchantsPage() {
     },
   });
 
+  // Mutation for suspending a merchant
+  const suspendMutation = useMutation({
+    mutationFn: suspendMerchant,
+    onSuccess: () => {
+      // Invalidate and refetch merchants after suspension
+      queryClient.invalidateQueries({ queryKey: ["merchants"] });
+      // Close modal if there's a callback
+      if (closeModalCallback) {
+        closeModalCallback();
+        setCloseModalCallback(null);
+      }
+    },
+    onError: () => {
+      // Close modal if there's a callback, even on error
+      if (closeModalCallback) {
+        closeModalCallback();
+        setCloseModalCallback(null);
+      }
+    },
+  });
+
+  // Mutation for reactivating a merchant
+  const reactivateMutation = useMutation({
+    mutationFn: reactivateMerchant,
+    onSuccess: () => {
+      // Invalidate and refetch merchants after reactivation
+      queryClient.invalidateQueries({ queryKey: ["merchants"] });
+      // Close modal if there's a callback
+      if (closeModalCallback) {
+        closeModalCallback();
+        setCloseModalCallback(null);
+      }
+    },
+    onError: () => {
+      // Close modal if there's a callback, even on error
+      if (closeModalCallback) {
+        closeModalCallback();
+        setCloseModalCallback(null);
+      }
+    },
+  });
+
   // Custom handler for merchant updates that will be passed down to MerchantsTab
   const handleMerchantsUpdate = (updatedMerchants: Merchant[]) => {
     // This will update the cached merchants data
@@ -194,6 +270,26 @@ function MerchantsPage() {
     rejectMutation.mutate({ id, declineReason: reason });
   };
 
+  // Handler for merchant suspension with modal closing
+  const handleSuspendMerchant = (
+    id: string,
+    reason?: string,
+    closeModal?: () => void
+  ) => {
+    if (closeModal) {
+      setCloseModalCallback(() => closeModal);
+    }
+    suspendMutation.mutate({ id, reason });
+  };
+
+  // Handler for merchant reactivation with modal closing
+  const handleReactivateMerchant = (id: string, closeModal?: () => void) => {
+    if (closeModal) {
+      setCloseModalCallback(() => closeModal);
+    }
+    reactivateMutation.mutate(id);
+  };
+
   // Show error if any query fails
   const queryError = merchantsError as Error | null;
   if (queryError || error) {
@@ -217,9 +313,13 @@ function MerchantsPage() {
         // Updated props to provide mutation functions to child components
         approveMerchant={handleApproveMerchant}
         rejectMerchant={handleRejectMerchant}
+        suspendMerchant={handleSuspendMerchant}
+        reactivateMerchant={handleReactivateMerchant}
         // Provide mutation loading states to show loading indicators
         approvalLoading={approveMutation.isPending}
         rejectionLoading={rejectMutation.isPending}
+        suspensionLoading={suspendMutation.isPending}
+        reactivationLoading={reactivateMutation.isPending}
       />
     </div>
   );
