@@ -1,4 +1,4 @@
-// FULL SCHEMA: src/lib/db/schema.ts
+// FULL SCHEMA (Corrected Zod Stubs): src/lib/db/schema.ts
 import {
   pgTable,
   text,
@@ -11,7 +11,7 @@ import {
   primaryKey,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
-import { z } from "zod"; // Assuming you use Zod elsewhere, keep if needed
+import { z } from "zod";
 import { relations } from "drizzle-orm";
 
 // ENUMs
@@ -42,31 +42,21 @@ export const transactionTypeEnum = pgEnum("transaction_type", [
   "Adjustment",// Index 2
 ]);
 
-// --- NEW ENUM for Account Types ---
 export const accountTypeEnum = pgEnum("account_type", [
-  "CHILD_DISPLAY",    // For existing customer/child accounts
-  "MERCHANT_INTERNAL", // For merchants' internal ledger/wallet accounts
-  "SYSTEM"             // For potential future system-level accounts
+  "CHILD_DISPLAY",
+  "MERCHANT_INTERNAL",
+  "SYSTEM"
 ]);
-// --- END NEW ENUM ---
 
-
-// Base timestamp mixin
 const timestampFields = {
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .$defaultFn(() => new Date())
-    .notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
 };
 
-// Soft delete mixin
 const softDeleteField = {
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 };
 
-// Define the administrators table
 export const administrators = pgTable(
   "administrators",
   {
@@ -80,14 +70,9 @@ export const administrators = pgTable(
     ...timestampFields,
     ...softDeleteField,
   },
-  (table) => {
-    return {
-      emailIdx: index("admin_email_idx").on(table.email),
-    };
-  }
+  (table) => ({ emailIdx: index("admin_email_idx").on(table.email) })
 );
 
-// --- MODIFIED 'accounts' TABLE ---
 export const accounts = pgTable(
   "accounts",
   {
@@ -96,172 +81,135 @@ export const accounts = pgTable(
     childName: text("child_name").notNull(),
     guardianName: text("guardian_name").notNull(),
     status: accountStatusEnum("status").default("Active").notNull(),
-    balance: numeric("balance", { precision: 10, scale: 2 })
-      .default("0.00")
-      .notNull(),
+    balance: numeric("balance", { precision: 10, scale: 2 }).default("0.00").notNull(),
     hashedPin: text("hashed_pin"),
-    lastActivity: timestamp("last_activity", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
+    lastActivity: timestamp("last_activity", { withTimezone: true }).defaultNow().notNull(),
     currentQrToken: text("current_qr_token"),
     guardianDob: text("guardian_dob"),
     guardianContact: text("guardian_contact"),
     email: text("email"),
     address: text("address"),
     notes: text("notes"),
-
-    // ADDED: Account Type column
-    accountType: accountTypeEnum("account_type")
-      .notNull()
-      .default("CHILD_DISPLAY"),
-
+    accountType: accountTypeEnum("account_type").notNull().default("CHILD_DISPLAY"),
     ...timestampFields,
     ...softDeleteField,
   },
-  (table) => {
-    return {
-      displayIdIdx: index("account_display_id_idx").on(table.displayId),
-      statusIdx: index("account_status_idx").on(table.status),
-      lastActivityIdx: index("account_last_activity_idx").on(table.lastActivity),
-      accountTypeIdx: index("account_account_type_idx").on(table.accountType), // ADDED Index
-    };
-  }
+  (table) => ({
+    displayIdIdx: index("account_display_id_idx").on(table.displayId),
+    statusIdx: index("account_status_idx").on(table.status),
+    lastActivityIdx: index("account_last_activity_idx").on(table.lastActivity),
+    accountTypeIdx: index("account_account_type_idx").on(table.accountType),
+  })
 );
 
-// --- MODIFIED 'merchants' TABLE ---
 export const merchants = pgTable(
   "merchants",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     businessName: text("business_name").notNull(),
     contactPerson: text("contact_person"),
-    contactEmail: text("contact_email").notNull().unique(), // Made notNull as it's login email
+    contactEmail: text("contact_email").notNull().unique(),
     contactPhone: text("contact_phone"),
     storeAddress: text("store_address"),
     hashedPassword: text("hashed_password").notNull(),
     status: merchantStatusEnum("status").default("pending_approval").notNull(),
-    submittedAt: timestamp("submitted_at", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }).defaultNow().notNull(),
     declineReason: text("decline_reason"),
     pinVerified: boolean("pin_verified").default(false),
     category: text("category"),
     website: text("website"),
     description: text("description"),
     logoUrl: text("logo_url"),
-
-    // ADDED: Link to the merchant's internal ledger account
-    internalAccountId: uuid("internal_account_id")
-      .references(() => accounts.id, { onDelete: "restrict" })
-      .notNull()
-      .unique(),
-
-    // ADDED: Settlement Payout Information
+    internalAccountId: uuid("internal_account_id").references(() => accounts.id, { onDelete: "restrict" }).notNull().unique(),
     settlementBankAccountName: text("settlement_bank_account_name"),
     settlementBankName: text("settlement_bank_name"),
     settlementBankAccountNumber: text("settlement_bank_account_number"),
     settlementBankSwiftCode: text("settlement_bank_swift_code"),
     settlementBankBranchName: text("settlement_bank_branch_name"),
-
     ...timestampFields,
     ...softDeleteField,
   },
-  (table) => {
-    return {
-      businessNameIdx: index("merchant_business_name_idx").on(table.businessName),
-      statusIdx: index("merchant_status_idx").on(table.status),
-      categoryIdx: index("merchant_category_idx").on(table.category),
-      internalAccountIdIdx: index("merchant_internal_account_id_idx").on(table.internalAccountId), // ADDED Index
-    };
-  }
+  (table) => ({
+    businessNameIdx: index("merchant_business_name_idx").on(table.businessName),
+    statusIdx: index("merchant_status_idx").on(table.status),
+    categoryIdx: index("merchant_category_idx").on(table.category),
+    internalAccountIdIdx: index("merchant_internal_account_id_idx").on(table.internalAccountId),
+  })
 );
 
-// --- MODIFIED 'transactions' TABLE ---
 export const transactions = pgTable(
   "transactions",
   {
-    id: uuid("id").primaryKey().defaultRandom(), // Unique ID for THIS transaction leg
-
-    // ADDED: paymentId to group debit and credit legs
+    id: uuid("id").primaryKey().defaultRandom(),
     paymentId: uuid("payment_id").notNull(),
-
     timestamp: timestamp("timestamp", { withTimezone: true }).defaultNow().notNull(),
     amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
     type: transactionTypeEnum("type").notNull(),
-    accountId: uuid("account_id") // FK to accounts.id (customer OR merchant's internal account)
-      .notNull()
-      .references(() => accounts.id, { onDelete: "restrict" }),
-    merchantId: uuid("merchant_id") // FK to merchants.id (merchant facilitating transaction)
-      .notNull() // Assuming a merchant is always involved in these app transactions
-      .references(() => merchants.id, { onDelete: "set null" }), // or restrict
+    accountId: uuid("account_id").notNull().references(() => accounts.id, { onDelete: "restrict" }),
+    merchantId: uuid("merchant_id").notNull().references(() => merchants.id, { onDelete: "set null" }),
     status: transactionStatusEnum("status").notNull(),
     declineReason: text("decline_reason"),
     pinVerified: boolean("pin_verified"),
     description: text("description"),
     reference: text("reference"),
     metadata: text("metadata"),
-
     ...timestampFields,
   },
-  (table) => {
-    return {
-      accountIdIdx: index("transaction_account_id_idx").on(table.accountId),
-      merchantIdIdx: index("transaction_merchant_id_idx").on(table.merchantId),
-      timestampIdx: index("transaction_timestamp_idx").on(table.timestamp),
-      statusIdx: index("transaction_status_idx").on(table.status),
-      typeIdx: index("transaction_type_idx").on(table.type),
-      paymentIdIdx: index("transaction_payment_id_idx").on(table.paymentId), // ADDED Index
-    };
-  }
+  (table) => ({
+    accountIdIdx: index("transaction_account_id_idx").on(table.accountId),
+    merchantIdIdx: index("transaction_merchant_id_idx").on(table.merchantId),
+    timestampIdx: index("transaction_timestamp_idx").on(table.timestamp),
+    statusIdx: index("transaction_status_idx").on(table.status),
+    typeIdx: index("transaction_type_idx").on(table.type),
+    paymentIdIdx: index("transaction_payment_id_idx").on(table.paymentId),
+  })
 );
 
-// Define the admin logs table
 export const adminLogs = pgTable(
   "admin_logs",
-  {
+  { // Using your original adminLogs structure
     id: uuid("id").primaryKey().defaultRandom(),
-    adminId: uuid("admin_id")
-      .notNull()
-      .references(() => administrators.id, { onDelete: "cascade" }),
+    timestamp: timestamp("timestamp", { withTimezone: true }).defaultNow().notNull(),
+    adminId: uuid("admin_id").references(() => administrators.id, { onDelete: "set null" }),
+    adminEmail: text("admin_email").notNull().references(() => administrators.email, { onDelete: "set null" }),
     action: text("action").notNull(),
+    targetType: text("target_type"),
+    targetId: text("target_id"),
     details: text("details"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    ...timestampFields, // This will add createdAt and updatedAt
   },
-  (table) => {
-    return {
-      adminIdIdx: index("admin_logs_admin_id_idx").on(table.adminId),
-      createdAtIdx: index("admin_logs_created_at_idx").on(table.createdAt),
-    };
-  }
+  (table) => ({
+    timestampIdx: index("admin_log_timestamp_idx").on(table.timestamp),
+    adminIdIdx: index("admin_log_admin_id_idx").on(table.adminId),
+    actionIdx: index("admin_log_action_idx").on(table.action),
+  })
 );
 
-// Many-to-many relationship for account permissions
 export const accountPermissions = pgTable(
   "account_permissions",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
-    accountId: uuid("account_id")
-      .notNull()
-      .references(() => accounts.id, { onDelete: "cascade" }),
-    adminId: uuid("admin_id")
-      .notNull()
-      .references(() => administrators.id, { onDelete: "cascade" }),
+    id: uuid("id").primaryKey().defaultRandom(), // Keep this if you want a surrogate UUID PK
+    accountId: uuid("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
+    adminId: uuid("admin_id").notNull().references(() => administrators.id, { onDelete: "cascade" }),
     permission: text("permission").notNull(),
-    ...timestampFields,
-    ...softDeleteField,
+    grantedAt: timestamp("granted_at", { withTimezone: true }).defaultNow().notNull(), // RESTORED your explicit grantedAt
+    ...timestampFields, // This adds createdAt and updatedAt
+    // ...softDeleteField, // Only if you want soft deletes for permissions
   },
   (table) => {
     return {
       accountIdIdx: index("account_permissions_account_id_idx").on(table.accountId),
       adminIdIdx: index("account_permissions_admin_id_idx").on(table.adminId),
       permissionIdx: index("account_permissions_permission_idx").on(table.permission),
-      uniqueAccountAdmin: primaryKey(table.accountId, table.adminId),
+      // If 'id' is the PK, you don't need the composite PK below unless you also want it as a unique constraint
+      // uniqueConstraint: uniqueIndex("account_admin_permission_unique").on(table.accountId, table.adminId, table.permission),
     };
   }
 );
 
-
-// --- Define relations (Updated for new links) ---
+// Define relations
 export const accountsRelations = relations(accounts, ({ one, many }) => ({
   transactions: many(transactions, { relationName: "accountTransactions" }),
   permissions: many(accountPermissions),
@@ -299,7 +247,7 @@ export const administratorsRelations = relations(administrators, ({ many }) => (
 
 export const adminLogsRelations = relations(adminLogs, ({ one }) => ({
   administrator: one(administrators, {
-    fields: [adminLogs.adminId],
+    fields: [adminLogs.adminId], // Assuming this should be adminId, not adminEmail for FK if adminId exists
     references: [administrators.id],
   }),
 }));
@@ -316,11 +264,7 @@ export const accountPermissionsRelations = relations(accountPermissions, ({ one 
 }));
 
 
-// --- Zod schemas for type validation ---
-// IMPORTANT: After schema changes, these need to be regenerated or manually updated.
-// The createInsertSchema/createSelectSchema will pick up new fields,
-// but your custom .omit().extend() schemas will need careful review.
-
+// Zod schemas for type validation
 export const insertAdministratorSchema = createInsertSchema(administrators);
 export const selectAdministratorSchema = createSelectSchema(administrators);
 
@@ -339,22 +283,33 @@ export const selectAdminLogSchema = createSelectSchema(adminLogs);
 export const insertAccountPermissionSchema = createInsertSchema(accountPermissions);
 export const selectAccountPermissionSchema = createSelectSchema(accountPermissions);
 
-
-// --- Custom Zod schemas (REVIEW AND UPDATE THESE CAREFULLY) ---
+// Custom schemas with additional validation
+// THESE ARE YOUR ORIGINAL CUSTOM ZOD SCHEMAS.
+// THEY WILL LIKELY NEED MANUAL UPDATES TO REFLECT THE NEW TABLE COLUMNS
+// AND LOGIC (e.g., how internalAccountId is handled on merchant creation).
 export const createAdministratorSchema = insertAdministratorSchema
-  .omit({ /* ... as you had ... */ })
-  .extend({ /* ... as you had ... */ });
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+    deletedAt: true,
+    lastLoginAt: true,
+  })
+  .extend({
+    email: z.string().email("Invalid email address"),
+    password: z.string().min(8, "Password must be at least 8 characters"),
+    firstName: z.string().min(1, "First name is required").optional(),
+    lastName: z.string().min(1, "Last name is required").optional(),
+  });
 
-// Example: Update createAccountSchema
 export const createAccountSchema = insertAccountSchema
   .omit({
     id: true,
     createdAt: true,
     updatedAt: true,
     deletedAt: true,
-    balance: true, // Typically set by system, not user input
+    balance: true,
     lastActivity: true,
-    // accountType: true, // You might set this programmatically, not from user input for general accounts
   })
   .extend({
     childName: z.string().min(1, "Child name is required"),
@@ -365,20 +320,22 @@ export const createAccountSchema = insertAccountSchema
     displayId: z.string().optional(),
     guardianDob: z.string().optional().nullable(),
     address: z.string().optional().nullable(),
-    // If accountType is part of creation form, add it here.
-    // accountType: z.enum(accountTypeEnum.enumValues).optional() // Example
   });
 
 export const createPublicRegistrationSchema = createAccountSchema
-  .omit({ /* ... as you had, but review with new accountType ... */ })
-  .extend({ /* ... as you had ... */ });
+  .omit({
+    status: true,
+    hashedPin: true,
+    displayId: true,
+    currentQrToken: true,
+    // Consider omitting accountType if it's always 'CHILD_DISPLAY' here
+  })
+  .extend({
+    pin: z.string().length(4, "PIN must be exactly 4 digits").regex(/^\d+$/, "PIN must contain only digits"),
+    guardianDob: z.string().min(1, "Guardian date of birth is required"),
+    submissionLanguage: z.string().optional(),
+  });
 
-
-// Example: Update createMerchantSchema
-// This will need significant update if internalAccountId needs to be handled during merchant creation.
-// Typically, an internal account record in 'accounts' would be created first, then its ID linked here.
-// Or, the merchant record is created, then an account record, then the merchant record is updated.
-// Settlement details might also be collected here or later.
 export const createMerchantSchema = insertMerchantSchema
   .omit({
     id: true,
@@ -388,9 +345,8 @@ export const createMerchantSchema = insertMerchantSchema
     deletedAt: true,
     pinVerified: true,
     declineReason: true,
-    internalAccountId: true, // Usually set programmatically after creating the linked account
-    // Omit settlement fields if they are added later
-    settlementBankAccountName: true,
+    internalAccountId: true, // MUST be omitted as it's set programmatically
+    settlementBankAccountName: true, // Omit if not collected at initial creation
     settlementBankName: true,
     settlementBankAccountNumber: true,
     settlementBankSwiftCode: true,
@@ -398,37 +354,49 @@ export const createMerchantSchema = insertMerchantSchema
   })
   .extend({
     businessName: z.string().min(1, "Business name is required"),
-    contactEmail: z.string().email("Invalid email address").optional(), // Should match merchants.contactEmail nullability
-    password: z.string().min(8, "Password must be at least 8 characters").optional(), // For initial password set?
+    contactEmail: z.string().email("Invalid email address"), // Should match notNull in table
+    password: z.string().min(8, "Password must be at least 8 characters"), // Removed .optional() if password is required at creation
     category: z.string().optional(),
-    // You might add settlement fields here if collected during initial creation and they are required.
-    // settlementBankAccountNumber: z.string().min(1, "Bank account number is required").optional(), // etc.
   });
 
-// Example: Update createTransactionSchema
 export const createTransactionSchema = insertTransactionSchema
   .omit({
     id: true,
     timestamp: true,
     createdAt: true,
     updatedAt: true,
-    paymentId: true, // paymentId will be generated by the system
-    // merchantId: true, // merchantId will come from authenticated user (JWT)
-    // status: true, // status will be set by the system
+    paymentId: true, // System generated
+    // merchantId: true, // Will come from JWT
+    // status: true, // System set
+    // type: true, // System set based on flow
   })
   .extend({
-    amount: z.number().positive("Amount must be positive"), // Or z.string() if you handle numeric as string
-    accountId: z.string().uuid("Invalid account ID for transaction leg"), // The account being debited/credited
-    // beneficiaryDisplayId might be part of the request to the API endpoint, not directly in createTransactionSchema
-    // The API route would use beneficiaryDisplayId to find the actual accountId.
-    merchantId: z.string().uuid("Merchant ID is required for this transaction").optional(), // This is the FACILITATING merchant.
-    type: z.enum(transactionTypeEnum.enumValues), // Ensure type is one of the enum values
+    amount: z.number().positive("Amount must be positive"), // Or string for precision
+    accountId: z.string().uuid("Invalid account ID for transaction leg"), // This is the account being acted upon
+    merchantId: z.string().uuid("Merchant ID is required for this transaction"), // Facilitating merchant
+    type: z.enum(transactionTypeEnum.enumValues), // Request body specifies type
   });
 
-
 export const createAdminLogSchema = insertAdminLogSchema
-  .omit({ /* ... as you had ... */ })
-  .extend({ /* ... as you had ... */ });
+  .omit({
+    id: true,
+    // timestamp: true, // Your original schema had these fields
+    // createdAt: true,
+    // updatedAt: true,
+  })
+  .extend({
+    // adminId: z.string().uuid("Invalid admin ID"), // From your original
+    action: z.string().min(1, "Action is required"),
+  });
 
 export const createAccountPermissionSchema = insertAccountPermissionSchema
-  .extend({ /* ... as you had ... */ });
+  .omit({
+    grantedAt: true, // Your original had this, so likely omit if defaultNow
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    accountId: z.string().uuid("Invalid account ID"),
+    adminId: z.string().uuid("Invalid admin ID"),
+    permission: z.string().min(1, "Permission is required"),
+  });

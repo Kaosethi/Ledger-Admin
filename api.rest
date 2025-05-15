@@ -2,10 +2,14 @@
 # Ledger Admin API Tests
 ###
 
-@baseUrl = localhost:3000/api
+@baseUrl = https://stc.pinroj.com/api
+# @baseUrl = https://stc.pinroj.com/api # Or your deployed URL
 @contentType = application/json
 
-### Authentication
+# Placeholder for Merchant JWT Token - REPLACE THIS AFTER LOGGING IN VIA MERCHANT APP LOGIN TEST
+@merchantToken = Bearer REPLACE_THIS_WITH_ACTUAL_MERCHANT_JWT_TOKEN
+
+### Authentication (Admin)
 # Login as administrator
 POST {{baseUrl}}/auth/login
 Content-Type: {{contentType}}
@@ -16,154 +20,182 @@ Content-Type: {{contentType}}
 }
 
 ### Administrators
-# Get all administrators
-GET {{baseUrl}}/administrators
-
-# Create new administrator
-POST {{baseUrl}}/administrators
-Content-Type: {{contentType}}
-
-{
-  "email": "newadmin@example.com",
-  "password": "password123"
-}
-
-# Get specific administrator
-GET {{baseUrl}}/administrators/1
-
-# Update administrator
-PATCH {{baseUrl}}/administrators/1
-Content-Type: {{contentType}}
-
-{
-  "email": "updated@example.com"
-}
-
-# Delete administrator
-DELETE {{baseUrl}}/administrators/1
+# ... (your existing administrator tests) ...
 
 ### Accounts
-# Get all accounts
-GET {{baseUrl}}/accounts
-
-# Create new account
-POST {{baseUrl}}/accounts
-Content-Type: {{contentType}}
-
-{
-  "name": "John Doe",
-  "guardianName": "Jane Doe",
-  "status": "Active",
-  "hashedPin": "1234"
-}
-
-# Get specific account
-GET {{baseUrl}}/accounts/ACC1234567890
-
-# Update account
-PATCH {{baseUrl}}/accounts/ACC1234567890
-Content-Type: {{contentType}}
-
-{
-  "name": "John Updated",
-  "status": "Inactive"
-}
-
-# Delete account
-DELETE {{baseUrl}}/accounts/ACC1234567890
+# ... (your existing accounts tests) ...
 
 ### Public Registrations
-# Create new account (public endpoint)
-POST {{baseUrl}}/registrations
-Content-Type: {{contentType}}
+# ... (your existing public registrations tests) ...
 
-{
-  "email": "parent@example.com",
-  "childName": "Child Name",
-  "guardianName": "Guardian Name",
-  "guardianDob": "1980-01-01",
-  "guardianContact": "1234567890",
-  "address": "123 Main St",
-  "pin": "1234",
-  "submissionLanguage": "en"
-}
+### Merchants (Admin Management)
+# ... (your existing merchants tests) ...
 
-### Merchants
-# Get all merchants
-GET {{baseUrl}}/merchants
-
-### Create new merchant
-POST {{baseUrl}}/merchants
-Content-Type: {{contentType}}
-
-{
-  "businessName": "Example Store",
-  "contactPerson": "Store Owner",
-  "contactEmail": "store@example.com",
-  "contactPhone": "1234567890",
-  "storeAddress": "123 Main St",
-  "password": "password123"
-}
-
-# Get specific merchant
-GET {{baseUrl}}/merchants/MERCH1234567890
-
-# Update merchant
-PATCH {{baseUrl}}/merchants/MERCH1234567890
-Content-Type: {{contentType}}
-
-{
-  "businessName": "Updated Store",
-  "status": "active"
-}
-
-### Transactions
-# Get all transactions
+### Transactions (Admin/System Level - if you have such an endpoint)
+# Get all transactions (admin view)
 GET {{baseUrl}}/transactions
 
-# Get transactions filtered by account
-GET {{baseUrl}}/transactions?accountId=ACC1234567890
+# Get transactions filtered by account (admin view)
+GET {{baseUrl}}/transactions?accountId=REPLACE_WITH_ACCOUNT_UUID
 
-# Get transactions filtered by merchant
-GET {{baseUrl}}/transactions?merchantId=MERCH1234567890
+# Get transactions filtered by merchant (admin view)
+GET {{baseUrl}}/transactions?merchantId=REPLACE_WITH_MERCHANT_UUID
 
-# Create new transaction
-POST {{baseUrl}}/transactions
-Content-Type: {{contentType}}
+# Create new transaction (ADMIN/SYSTEM LEVEL - if exists)
+# This endpoint might have different authorization and request body than the merchant app one
+# POST {{baseUrl}}/transactions
+# Content-Type: {{contentType}}
+# # Authorization: Bearer ADMIN_TOKEN_IF_NEEDED
+#
+# {
+#   "amount": "100.00",
+#   "type": "Debit", # Or "Credit"
+#   "accountId": "REPLACE_WITH_ACCOUNT_UUID", # The account being affected
+#   "merchantId": "REPLACE_WITH_MERCHANT_UUID", # If relevant for system transaction
+#   "status": "Completed", # Or "Pending", "Failed"
+#   "description": "System initiated transaction"
+# }
 
-{
-  "amount": "100.00",
-  "type": "Debit",
-  "accountId": "ACC1234567890",
-  "merchantId": "MERCH1234567890",
-  "status": "Approved"
-}
+# Get specific transaction (admin view)
+GET {{baseUrl}}/transactions/REPLACE_WITH_TRANSACTION_UUID
 
-# Get specific transaction
-GET {{baseUrl}}/transactions/TXN1234567890
+# Update transaction (ADMIN/SYSTEM LEVEL - if exists)
+# PATCH {{baseUrl}}/transactions/REPLACE_WITH_TRANSACTION_UUID
+# Content-Type: {{contentType}}
+# # Authorization: Bearer ADMIN_TOKEN_IF_NEEDED
+#
+# {
+#   "status": "Declined",
+#   "declineReason": "Manual adjustment"
+# }
 
-# Update transaction
-PATCH {{baseUrl}}/transactions/TXN1234567890
-Content-Type: {{contentType}}
 
-{
-  "status": "Declined",
-  "declineReason": "Insufficient funds"
-}
-
-### register merchant
+### Merchant App - Authentication & Registration
+# Register new merchant (via merchant app flow simulation)
+# Note: your /merchant-app/auth/register takes 'storeName', not 'name' as per our last update
 POST {{baseUrl}}/merchant-app/auth/register
 Content-Type: {{contentType}}
 
 {
-  "name": "Coffee Shop Example",
-  "email": "coffee@example.com",
+  "storeName": "Kao Test Cafe",
+  "email": "kao.test.cafe@example.com",
   "password": "password123",
-  "location": "123 Coffee Street, Bangkok",
-  "category": "Food & Beverage",
-  "contactPerson": "John Barista",
-  "contactPhone": "0812345678",
-  "website": "https://coffeeshop.example.com",
-  "description": "A cozy coffee shop serving specialty coffee and pastries",
-  "logoUrl": "https://example.com/logo.png"
+  "location": "123 Test Street, Bangkok",
+  "category": "Cafe",
+  "contactPerson": "Kao Tester",
+  "contactPhoneNumber": "0800001234"
+}
+
+### Merchant App - Login
+# Login as a merchant to get a token for subsequent merchant app requests
+# You'll need to manually copy the 'token' from this response
+# and update the @merchantToken variable above.
+POST {{baseUrl}}/merchant-app/auth/login
+Content-Type: {{contentType}}
+
+{
+  "email": "kao.test.cafe@example.com",
+  "password": "password123"
+}
+
+# 
+
+###
+# Merchant App - Create Transaction (NEW TESTS)
+# REQUIRES @merchantToken to be set with a valid JWT
+###
+
+### Create Transaction - Successful Case
+# Assumes:
+# - @merchantToken is valid
+# - 'BENEFICIARY_DISPLAY_ID_ACTIVE_WITH_FUNDS' exists, is active, and has >= 50.75 balance
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+Authorization: {{merchantToken}}
+
+{
+  "amount": 50.75,
+  "beneficiaryDisplayId": "BENEFICIARY_DISPLAY_ID_ACTIVE_WITH_FUNDS",
+  "description": "Payment for coffee and cake"
+}
+
+### Create Transaction - Beneficiary Not Found
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+Authorization: {{merchantToken}}
+
+{
+  "amount": 10.00,
+  "beneficiaryDisplayId": "NON_EXISTENT_DISPLAY_ID",
+  "description": "Test non-existent beneficiary"
+}
+
+### Create Transaction - Beneficiary Not Active
+# Assumes:
+# - 'BENEFICIARY_DISPLAY_ID_INACTIVE' exists but its account status is not 'Active'
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+Authorization: {{merchantToken}}
+
+{
+  "amount": 20.00,
+  "beneficiaryDisplayId": "BENEFICIARY_DISPLAY_ID_INACTIVE",
+  "description": "Test inactive beneficiary"
+}
+
+### Create Transaction - Insufficient Funds
+# Assumes:
+# - 'BENEFICIARY_DISPLAY_ID_LOW_FUNDS' exists, is active, but has < 100.00 balance
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+Authorization: {{merchantToken}}
+
+{
+  "amount": 100.00,
+  "beneficiaryDisplayId": "BENEFICIARY_DISPLAY_ID_LOW_FUNDS",
+  "description": "Test insufficient funds"
+}
+
+### Create Transaction - Invalid Amount (Zero)
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+Authorization: {{merchantToken}}
+
+{
+  "amount": 0,
+  "beneficiaryDisplayId": "BENEFICIARY_DISPLAY_ID_ACTIVE_WITH_FUNDS",
+  "description": "Test zero amount"
+}
+
+### Create Transaction - Invalid Amount (Negative)
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+Authorization: {{merchantToken}}
+
+{
+  "amount": -10.00,
+  "beneficiaryDisplayId": "BENEFICIARY_DISPLAY_ID_ACTIVE_WITH_FUNDS",
+  "description": "Test negative amount"
+}
+
+### Create Transaction - Missing beneficiaryDisplayId
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+Authorization: {{merchantToken}}
+
+{
+  "amount": 5.00,
+  "description": "Test missing beneficiaryDisplayId"
+  // "beneficiaryDisplayId": "" // or send empty string
+}
+
+### Create Transaction - Invalid Token (Example: expired or tampered)
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+Authorization: Bearer an.invalid.or.expired.token.here
+
+{
+  "amount": 15.00,
+  "beneficiaryDisplayId": "BENEFICIARY_DISPLAY_ID_ACTIVE_WITH_FUNDS",
+  "description": "Test invalid token"
 }
