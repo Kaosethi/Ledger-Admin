@@ -7,7 +7,7 @@
 @contentType = application/json
 
 # Placeholder for Merchant JWT Token - REPLACE THIS AFTER LOGGING IN VIA MERCHANT APP LOGIN TEST
-@merchantToken = Bearer REPLACE_THIS_WITH_ACTUAL_MERCHANT_JWT_TOKEN
+@merchantToken = Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI4YTdkMmQzNC1hZmVhLTRkZjAtYjc3MS0wOGNhN2Q1ZGMwNWMiLCJlbWFpbCI6ImFAYS5jb20iLCJyb2xlIjoibWVyY2hhbnQiLCJtZXJjaGFudElkIjoiOGE3ZDJkMzQtYWZlYS00ZGYwLWI3NzEtMDhjYTdkNWRjMDVjIiwiaWF0IjoxNzQ3Mjk2NzU0LCJleHAiOjE3NDczMzk5NTR9.8u6E7edBrLPmMWr8y1rq_6WW6Dh30pWeCbDJEanxPrQ
 
 ### Authentication (Admin)
 # Login as administrator
@@ -94,8 +94,8 @@ POST {{baseUrl}}/merchant-app/auth/login
 Content-Type: {{contentType}}
 
 {
-  "email": "kao.test.cafe@example.com",
-  "password": "password123"
+  "email": "a@a.com",
+  "password": "password"
 }
 
 # 
@@ -115,7 +115,7 @@ Authorization: {{merchantToken}}
 
 {
   "amount": 50.75,
-  "beneficiaryDisplayId": "BENEFICIARY_DISPLAY_ID_ACTIVE_WITH_FUNDS",
+  "beneficiaryDisplayId": "STC-2025-NAC6",
   "description": "Payment for coffee and cake"
 }
 
@@ -126,7 +126,7 @@ Authorization: {{merchantToken}}
 
 {
   "amount": 10.00,
-  "beneficiaryDisplayId": "NON_EXISTENT_DISPLAY_ID",
+  "beneficiaryDisplayId": "STC-2025-NAC7",
   "description": "Test non-existent beneficiary"
 }
 
