@@ -1,10 +1,15 @@
 // MODIFIED: src/app/api/merchant-app/auth/register/route.ts
-import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { merchants, accounts, accountTypeEnum, accountStatusEnum } from '@/lib/db/schema'; // Added accounts, accountTypeEnum, accountStatusEnum
-import { eq, and } from 'drizzle-orm';
-import { hash } from 'bcryptjs';
-import { v4 as uuidv4 } from 'uuid'; // For generating a unique displayId for internal account if needed
+import { NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import {
+  merchants,
+  accounts,
+  accountTypeEnum,
+  accountStatusEnum,
+} from "@/lib/db/schema"; // Added accounts, accountTypeEnum, accountStatusEnum
+import { eq, and } from "drizzle-orm";
+import { hashPassword } from "@/lib/auth/password";
+import { v4 as uuidv4 } from "uuid"; // For generating a unique displayId for internal account if needed
 
 const SALT_ROUNDS = 10;
 
@@ -23,25 +28,45 @@ export async function POST(request: Request) {
       // Removed: website, description, logoUrl from direct destructuring for now, handle if present
     } = body;
 
-    console.log(
-      "[API /merchant-app/auth/register] Request body parsed:",
-      { storeName, email, /* no password */ location, category, contactPerson, contactPhoneNumber }
-    );
+    console.log("[API /merchant-app/auth/register] Request body parsed:", {
+      storeName,
+      email,
+      /* no password */ location,
+      category,
+      contactPerson,
+      contactPhoneNumber,
+    });
 
     // --- Basic Validation ---
-    if (!storeName || !email || !password || !location || !contactPerson || !contactPhoneNumber) {
+    if (
+      !storeName ||
+      !email ||
+      !password ||
+      !location ||
+      !contactPerson ||
+      !contactPhoneNumber
+    ) {
       return NextResponse.json(
-        { error: "Missing required fields: storeName, email, password, location, contactPerson, and contactPhoneNumber are required." },
+        {
+          error:
+            "Missing required fields: storeName, email, password, location, contactPerson, and contactPhoneNumber are required.",
+        },
         { status: 400 }
       );
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return NextResponse.json({ error: "Invalid email format." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid email format." },
+        { status: 400 }
+      );
     }
     if (password.length < 8) {
-      return NextResponse.json({ error: "Password must be at least 8 characters long." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Password must be at least 8 characters long." },
+        { status: 400 }
+      );
     }
 
     // Start Database Transaction
@@ -54,7 +79,9 @@ export async function POST(request: Request) {
         .limit(1);
 
       if (existingMerchantByEmail.length > 0) {
-        console.warn("[API /merchant-app/auth/register] Merchant with email already exists in tx");
+        console.warn(
+          "[API /merchant-app/auth/register] Merchant with email already exists in tx"
+        );
         // To make db.transaction return a specific response, we can throw a custom error
         // or return a specific structure that the outer code interprets.
         // For simplicity, let's throw an error that we can catch and interpret.
@@ -82,13 +109,15 @@ export async function POST(request: Request) {
         .returning({ id: accounts.id });
 
       if (!newInternalAccount || !newInternalAccount.id) {
-        console.error("[API /merchant-app/auth/register] Failed to create internal account for merchant in tx.");
+        console.error(
+          "[API /merchant-app/auth/register] Failed to create internal account for merchant in tx."
+        );
         throw new Error("Failed to set up merchant account structure."); // Generic error
       }
       const merchantInternalAccountId = newInternalAccount.id;
 
       // 3. Hash the received plain text password
-      const hashedPassword = await hash(password, SALT_ROUNDS);
+      const hashedPassword = await hashPassword(password);
 
       // 4. Create the new merchant record, linking to the internal account
       const newMerchantData: any = {
@@ -120,11 +149,16 @@ export async function POST(request: Request) {
         });
 
       if (!insertedMerchant) {
-        console.error("[API /merchant-app/auth/register] Failed to insert merchant into database in tx.");
+        console.error(
+          "[API /merchant-app/auth/register] Failed to insert merchant into database in tx."
+        );
         throw new Error("Failed to register merchant entity.");
       }
-      
-      console.log("[API /merchant-app/auth/register] Merchant registered successfully in tx:", insertedMerchant);
+
+      console.log(
+        "[API /merchant-app/auth/register] Merchant registered successfully in tx:",
+        insertedMerchant
+      );
       return insertedMerchant; // Return the successfully created merchant from the transaction
     });
 
@@ -132,7 +166,8 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         message: "Merchant registration successful. Awaiting admin approval.",
-        merchant: { // Map to a consistent response structure if needed
+        merchant: {
+          // Map to a consistent response structure if needed
           id: registrationResult.id,
           name: registrationResult.businessName,
           email: registrationResult.contactEmail,
@@ -141,16 +176,29 @@ export async function POST(request: Request) {
       },
       { status: 201 }
     );
-
   } catch (error: any) {
-    console.error("[API /merchant-app/auth/register] Error processing request:", error.message, error.stack);
-    if (error.statusCode) { // Check for custom statusCode attached to thrown error
-      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    console.error(
+      "[API /merchant-app/auth/register] Error processing request:",
+      error.message,
+      error.stack
+    );
+    if (error.statusCode) {
+      // Check for custom statusCode attached to thrown error
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
     }
     if (error instanceof SyntaxError) {
-      return NextResponse.json({ error: "Invalid request body. Ensure JSON is well-formed." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid request body. Ensure JSON is well-formed." },
+        { status: 400 }
+      );
     }
     // The generic message you saw before
-    return NextResponse.json({ error: "Internal Server Error during registration." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal Server Error during registration." },
+      { status: 500 }
+    );
   }
 }

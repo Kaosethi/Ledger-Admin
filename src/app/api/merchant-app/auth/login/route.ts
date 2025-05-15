@@ -1,9 +1,9 @@
 // MODIFIED: src/app/api/merchant-app/auth/login/route.ts
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { merchants } from "@/lib/db/schema"; // Ensure this is your merchants table object
+import { merchants } from "@/lib/db/schema"; //  Ensure this is your merchants table object
 import { eq } from "drizzle-orm";
-import { hashPassword, verifyPassword } from "@/lib/auth/password";
+import { verifyPassword } from "@/lib/auth/password";
 import * as jose from "jose"; // MODIFIED: Import jose
 
 // Ensure you have a JWT_SECRET in your .env.local or environment variables
