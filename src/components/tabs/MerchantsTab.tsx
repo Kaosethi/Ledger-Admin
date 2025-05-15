@@ -12,7 +12,7 @@ import type {
   BackendMerchantStatus,
 } from "@/lib/mockData";
 
-import { formatDate, renderStatusBadge } from "@/lib/utils"; // Adjust path as needed
+import { formatDate, renderStatusBadge, tuncateUUID } from "@/lib/utils"; // Adjust path as needed
 // Import MerchantDetailModal and its action types
 import MerchantDetailModal, {
   FullMerchantActionType, // The full list of actions the modal *could* support
@@ -459,7 +459,7 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
                       <td
                         className={`${tableCellClasses} font-semibold text-gray-900`}
                       >
-                        {merchant.id}
+                        {tuncateUUID(merchant.id)}
                       </td>
                       <td className={tableCellClasses}>
                         {merchant.businessName}

@@ -275,6 +275,7 @@ export const renderStatusBadge = (
   );
 };
 
+// only return first 8 characters of the UUID
 export const tuncateUUID = (uuid: string): string => {
   return uuid.slice(0, 8);
 };

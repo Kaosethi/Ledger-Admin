@@ -3,9 +3,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { merchants } from "@/lib/db/schema"; // Assuming this is 'merchantsTable' or similar
 import { eq } from "drizzle-orm";
-import { hash } from "bcryptjs";
-
-const SALT_ROUNDS = 10;
+import { hashPassword } from "@/lib/auth/password";
 
 export async function POST(request: Request) {
   console.log("[API /merchant-app/auth/register] Request received");
@@ -22,22 +20,26 @@ export async function POST(request: Request) {
       category, // ADDED: Destructure category here, but it will be optional
     } = body;
 
-    console.log(
-      "[API /merchant-app/auth/register] Request body parsed:",
-      {
-        storeName,
-        email,
-        // Do not log password
-        location,
-        category, // Log if present
-        contactPerson,
-        contactPhoneNumber
-      }
-    );
+    console.log("[API /merchant-app/auth/register] Request body parsed:", {
+      storeName,
+      email,
+      // Do not log password
+      location,
+      category, // Log if present
+      contactPerson,
+      contactPhoneNumber,
+    });
 
     // --- Basic Validation ---
     // REMOVED: category from this primary validation check
-    if (!storeName || !email || !password || !location || !contactPerson || !contactPhoneNumber) {
+    if (
+      !storeName ||
+      !email ||
+      !password ||
+      !location ||
+      !contactPerson ||
+      !contactPhoneNumber
+    ) {
       console.warn(
         "[API /merchant-app/auth/register] Missing required fields",
         {
@@ -99,7 +101,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const hashedPassword = await hash(password, SALT_ROUNDS);
+    const hashedPassword = await hashPassword(password);
 
     const newMerchantData: any = {
       businessName: storeName,
@@ -113,7 +115,7 @@ export async function POST(request: Request) {
       contactPhone: contactPhoneNumber,
     };
 
-    if (category && typeof category === 'string' && category.trim() !== '') {
+    if (category && typeof category === "string" && category.trim() !== "") {
       newMerchantData.category = category;
     }
     // If category is not in the request body, or is empty, it's simply not added to newMerchantData.
