@@ -2,7 +2,7 @@
 # Ledger Admin API Tests
 ###
 
-@baseUrl = http://localhost:3002/api
+@baseUrl = https://stc.pinroj.com/api
 # @baseUrl = https://stc.pinroj.com/api # Or your deployed URL
 @contentType = application/json
 
