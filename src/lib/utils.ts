@@ -274,3 +274,7 @@ export const renderStatusBadge = (
     text
   );
 };
+
+export const tuncateUUID = (uuid: string): string => {
+  return uuid.slice(0, 8);
+};

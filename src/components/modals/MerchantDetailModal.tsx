@@ -5,7 +5,7 @@ import type {
   Transaction, 
   BackendMerchantStatus 
 } from '@/lib/mockData'; // Ensure Merchant type here is API-aligned
-import { formatDate, formatCurrency, renderStatusBadge, formatDateTime } from '@/lib/utils';
+import { formatDate, formatCurrency, renderStatusBadge, formatDateTime, tuncateUUID } from '@/lib/utils';
 
 export type FullMerchantActionType = 'approve' | 'reject' | 'suspend' | 'reactivate' | 'deactivate';
 export type AllowedMerchantActionForModal = Exclude<FullMerchantActionType, "deactivate">;
@@ -64,7 +64,7 @@ const MerchantDetailModal: React.FC<MerchantDetailModalProps> = ({
           </div>
 
           <div className="mt-5 space-y-4">
-            <p><strong>ID:</strong> {merchant.id}</p>
+            <p><strong>ID:</strong> {tuncateUUID(merchant.id)}</p>
             <p><strong>Contact Email:</strong> {merchant.contactEmail || 'N/A'}</p>
             <p><strong>Category:</strong> {merchant.category || 'N/A'}</p>
             <p><strong>Location/Address:</strong> {merchant.storeAddress || 'N/A'}</p>
