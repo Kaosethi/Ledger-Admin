@@ -6,7 +6,10 @@ import { eq, and } from 'drizzle-orm';
 import * as jose from 'jose';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
-import * as bcrypt from 'bcrypt'; // <--- IMPORTED BCRYPT
+// --- MODIFICATION: Import your scrypt verifyPassword utility ---
+import { verifyPassword } from '@/lib/auth/password'; 
+// --- REMOVE BCRYPT IMPORT ---
+// import * as bcrypt from 'bcrypt'; 
 
 // --- JWT Configuration ---
 const JWT_SECRET_STRING = process.env.JWT_SECRET;
@@ -28,7 +31,7 @@ interface AuthenticatedMerchantPayload extends jose.JWTPayload {
   email: string;
 }
 
-// --- Custom Error Classes ---
+// --- Custom Error Classes (No change here) ---
 class ApiError extends Error {
   public statusCode: number;
   public details?: any;
@@ -45,12 +48,12 @@ class BadRequestError extends ApiError { constructor(message: string, details?: 
 class BeneficiaryNotFoundError extends ApiError { constructor(message: string = "Beneficiary account not found.") { super(message, 404); } }
 class BeneficiaryInactiveError extends ApiError { constructor(message: string = "Beneficiary account is not active.") { super(message, 403); } }
 class InsufficientFundsError extends ApiError { constructor(message: string = "Insufficient funds in beneficiary account.") { super(message, 403); } }
-class IncorrectPinError extends ApiError { constructor(message: string = "Incorrect PIN provided.") { super(message, 400); } } // User input error
-class PinEntryLockedError extends ApiError { constructor(message: string = "PIN entry locked: Too many incorrect attempts.") { super(message, 403); } } // Changed to 403 Forbidden
+class IncorrectPinError extends ApiError { constructor(message: string = "Incorrect PIN provided.") { super(message, 400); } }
+class PinEntryLockedError extends ApiError { constructor(message: string = "PIN entry locked: Too many incorrect attempts.") { super(message, 403); } }
 class MerchantAccountError extends ApiError { constructor(message: string = "Merchant account configuration error.") { super(message, 500); } }
 class TransactionProcessingError extends ApiError { constructor(message: string = "Failed to complete all transaction operations.") { super(message, 500); } }
 
-// --- Helper to get Authenticated Merchant Info ---
+// --- Helper to get Authenticated Merchant Info (No change here) ---
 async function getAuthenticatedMerchantInfo(request: NextRequest): Promise<{ merchantId: string; merchantInternalAccountId: string; merchantBusinessName: string }> {
   const authHeader = request.headers.get('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -105,7 +108,7 @@ async function getAuthenticatedMerchantInfo(request: NextRequest): Promise<{ mer
   }
 }
 
-// --- Zod Schema for Request Body Validation ---
+// --- Zod Schema for Request Body Validation (No change here) ---
 const PIN_FAILURE_TYPE_MAX_ATTEMPTS = "MAX_ATTEMPTS_REACHED";
 
 const createTransactionSchema = z.object({
@@ -124,7 +127,7 @@ export async function POST(request: NextRequest) {
   let paymentId: string | null = null; 
 
   try {
-    getJwtSecretKey(); // Ensures JWT_SECRET is loaded early
+    getJwtSecretKey(); 
 
     const authenticatedMerchant = await getAuthenticatedMerchantInfo(request);
     const { merchantId, merchantInternalAccountId, merchantBusinessName } = authenticatedMerchant;
@@ -144,7 +147,6 @@ export async function POST(request: NextRequest) {
 
     paymentId = uuidv4();
 
-    // Fetch Beneficiary Account
     const beneficiaryQueryResult = await db
       .select({
         id: accounts.id, balance: accounts.balance, status: accounts.status,
@@ -160,7 +162,6 @@ export async function POST(request: NextRequest) {
     }
     const beneficiaryAccount = beneficiaryQueryResult[0];
 
-    // STEP 1: Handle Client-Reported Max PIN Attempts or Perform Server-Side PIN Verification
     if (clientReportedPinFailureType === PIN_FAILURE_TYPE_MAX_ATTEMPTS) {
       const reason = "PIN entry locked: Too many incorrect attempts (reported by client).";
       console.warn(`[TX PaymentID: ${paymentId}] Client reported max PIN attempts for beneficiary '${beneficiaryDisplayId}'.`);
@@ -173,7 +174,6 @@ export async function POST(request: NextRequest) {
       console.log(`[TX PaymentID: ${paymentId}] Logged FAILED transaction due to client-reported max PIN attempts.`);
       throw new PinEntryLockedError(reason);
     } else {
-      // Proceed with server-side PIN verification
       if (!beneficiaryAccount.hashedPin) {
         const reason = `Beneficiary account '${beneficiaryDisplayId}' does not have a PIN set up.`;
         console.warn(`[TX PaymentID: ${paymentId}] Pre-check: ${reason}`);
@@ -187,9 +187,9 @@ export async function POST(request: NextRequest) {
         throw new IncorrectPinError(reason);
       }
 
-      // --- USING BCRYPT.COMPARE ---
-      const isPinValid = await bcrypt.compare(enteredPin, beneficiaryAccount.hashedPin);
-      // --- END OF BCRYPT MODIFICATION ---
+      // --- MODIFICATION: USING verifyPassword (your scrypt utility) ---
+      const isPinValid = await verifyPassword(enteredPin, beneficiaryAccount.hashedPin);
+      // --- END OF MODIFICATION ---
 
       if (!isPinValid) {
         const reason = `Incorrect PIN provided for beneficiary '${beneficiaryDisplayId}'.`;
@@ -203,18 +203,14 @@ export async function POST(request: NextRequest) {
         console.log(`[TX PaymentID: ${paymentId}] Logged FAILED transaction due to incorrect PIN.`);
         throw new IncorrectPinError(reason);
       }
-      // PIN is valid if we reach here
     }
-
-    // PIN IS CONSIDERED VALID (either by server-side check or client didn't report lockout)
-    // Proceed with other pre-checks (status, balance)
 
     if (beneficiaryAccount.status !== 'Active') {
       const reason = `Beneficiary account '${beneficiaryDisplayId}' is not active (status: ${beneficiaryAccount.status}).`;
       console.warn(`[TX PaymentID: ${paymentId}] Pre-check: ${reason}`);
       await db.insert(transactions).values({
           paymentId: paymentId!, amount: amount.toString(), type: "Debit", accountId: beneficiaryAccount.id, merchantId: merchantId,
-          status: "Failed", declineReason: reason, pinVerified: true, // PIN was okay before this check
+          status: "Failed", declineReason: reason, pinVerified: true,
           description: reqDescription || `Payment attempt from ${beneficiaryAccount.childName || beneficiaryDisplayId} to ${merchantBusinessName}`,
           timestamp: new Date(),
       });
@@ -228,7 +224,7 @@ export async function POST(request: NextRequest) {
       console.warn(`[TX PaymentID: ${paymentId}] Pre-check: ${reason}`);
       await db.insert(transactions).values({
           paymentId: paymentId!, amount: amount.toString(), type: "Debit", accountId: beneficiaryAccount.id, merchantId: merchantId,
-          status: "Failed", declineReason: reason, pinVerified: true, // PIN was okay
+          status: "Failed", declineReason: reason, pinVerified: true,
           description: reqDescription || `Payment attempt from ${beneficiaryAccount.childName || beneficiaryDisplayId} to ${merchantBusinessName}`,
           timestamp: new Date(),
       });
@@ -236,7 +232,6 @@ export async function POST(request: NextRequest) {
       throw new InsufficientFundsError(reason);
     }
 
-    // STEP 2: All pre-validations passed. Proceed with the main atomic transaction
     const result = await db.transaction(async (tx) => {
       const merchantInternalAcctDetails = await tx
         .select({ id: accounts.id, balance: accounts.balance, status: accounts.status })
