@@ -2,7 +2,7 @@ version: "3"
 
 vars:
   NODE_ENV: development
-  DATABASE_URL: "postgresql://username:password@localhost:5432/ledger"
+  DATABASE_URL: "postgresql://username:password@localhost:5432/database"
   NODE_TLS_REJECT_UNAUTHORIZED: 0
 
 tasks:

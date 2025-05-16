@@ -25,10 +25,18 @@ export async function POST(request: NextRequest) {
     console.log("Login request received:", { email, password });
 
     if (!email || !password) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { error: "Email and password are required" },
         { status: 400 }
       );
+      response.cookies.set({
+        name: "auth-token",
+        value: "",
+        httpOnly: true,
+        path: "/",
+        maxAge: 0,
+      });
+      return response;
     }
 
     // Bypass authentication for test credentials
@@ -62,7 +70,7 @@ export async function POST(request: NextRequest) {
         value: token,
         httpOnly: true,
         path: "/",
-        // secure: process.env.NODE_ENV === "production",
+        secure: process.env.NODE_ENV === "production",
         maxAge: 60 * 60 * 8, // 8 hours
       });
 
@@ -85,10 +93,18 @@ export async function POST(request: NextRequest) {
         const isPasswordValid = adminUser.passwordHash === password; // Simplified for demo
 
         if (!isPasswordValid) {
-          return NextResponse.json(
+          const response = NextResponse.json(
             { error: "Invalid credentials" },
             { status: 401 }
           );
+          response.cookies.set({
+            name: "auth-token",
+            value: "",
+            httpOnly: true,
+            path: "/",
+            maxAge: 0,
+          });
+          return response;
         }
       }
     } catch (dbError) {
@@ -106,10 +122,18 @@ export async function POST(request: NextRequest) {
       );
 
       if (!mockAdmin) {
-        return NextResponse.json(
+        const response = NextResponse.json(
           { error: "Invalid credentials" },
           { status: 401 }
         );
+        response.cookies.set({
+          name: "auth-token",
+          value: "",
+          httpOnly: true,
+          path: "/",
+          maxAge: 0,
+        });
+        return response;
       }
 
       admin = [mockAdmin];
@@ -152,9 +176,17 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (error) {
     console.error("Login error:", error);
-    return NextResponse.json(
+    const response = NextResponse.json(
       { error: "An error occurred during login" },
       { status: 500 }
     );
+    response.cookies.set({
+      name: "auth-token",
+      value: "",
+      httpOnly: true,
+      path: "/",
+      maxAge: 0,
+    });
+    return response;
   }
 }
