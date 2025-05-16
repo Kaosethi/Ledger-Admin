@@ -13,6 +13,7 @@ import {
 import { QRCodeSVG } from "qrcode.react";
 import { useReactToPrint, UseReactToPrintOptions } from "react-to-print";
 import ConfirmActionModal from "./ConfirmActionModal"; // Ensure this path is correct
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 type AccountActionType = "suspend" | "reactivate";
 
@@ -50,7 +51,78 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
     account: Account | null;
   }>({ actionType: null, account: null });
 
+  const queryClient = useQueryClient();
   const qrCodePrintRef = useRef<HTMLDivElement>(null);
+
+  // React Query mutation for suspending an account
+  const suspendAccountMutation = useMutation({
+    mutationFn: async (accountId: string) => {
+      const response = await fetch(`/api/accounts/${accountId}/suspend`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to suspend account");
+      }
+
+      return await response.json();
+    },
+    onSuccess: (data) => {
+      // Invalidate and refetch queries that use the accounts data
+      queryClient.invalidateQueries({ queryKey: ["accounts"] });
+
+      // Log the activity
+      logAdminActivity?.(
+        "Suspend Account",
+        "Account",
+        data.id,
+        `Changed status to Suspended.`
+      );
+
+      // Update local state with the updated account
+      onSave(data);
+      handleCloseConfirmModal();
+    },
+  });
+
+  // React Query mutation for reactivating an account
+  const reactivateAccountMutation = useMutation({
+    mutationFn: async (accountId: string) => {
+      const response = await fetch(`/api/accounts/${accountId}/reactive`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to reactivate account");
+      }
+
+      return await response.json();
+    },
+    onSuccess: (data) => {
+      // Invalidate and refetch queries that use the accounts data
+      queryClient.invalidateQueries({ queryKey: ["accounts"] });
+
+      // Log the activity
+      logAdminActivity?.(
+        "Reactivate Account",
+        "Account",
+        data.id,
+        `Changed status to Active.`
+      );
+
+      // Update local state with the updated account
+      onSave(data);
+      handleCloseConfirmModal();
+    },
+  });
 
   useEffect(() => {
     if (account && isOpen) {
@@ -132,23 +204,13 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
       handleCloseConfirmModal();
       return;
     }
-    // Match status type: 'Active' | 'Inactive' | 'Suspended'
-    const newStatus: Account["status"] =
-      actionType === "suspend" ? "Suspended" : "Active";
-    const updatedAccount: Account = {
-      ...accountToUpdate,
-      status: newStatus,
-      updatedAt: new Date().toISOString(),
-      lastActivity: new Date().toISOString(), // Update lastActivity on status change too
-    };
-    logAdminActivity?.(
-      actionType === "suspend" ? "Suspend Account" : "Reactivate Account",
-      "Account",
-      accountToUpdate.id,
-      `Changed status to ${newStatus}.`
-    );
-    onSave(updatedAccount);
-    handleCloseConfirmModal();
+
+    // Use the appropriate mutation based on the action type
+    if (actionType === "suspend") {
+      suspendAccountMutation.mutate(accountToUpdate.id);
+    } else if (actionType === "reactivate") {
+      reactivateAccountMutation.mutate(accountToUpdate.id);
+    }
   };
 
   const handleToggleStatus = () => {
@@ -247,6 +309,10 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
     ? "w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 disabled:opacity-50"
     : "w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50";
   const beneficiaryName = account.childName || "N/A"; // Use childName
+
+  // Show loading state when mutations are in progress
+  const isLoading =
+    suspendAccountMutation.isPending || reactivateAccountMutation.isPending;
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 flex justify-center items-start py-10 px-4">
@@ -406,9 +472,11 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
                     type="button"
                     onClick={handleToggleStatus}
                     className={toggleStatusButtonClass}
-                    disabled={!canToggleStatus}
+                    disabled={!canToggleStatus || isLoading}
                   >
-                    {canToggleStatus
+                    {isLoading
+                      ? "Processing..."
+                      : canToggleStatus
                       ? toggleStatusButtonText
                       : `Status: ${account.status}`}
                   </button>
