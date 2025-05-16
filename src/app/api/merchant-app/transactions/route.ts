@@ -6,9 +6,7 @@ import { eq, and } from 'drizzle-orm';
 import * as jose from 'jose';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
-
-// --- BUN Password Hashing ---
-// Assuming Bun is globally available. Bun.password.verify will be called directly.
+import * as bcrypt from 'bcrypt'; // <--- IMPORTED BCRYPT
 
 // --- JWT Configuration ---
 const JWT_SECRET_STRING = process.env.JWT_SECRET;
@@ -52,7 +50,7 @@ class PinEntryLockedError extends ApiError { constructor(message: string = "PIN 
 class MerchantAccountError extends ApiError { constructor(message: string = "Merchant account configuration error.") { super(message, 500); } }
 class TransactionProcessingError extends ApiError { constructor(message: string = "Failed to complete all transaction operations.") { super(message, 500); } }
 
-// --- Helper to get Authenticated Merchant Info (No changes from previous full version) ---
+// --- Helper to get Authenticated Merchant Info ---
 async function getAuthenticatedMerchantInfo(request: NextRequest): Promise<{ merchantId: string; merchantInternalAccountId: string; merchantBusinessName: string }> {
   const authHeader = request.headers.get('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -114,10 +112,10 @@ const createTransactionSchema = z.object({
   amount: z.number({ required_error: "Amount is required." }).positive({ message: "Amount must be a positive number." }),
   beneficiaryDisplayId: z.string({ required_error: "Beneficiary display ID is required." }).min(1, "Beneficiary display ID cannot be empty."),
   enteredPin: z.string({ required_error: "Customer PIN is required." })
-              .length(4, "PIN must be exactly 4 digits.") // Ensure PIN is exactly 4 digits
-              .regex(/^\d+$/, "PIN must contain only digits."), // Ensure PIN contains only digits
+              .length(4, "PIN must be exactly 4 digits.")
+              .regex(/^\d+$/, "PIN must contain only digits."),
   description: z.string().optional(),
-  clientReportedPinFailureType: z.string().optional(), // Optional field for client to report specific PIN failures
+  clientReportedPinFailureType: z.string().optional(),
 });
 
 
@@ -126,7 +124,7 @@ export async function POST(request: NextRequest) {
   let paymentId: string | null = null; 
 
   try {
-    getJwtSecretKey();
+    getJwtSecretKey(); // Ensures JWT_SECRET is loaded early
 
     const authenticatedMerchant = await getAuthenticatedMerchantInfo(request);
     const { merchantId, merchantInternalAccountId, merchantBusinessName } = authenticatedMerchant;
@@ -140,14 +138,13 @@ export async function POST(request: NextRequest) {
 
     const validationResult = createTransactionSchema.safeParse(requestBodyJson);
     if (!validationResult.success) {
-      // Provide Zod error details for BadRequest
       throw new BadRequestError("Invalid request payload.", validationResult.error.format());
     }
     const { amount, beneficiaryDisplayId, enteredPin, description: reqDescription, clientReportedPinFailureType } = validationResult.data;
 
     paymentId = uuidv4();
 
-    // Fetch Beneficiary Account (needed for all subsequent checks)
+    // Fetch Beneficiary Account
     const beneficiaryQueryResult = await db
       .select({
         id: accounts.id, balance: accounts.balance, status: accounts.status,
@@ -163,7 +160,7 @@ export async function POST(request: NextRequest) {
     }
     const beneficiaryAccount = beneficiaryQueryResult[0];
 
-    // --- STEP 1: Handle Client-Reported Max PIN Attempts or Perform Server-Side PIN Verification ---
+    // STEP 1: Handle Client-Reported Max PIN Attempts or Perform Server-Side PIN Verification
     if (clientReportedPinFailureType === PIN_FAILURE_TYPE_MAX_ATTEMPTS) {
       const reason = "PIN entry locked: Too many incorrect attempts (reported by client).";
       console.warn(`[TX PaymentID: ${paymentId}] Client reported max PIN attempts for beneficiary '${beneficiaryDisplayId}'.`);
@@ -187,10 +184,13 @@ export async function POST(request: NextRequest) {
             timestamp: new Date(),
         });
         console.log(`[TX PaymentID: ${paymentId}] Logged FAILED transaction due to beneficiary PIN not set.`);
-        throw new IncorrectPinError(reason); // Or a more specific "PINNotSetupError"
+        throw new IncorrectPinError(reason);
       }
 
-      const isPinValid = await Bun.password.verify(enteredPin, beneficiaryAccount.hashedPin);
+      // --- USING BCRYPT.COMPARE ---
+      const isPinValid = await bcrypt.compare(enteredPin, beneficiaryAccount.hashedPin);
+      // --- END OF BCRYPT MODIFICATION ---
+
       if (!isPinValid) {
         const reason = `Incorrect PIN provided for beneficiary '${beneficiaryDisplayId}'.`;
         console.warn(`[TX PaymentID: ${paymentId}] Pre-check: ${reason}`);
@@ -206,8 +206,8 @@ export async function POST(request: NextRequest) {
       // PIN is valid if we reach here
     }
 
-    // --- PIN IS CONSIDERED VALID (either by server-side check or client didn't report lockout) ---
-    // --- Proceed with other pre-checks (status, balance) ---
+    // PIN IS CONSIDERED VALID (either by server-side check or client didn't report lockout)
+    // Proceed with other pre-checks (status, balance)
 
     if (beneficiaryAccount.status !== 'Active') {
       const reason = `Beneficiary account '${beneficiaryDisplayId}' is not active (status: ${beneficiaryAccount.status}).`;
@@ -236,9 +236,8 @@ export async function POST(request: NextRequest) {
       throw new InsufficientFundsError(reason);
     }
 
-    // --- STEP 2: All pre-validations passed. Proceed with the main atomic transaction ---
+    // STEP 2: All pre-validations passed. Proceed with the main atomic transaction
     const result = await db.transaction(async (tx) => {
-      // Fetch Merchant's Internal Account (already fetched during auth, but re-fetch status/balance within TX for safety)
       const merchantInternalAcctDetails = await tx
         .select({ id: accounts.id, balance: accounts.balance, status: accounts.status })
         .from(accounts)
@@ -308,7 +307,6 @@ export async function POST(request: NextRequest) {
     }
 
     if (error instanceof ApiError) {
-      // Pass Zod error details if it's a BadRequestError and details exist
       const errorDetails = (error instanceof BadRequestError && error.details) ? error.details : null;
       return NextResponse.json({ error: error.message, details: errorDetails }, { status: error.statusCode });
     }
