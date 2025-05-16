@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import {
-  accounts,
-  createAccountSchema,
-  accountStatusEnum,
-} from "@/lib/db/schema";
+import { accounts, createAccountSchema } from "@/lib/db/schema";
 import { z } from "zod";
 import mockDataInstance from "@/lib/mockData";
 import { generateFallbackId } from "@/lib/utils";
@@ -56,7 +52,8 @@ export const GET = withAuth(
           );
         }
 
-        // filter soft deleted accounts
+        // filters
+        conditions.push(eq(accounts.accountType, "CHILD_DISPLAY"));
         conditions.push(isNull(accounts.deletedAt));
 
         // Execute query with conditions if they exist
@@ -139,7 +136,7 @@ export const POST = withAuth(
         email: body.email,
         childName: body.childName,
         guardianName: body.guardianName,
-        status: body.status || "Pending",
+        status: "Pending",
         guardianDob: body.guardianDob,
         guardianContact: body.guardianContact,
         address: body.address,

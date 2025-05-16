@@ -28,9 +28,14 @@ export async function checkAuth(request: NextRequest): Promise<AuthResult> {
 
   // If token is invalid, return unauthorized
   if (!payload) {
+    const response = NextResponse.json(
+      { error: "Invalid token" },
+      { status: 401 }
+    );
+    response.cookies.delete("auth-token");
     return {
       authenticated: false,
-      response: NextResponse.json({ error: "Invalid token" }, { status: 401 }),
+      response,
     };
   }
 

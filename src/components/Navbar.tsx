@@ -1,11 +1,12 @@
 // src/app/components/Navbar.tsx
 import React from "react";
+import { useRouter } from "next/navigation";
+import { useMutation } from "@tanstack/react-query";
 
 interface NavbarProps {
   activeTab: string;
   setActiveTab: (tabId: string) => void;
   adminName: string;
-  onLogout: () => void;
 }
 
 const tabs = [
@@ -21,8 +22,35 @@ const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   setActiveTab,
   adminName,
-  onLogout,
 }) => {
+  const router = useRouter();
+
+  const logoutUser = async () => {
+    const response = await fetch("/api/auth/logout", {
+      method: "POST",
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Logout failed");
+    }
+    return response.json();
+  };
+
+  const logoutMutation = useMutation({
+    mutationFn: logoutUser,
+    onSuccess: () => {
+      router.push("/login");
+    },
+    onError: (error: Error) => {
+      console.error("Logout failed:", error.message);
+      alert(`Logout failed: ${error.message}`);
+    },
+  });
+
+  const handleLogout = () => {
+    logoutMutation.mutate();
+  };
+
   return (
     <nav className="bg-white shadow-md mb-6 rounded-lg">
       {/* Top Section */}
@@ -36,7 +64,7 @@ const Navbar: React.FC<NavbarProps> = ({
           <div className="flex items-center space-x-4">
             <span className="text-gray-700">{adminName || "Admin User"}</span>
             <button
-              onClick={onLogout}
+              onClick={handleLogout}
               className="text-sm text-gray-700 hover:text-primary"
             >
               Logout

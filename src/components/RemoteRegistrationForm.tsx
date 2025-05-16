@@ -287,9 +287,9 @@ const RemoteRegistrationForm: React.FC<RemoteRegistrationFormProps> = ({
                 <SelectTrigger
                   id="guardianDobMonth"
                   className="w-full sm:w-28"
-                  aria-label={t.pinPlaceholder || "Month"}
+                  aria-label={t.monthPlaceholder || "Month"}
                 >
-                  <SelectValue placeholder={t.pinPlaceholder || "Month"} />
+                  <SelectValue placeholder={t.monthPlaceholder || "Month"} />
                 </SelectTrigger>
                 <SelectContent>
                   {Array.from({ length: 12 }, (_, i) => (
