@@ -14,36 +14,12 @@
 
 
 # ==============================================================================
-# === ADMIN PORTAL AUTHENTICATION & ACTIONS ===
-# ==============================================================================
-
-## ==============================================================================
-# === ADMIN SEEDING (For Development/Testing Only) ===
-# ==============================================================================
-# This endpoint should be protected or removed in production.
-# Requires ADMIN_SEED_SECRET to be set in the backend environment
-# and provided in the request body.
-
-### Seed Initial Administrator Account
-# @name seedAdmin
-POST {{baseUrl}}/auth/admin/register-seed
-Content-Type: {{contentType}}
-
-{
-  "email": "admin@example.com",     // Choose your desired admin email
-  "password": "password",      // Choose a strong password
-  "firstName": "Super",
-  "lastName": "Admin",
-  "seedSecret": "your_very_strong_random_secret_here_123!@#" // MUST MATCH your .env.local
-}
-
-# ==============================================================================
 # === ADMIN PORTAL AUTHENTICATION & ACTIONS (EXISTING) ===
 # ==============================================================================
 
 ### Admin Login
 # @name adminLogin
-POST {{baseUrl}}/auth/login
+POST https://stc.pinroj.com/api/auth/login
 Content-Type: {{contentType}}
 
 {
