@@ -10,6 +10,8 @@ const nextConfig = {
   webpack: (config) => {
     return config;
   },
+  // Enable standalone output for containerized deployment
+  output: "standalone",
 };
 
 module.exports = nextConfig;

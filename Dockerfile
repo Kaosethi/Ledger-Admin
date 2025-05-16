@@ -13,11 +13,10 @@ RUN bun install
 COPY tsconfig.json next.config.js tailwind.config.js postcss.config.js ./
 COPY src/ ./src/
 COPY public/ ./public/
+COPY .env.local ./
 
 # Set environment variables
 ENV NODE_ENV=production
-ARG DATABASE_URL
-ENV DATABASE_URL=${DATABASE_URL}
 
 # Build the application
 RUN bun run build
@@ -30,13 +29,15 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Copy built application
-COPY --from=base /app/.next/standalone ./
-COPY --from=base /app/.next/static ./.next/static
+# Copy built application - .next directory, package.json, and node_modules are needed
+COPY --from=base /app/.next ./.next
 COPY --from=base /app/public ./public
+COPY --from=base /app/package.json ./package.json
+COPY --from=base /app/node_modules ./node_modules
+COPY --from=base /app/.env.local ./
 
 # Expose application port
 EXPOSE 3000
 
 # Start the application
-CMD ["node", "server.js"]
+CMD ["node", "node_modules/next/dist/bin/next", "start"]
