@@ -3,7 +3,7 @@
 ###
 
 # --- Configuration ---
-@baseUrl = https://stc.pinroj.com/api
+@baseUrl = http://localhost:3000/api
 @contentType = application/json
 
 # Admin Token - Get this by running the "Admin Login" request below and copying the token
@@ -47,8 +47,8 @@ POST {{baseUrl}}/auth/login
 Content-Type: {{contentType}}
 
 {
-  "email": "admin@example.com", // Use the email you just seeded
-  "password": "password123"     // Use the password you just seeded
+  "email": "admin@example.com",
+  "password": "password"
 }
 
 # ==============================================================================

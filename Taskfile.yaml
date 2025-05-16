@@ -1,10 +1,5 @@
 version: "3"
 
-vars:
-  NODE_ENV: development
-  DATABASE_URL: "postgresql://username:password@localhost:5432/database"
-  NODE_TLS_REJECT_UNAUTHORIZED: 0
-
 tasks:
   default:
     cmds:
@@ -14,10 +9,7 @@ tasks:
 
   dev:
     cmds:
-      - bun run dev
-    env:
-      NODE_ENV: "{{.NODE_ENV}}"
-      DATABASE_URL: "{{.DATABASE_URL}}"
+      - bun dev
     desc: Run the development server
 
   install:
@@ -28,17 +20,11 @@ tasks:
   build:
     cmds:
       - bun run build
-    env:
-      NODE_ENV: production
-      DATABASE_URL: "{{.DATABASE_URL}}"
     desc: Build the application for production
 
   start:
     cmds:
       - bun run start
-    env:
-      NODE_ENV: production
-      DATABASE_URL: "{{.DATABASE_URL}}"
     desc: Start the production server
 
   lint:
@@ -62,36 +48,27 @@ tasks:
   db:generate:
     cmds:
       - bun run db:generate
-    env:
-      DATABASE_URL: "{{.DATABASE_URL}}"
     desc: Generate database migrations using Drizzle
 
   db:push:
     cmds:
       - bun run db:push
-    env:
-      DATABASE_URL: "{{.DATABASE_URL}}"
-      NODE_TLS_REJECT_UNAUTHORIZED: 0
     desc: Push schema changes to the database
 
   db:studio:
     cmds:
       - bun run db:studio
-    env:
-      DATABASE_URL: "{{.DATABASE_URL}}"
     desc: Open Drizzle Studio to manage database
 
   db:migrate:
     cmds:
       - bun run db:migrate
-    env:
-      DATABASE_URL: "{{.DATABASE_URL}}"
     desc: Run database migrations
 
   docker:build:
     desc: Build the Docker image with environment variables
     cmds:
-      - docker build --build-arg NODE_ENV=production --build-arg DATABASE_URL="{{.DATABASE_URL}}" -t ledger-admin .
+      - docker build -t ledger-admin .
 
   docker:run:
     desc: Run the Docker container
