@@ -1,16 +1,20 @@
 // src/app/api/merchant-app/transactions/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db'; // Assuming this is your Drizzle instance path
-import { merchants, accounts, transactions } from '@/lib/db/schema'; // Assuming this is your schema path
+import { db } from '@/lib/db';
+import { merchants, accounts, transactions } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import * as jose from 'jose';
 import { v4 as uuidv4 } from 'uuid';
+import { z } from 'zod';
+
+// --- BUN Password Hashing ---
+// Assuming Bun is globally available. Bun.password.verify will be called directly.
 
 // --- JWT Configuration ---
 const JWT_SECRET_STRING = process.env.JWT_SECRET;
 const JWT_ALGORITHM = 'HS256';
 
-let _jwtSecretKey: Uint8Array | null = null; // Cached secret key
+let _jwtSecretKey: Uint8Array | null = null;
 
 function getJwtSecretKey(): Uint8Array {
   if (_jwtSecretKey) return _jwtSecretKey;
@@ -26,26 +30,29 @@ interface AuthenticatedMerchantPayload extends jose.JWTPayload {
   email: string;
 }
 
-// --- Custom Error Classes (Remain the same) ---
+// --- Custom Error Classes ---
 class ApiError extends Error {
   public statusCode: number;
-  constructor(message: string, statusCode: number) {
+  public details?: any;
+  constructor(message: string, statusCode: number, details?: any) {
     super(message);
     this.name = this.constructor.name;
     this.statusCode = statusCode;
+    this.details = details;
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }
-class UnauthorizedError extends ApiError { /* ... */ constructor(message: string = 'Unauthorized: Invalid or missing token, or merchant configuration issue.') { super(message, 401); } }
-class BadRequestError extends ApiError { /* ... */ constructor(message: string) { super(message, 400); } }
-class BeneficiaryNotFoundError extends ApiError { /* ... */ constructor(message: string = "Beneficiary account not found.") { super(message, 404); } }
-class BeneficiaryInactiveError extends ApiError { /* ... */ constructor(message: string = "Beneficiary account is not active.") { super(message, 403); } }
-class InsufficientFundsError extends ApiError { /* ... */ constructor(message: string = "Insufficient funds in beneficiary account.") { super(message, 403); } }
-class MerchantAccountError extends ApiError { /* ... */ constructor(message: string = "Merchant account configuration error.") { super(message, 500); } }
-class TransactionProcessingError extends ApiError { /* ... */ constructor(message: string = "Failed to complete all transaction operations.") { super(message, 500); } }
+class UnauthorizedError extends ApiError { constructor(message: string = 'Unauthorized: Invalid or missing token, or merchant configuration issue.') { super(message, 401); } }
+class BadRequestError extends ApiError { constructor(message: string, details?: any) { super(message, 400, details); } }
+class BeneficiaryNotFoundError extends ApiError { constructor(message: string = "Beneficiary account not found.") { super(message, 404); } }
+class BeneficiaryInactiveError extends ApiError { constructor(message: string = "Beneficiary account is not active.") { super(message, 403); } }
+class InsufficientFundsError extends ApiError { constructor(message: string = "Insufficient funds in beneficiary account.") { super(message, 403); } }
+class IncorrectPinError extends ApiError { constructor(message: string = "Incorrect PIN provided.") { super(message, 400); } } // User input error
+class PinEntryLockedError extends ApiError { constructor(message: string = "PIN entry locked: Too many incorrect attempts.") { super(message, 403); } } // Changed to 403 Forbidden
+class MerchantAccountError extends ApiError { constructor(message: string = "Merchant account configuration error.") { super(message, 500); } }
+class TransactionProcessingError extends ApiError { constructor(message: string = "Failed to complete all transaction operations.") { super(message, 500); } }
 
-
-// --- Helper to get Authenticated Merchant Info (Remains the same) ---
+// --- Helper to get Authenticated Merchant Info (No changes from previous full version) ---
 async function getAuthenticatedMerchantInfo(request: NextRequest): Promise<{ merchantId: string; merchantInternalAccountId: string; merchantBusinessName: string }> {
   const authHeader = request.headers.get('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -57,13 +64,11 @@ async function getAuthenticatedMerchantInfo(request: NextRequest): Promise<{ mer
     console.warn('[API Transactions] Auth: Token missing after Bearer prefix');
     throw new UnauthorizedError('Token is missing.');
   }
-
   try {
     const secretKey = getJwtSecretKey();
     const { payload } = await jose.jwtVerify<AuthenticatedMerchantPayload>(token, secretKey, {
       algorithms: [JWT_ALGORITHM],
     });
-
     if (payload && payload.merchantId) {
       const merchantDetails = await db
         .select({
@@ -75,7 +80,6 @@ async function getAuthenticatedMerchantInfo(request: NextRequest): Promise<{ mer
         .from(merchants)
         .where(eq(merchants.id, payload.merchantId))
         .limit(1);
-
       if (merchantDetails.length > 0 && merchantDetails[0].internalAccountId) {
         if (merchantDetails[0].status !== 'active') {
           console.warn(`[API Transactions] Auth: Merchant ${payload.merchantId} is not active (status: ${merchantDetails[0].status}).`);
@@ -103,213 +107,210 @@ async function getAuthenticatedMerchantInfo(request: NextRequest): Promise<{ mer
   }
 }
 
-interface CreateTransactionRequestBody {
-  amount: number;
-  beneficiaryDisplayId: string;
-  description?: string;
-}
+// --- Zod Schema for Request Body Validation ---
+const PIN_FAILURE_TYPE_MAX_ATTEMPTS = "MAX_ATTEMPTS_REACHED";
+
+const createTransactionSchema = z.object({
+  amount: z.number({ required_error: "Amount is required." }).positive({ message: "Amount must be a positive number." }),
+  beneficiaryDisplayId: z.string({ required_error: "Beneficiary display ID is required." }).min(1, "Beneficiary display ID cannot be empty."),
+  enteredPin: z.string({ required_error: "Customer PIN is required." })
+              .length(4, "PIN must be exactly 4 digits.") // Ensure PIN is exactly 4 digits
+              .regex(/^\d+$/, "PIN must contain only digits."), // Ensure PIN contains only digits
+  description: z.string().optional(),
+  clientReportedPinFailureType: z.string().optional(), // Optional field for client to report specific PIN failures
+});
+
 
 // --- API Route Handler: POST /api/merchant-app/transactions ---
-// --- MODIFIED TO PERSISTENTLY LOG FAILED TRANSACTIONS FOR INACTIVE/INSUFFICIENT FUNDS ---
 export async function POST(request: NextRequest) {
   let paymentId: string | null = null; 
 
   try {
-    getJwtSecretKey(); // Check JWT_SECRET upfront
+    getJwtSecretKey();
 
     const authenticatedMerchant = await getAuthenticatedMerchantInfo(request);
     const { merchantId, merchantInternalAccountId, merchantBusinessName } = authenticatedMerchant;
 
-    let requestBody: CreateTransactionRequestBody;
+    let requestBodyJson;
     try {
-      requestBody = await request.json();
+      requestBodyJson = await request.json();
     } catch (e) {
       throw new BadRequestError('Invalid request body: Must be valid JSON.');
     }
 
-    const { amount, beneficiaryDisplayId, description: reqDescription } = requestBody;
-
-    if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
-      throw new BadRequestError('Invalid amount: Must be a positive number.');
+    const validationResult = createTransactionSchema.safeParse(requestBodyJson);
+    if (!validationResult.success) {
+      // Provide Zod error details for BadRequest
+      throw new BadRequestError("Invalid request payload.", validationResult.error.format());
     }
-    if (!beneficiaryDisplayId || typeof beneficiaryDisplayId !== 'string' || beneficiaryDisplayId.trim() === '') {
-      throw new BadRequestError('Beneficiary display ID is required and must be a non-empty string.');
-    }
+    const { amount, beneficiaryDisplayId, enteredPin, description: reqDescription, clientReportedPinFailureType } = validationResult.data;
 
-    paymentId = uuidv4(); // Generate paymentId early for all scenarios (success or logged failure)
+    paymentId = uuidv4();
 
-    // --- STEP 1: Pre-validation of Beneficiary (outside main db.transaction) ---
+    // Fetch Beneficiary Account (needed for all subsequent checks)
     const beneficiaryQueryResult = await db
       .select({
-        id: accounts.id,
-        balance: accounts.balance,
-        status: accounts.status,
-        displayId: accounts.displayId,
-        childName: accounts.childName,
+        id: accounts.id, balance: accounts.balance, status: accounts.status,
+        displayId: accounts.displayId, childName: accounts.childName, hashedPin: accounts.hashedPin,
       })
       .from(accounts)
-      .where(and(
-        eq(accounts.displayId, beneficiaryDisplayId),
-        eq(accounts.accountType, "CHILD_DISPLAY")
-      ))
+      .where(and(eq(accounts.displayId, beneficiaryDisplayId), eq(accounts.accountType, "CHILD_DISPLAY")))
       .limit(1);
 
     if (beneficiaryQueryResult.length === 0) {
-      console.warn(`[TX PaymentID: ${paymentId}] Pre-check: Beneficiary account (CHILD_DISPLAY) with displayId '${beneficiaryDisplayId}' not found.`);
-      // No "Failed" log for "Not Found" as transactions.accountId requires a valid account.
+      console.warn(`[TX PaymentID: ${paymentId}] Pre-check: Beneficiary with displayId '${beneficiaryDisplayId}' not found.`);
       throw new BeneficiaryNotFoundError(`Beneficiary account with display ID '${beneficiaryDisplayId}' not found.`);
     }
     const beneficiaryAccount = beneficiaryQueryResult[0];
 
-    // Check for Inactive Beneficiary
+    // --- STEP 1: Handle Client-Reported Max PIN Attempts or Perform Server-Side PIN Verification ---
+    if (clientReportedPinFailureType === PIN_FAILURE_TYPE_MAX_ATTEMPTS) {
+      const reason = "PIN entry locked: Too many incorrect attempts (reported by client).";
+      console.warn(`[TX PaymentID: ${paymentId}] Client reported max PIN attempts for beneficiary '${beneficiaryDisplayId}'.`);
+      await db.insert(transactions).values({
+          paymentId: paymentId!, amount: amount.toString(), type: "Debit", accountId: beneficiaryAccount.id, merchantId: merchantId,
+          status: "Failed", declineReason: reason, pinVerified: false,
+          description: reqDescription || `Payment attempt from ${beneficiaryAccount.childName || beneficiaryDisplayId} to ${merchantBusinessName}`,
+          timestamp: new Date(),
+      });
+      console.log(`[TX PaymentID: ${paymentId}] Logged FAILED transaction due to client-reported max PIN attempts.`);
+      throw new PinEntryLockedError(reason);
+    } else {
+      // Proceed with server-side PIN verification
+      if (!beneficiaryAccount.hashedPin) {
+        const reason = `Beneficiary account '${beneficiaryDisplayId}' does not have a PIN set up.`;
+        console.warn(`[TX PaymentID: ${paymentId}] Pre-check: ${reason}`);
+        await db.insert(transactions).values({
+            paymentId: paymentId!, amount: amount.toString(), type: "Debit", accountId: beneficiaryAccount.id, merchantId: merchantId,
+            status: "Failed", declineReason: reason, pinVerified: false,
+            description: reqDescription || `Payment attempt from ${beneficiaryAccount.childName || beneficiaryDisplayId} to ${merchantBusinessName}`,
+            timestamp: new Date(),
+        });
+        console.log(`[TX PaymentID: ${paymentId}] Logged FAILED transaction due to beneficiary PIN not set.`);
+        throw new IncorrectPinError(reason); // Or a more specific "PINNotSetupError"
+      }
+
+      const isPinValid = await Bun.password.verify(enteredPin, beneficiaryAccount.hashedPin);
+      if (!isPinValid) {
+        const reason = `Incorrect PIN provided for beneficiary '${beneficiaryDisplayId}'.`;
+        console.warn(`[TX PaymentID: ${paymentId}] Pre-check: ${reason}`);
+        await db.insert(transactions).values({
+            paymentId: paymentId!, amount: amount.toString(), type: "Debit", accountId: beneficiaryAccount.id, merchantId: merchantId,
+            status: "Failed", declineReason: reason, pinVerified: false,
+            description: reqDescription || `Payment attempt from ${beneficiaryAccount.childName || beneficiaryDisplayId} to ${merchantBusinessName}`,
+            timestamp: new Date(),
+        });
+        console.log(`[TX PaymentID: ${paymentId}] Logged FAILED transaction due to incorrect PIN.`);
+        throw new IncorrectPinError(reason);
+      }
+      // PIN is valid if we reach here
+    }
+
+    // --- PIN IS CONSIDERED VALID (either by server-side check or client didn't report lockout) ---
+    // --- Proceed with other pre-checks (status, balance) ---
+
     if (beneficiaryAccount.status !== 'Active') {
       const reason = `Beneficiary account '${beneficiaryDisplayId}' is not active (status: ${beneficiaryAccount.status}).`;
       console.warn(`[TX PaymentID: ${paymentId}] Pre-check: ${reason}`);
-
-      // Log the "Failed" transaction (this INSERT is its own committed operation)
       await db.insert(transactions).values({
-          paymentId: paymentId!,
-          amount: amount.toString(),
-          type: "Debit", // Attempted debit
-          accountId: beneficiaryAccount.id, // Link to the found (but inactive) beneficiary
-          merchantId: merchantId,
-          status: "Failed",
-          declineReason: reason,
+          paymentId: paymentId!, amount: amount.toString(), type: "Debit", accountId: beneficiaryAccount.id, merchantId: merchantId,
+          status: "Failed", declineReason: reason, pinVerified: true, // PIN was okay before this check
           description: reqDescription || `Payment attempt from ${beneficiaryAccount.childName || beneficiaryDisplayId} to ${merchantBusinessName}`,
           timestamp: new Date(),
       });
       console.log(`[TX PaymentID: ${paymentId}] Logged FAILED transaction due to inactive beneficiary.`);
-      throw new BeneficiaryInactiveError(reason); // Now throw to send 403 to client
+      throw new BeneficiaryInactiveError(reason);
     }
 
-    // Check for Insufficient Funds
     const beneficiaryBalance = parseFloat(beneficiaryAccount.balance || "0.00");
     if (beneficiaryBalance < amount) {
       const reason = `Insufficient funds in beneficiary account '${beneficiaryDisplayId}'. Available: ${beneficiaryBalance}, Required: ${amount}.`;
       console.warn(`[TX PaymentID: ${paymentId}] Pre-check: ${reason}`);
-
-      // Log the "Failed" transaction
       await db.insert(transactions).values({
-          paymentId: paymentId!,
-          amount: amount.toString(),
-          type: "Debit", // Attempted debit
-          accountId: beneficiaryAccount.id,
-          merchantId: merchantId,
-          status: "Failed",
-          declineReason: reason,
+          paymentId: paymentId!, amount: amount.toString(), type: "Debit", accountId: beneficiaryAccount.id, merchantId: merchantId,
+          status: "Failed", declineReason: reason, pinVerified: true, // PIN was okay
           description: reqDescription || `Payment attempt from ${beneficiaryAccount.childName || beneficiaryDisplayId} to ${merchantBusinessName}`,
           timestamp: new Date(),
       });
       console.log(`[TX PaymentID: ${paymentId}] Logged FAILED transaction due to insufficient funds.`);
-      throw new InsufficientFundsError(reason); // Now throw to send 403 to client
+      throw new InsufficientFundsError(reason);
     }
 
-    // --- STEP 2: If all pre-validations pass, proceed with the main atomic transaction ---
+    // --- STEP 2: All pre-validations passed. Proceed with the main atomic transaction ---
     const result = await db.transaction(async (tx) => {
-      // Fetch Merchant's Internal Account within this transaction to ensure consistency
+      // Fetch Merchant's Internal Account (already fetched during auth, but re-fetch status/balance within TX for safety)
       const merchantInternalAcctDetails = await tx
         .select({ id: accounts.id, balance: accounts.balance, status: accounts.status })
         .from(accounts)
-        .where(and(
-            eq(accounts.id, merchantInternalAccountId),
-            eq(accounts.accountType, "MERCHANT_INTERNAL")
-        ))
+        .where(and(eq(accounts.id, merchantInternalAccountId), eq(accounts.accountType, "MERCHANT_INTERNAL")))
         .limit(1);
       
-      if (merchantInternalAcctDetails.length === 0) {
-        const errMsg = `CRITICAL (within TX): Merchant internal account ${merchantInternalAccountId} not found for merchant ${merchantId}.`;
+      if (merchantInternalAcctDetails.length === 0 || merchantInternalAcctDetails[0].status !== 'Active') {
+        const statusInfo = merchantInternalAcctDetails.length > 0 ? merchantInternalAcctDetails[0].status : 'Not Found';
+        const errMsg = `CRITICAL (within TX): Merchant internal account ${merchantInternalAccountId} issue (Status: ${statusInfo}).`;
         console.error(`[TX PaymentID: ${paymentId}] ${errMsg}`);
         throw new MerchantAccountError(errMsg); 
       }
       const merchantLedgerAccount = merchantInternalAcctDetails[0];
-
-      if (merchantLedgerAccount.status !== 'Active') {
-        const errMsg = `CRITICAL (within TX): Merchant internal account ${merchantInternalAccountId} is not active (status: ${merchantLedgerAccount.status}).`;
-        console.error(`[TX PaymentID: ${paymentId}] ${errMsg}`);
-        // This error will cause the db.transaction to roll back, no "Failed" log inserted here for this.
-        throw new MerchantAccountError(errMsg); 
-      }
       
-      // Perform ledger updates
       const debitDescription = reqDescription || `Payment to ${merchantBusinessName}`;
       const creditDescription = reqDescription || `Payment from ${beneficiaryAccount.childName || beneficiaryDisplayId}`;
 
-      // Use beneficiaryBalance from pre-check. For higher concurrency safety, re-fetch with FOR UPDATE here.
       const newBeneficiaryBalance = (beneficiaryBalance - amount); 
-      const [updatedCustomerAccount] = await tx
-        .update(accounts)
-        .set({ balance: newBeneficiaryBalance.toFixed(2) }) 
-        .where(eq(accounts.id, beneficiaryAccount.id)) // Use beneficiaryAccount.id from pre-check
-        .returning({ id: accounts.id, balance: accounts.balance });
+      await tx.update(accounts).set({ balance: newBeneficiaryBalance.toFixed(2) }).where(eq(accounts.id, beneficiaryAccount.id));
 
       const [debitLeg] = await tx.insert(transactions).values({
-        paymentId: paymentId!,
-        accountId: beneficiaryAccount.id, // Use beneficiaryAccount.id from pre-check
-        merchantId: merchantId,
-        type: "Debit",
-        amount: amount.toString(),
-        status: "Completed",
-        description: debitDescription,
-        timestamp: new Date(),
+        paymentId: paymentId!, accountId: beneficiaryAccount.id, merchantId: merchantId,
+        type: "Debit", amount: amount.toString(), status: "Completed", pinVerified: true,
+        description: debitDescription, timestamp: new Date(),
       }).returning();
 
       const merchantCurrentBalance = parseFloat(merchantLedgerAccount.balance || "0.00");
       const newMerchantBalance = (merchantCurrentBalance + amount);
-      const [updatedMerchantAccount] = await tx
-        .update(accounts)
-        .set({ balance: newMerchantBalance.toFixed(2) }) 
-        .where(eq(accounts.id, merchantInternalAccountId))
-        .returning({ id: accounts.id, balance: accounts.balance });
+      await tx.update(accounts).set({ balance: newMerchantBalance.toFixed(2) }).where(eq(accounts.id, merchantInternalAccountId));
         
       const [creditLeg] = await tx.insert(transactions).values({
-        paymentId: paymentId!,
-        accountId: merchantInternalAccountId,
-        merchantId: merchantId, 
-        type: "Credit",
-        amount: amount.toString(),
-        status: "Completed",
-        description: creditDescription,
-        timestamp: new Date(),
+        paymentId: paymentId!, accountId: merchantInternalAccountId, merchantId: merchantId, 
+        type: "Credit", amount: amount.toString(), status: "Completed", pinVerified: true,
+        description: creditDescription, timestamp: new Date(),
       }).returning();
       
-      if (!updatedCustomerAccount || !updatedMerchantAccount || !debitLeg || !creditLeg) {
-          console.error(`[TX PaymentID: ${paymentId}] Critical error during ledger updates or transaction leg insertion within DB transaction.`);
-          throw new TransactionProcessingError("Failed to complete all transaction operations due to unexpected database response.");
+      const [updatedCustomerAccountRes, updatedMerchantAccountRes] = await Promise.all([
+          tx.select({ id: accounts.id, balance: accounts.balance }).from(accounts).where(eq(accounts.id, beneficiaryAccount.id)).limit(1),
+          tx.select({ id: accounts.id, balance: accounts.balance }).from(accounts).where(eq(accounts.id, merchantInternalAccountId)).limit(1)
+      ]);
+
+      if (!updatedCustomerAccountRes[0] || !updatedMerchantAccountRes[0] || !debitLeg || !creditLeg) {
+          console.error(`[TX PaymentID: ${paymentId}] Critical error: Post-update data fetching or leg insertion failed.`);
+          throw new TransactionProcessingError("Failed to confirm all transaction operations.");
       }
 
-      console.log(`[TX PaymentID: ${paymentId}] SUCCESSFUL transaction. Customer (${beneficiaryAccount.id}) new balance: ${updatedCustomerAccount.balance}, Merchant Account (${merchantInternalAccountId}) new balance: ${updatedMerchantAccount.balance}`);
+      console.log(`[TX PaymentID: ${paymentId}] SUCCESSFUL transaction. Customer (${beneficiaryAccount.id}) new balance: ${updatedCustomerAccountRes[0].balance}, Merchant Account (${merchantInternalAccountId}) new balance: ${updatedMerchantAccountRes[0].balance}`);
       return { 
-        paymentId: paymentId!, 
-        debitLeg, 
-        creditLeg,
-        updatedCustomerBalance: updatedCustomerAccount.balance,
-        updatedMerchantBalance: updatedMerchantAccount.balance
+        paymentId: paymentId!, debitLeg, creditLeg,
+        updatedCustomerBalance: updatedCustomerAccountRes[0].balance,
+        updatedMerchantBalance: updatedMerchantAccountRes[0].balance
       };
-    }); // End of db.transaction
+    });
 
-    return NextResponse.json(
-      {
-        message: 'Transaction processed successfully.',
-        paymentId: result.paymentId,
-        debitTransaction: result.debitLeg,
-        creditTransaction: result.creditLeg,
-        customerAccountBalance: result.updatedCustomerBalance,
-        merchantAccountBalance: result.updatedMerchantBalance,
-      },
-      { status: 201 }
-    );
+    return NextResponse.json({
+        message: 'Transaction processed successfully.', paymentId: result.paymentId,
+        debitTransaction: result.debitLeg, creditTransaction: result.creditLeg,
+        customerAccountBalance: result.updatedCustomerBalance, merchantAccountBalance: result.updatedMerchantBalance,
+      },{ status: 201 });
 
   } catch (error: any) {
-    const logPId = paymentId || "N/A"; // paymentId should be set if we got past input validation
-    // Avoid logging the full error.stack to production logs if it's too verbose or sensitive
-    console.error(`[API Transactions - PaymentID: ${logPId}] Processing ended with error: ${error.message}`);
-    if (error.stack && process.env.NODE_ENV === 'development') { // Log stack in dev
+    const logPId = paymentId || "N/A";
+    const errorMessage = error.message || 'Unknown error occurred.';
+    console.error(`[API Transactions - PaymentID: ${logPId}] Processing ended with error: ${errorMessage}`);
+    if (error.stack && process.env.NODE_ENV === 'development') {
         console.error(error.stack);
     }
 
-
     if (error instanceof ApiError) {
-      return NextResponse.json({ error: error.message, details: error.cause || null }, { status: error.statusCode });
+      // Pass Zod error details if it's a BadRequestError and details exist
+      const errorDetails = (error instanceof BadRequestError && error.details) ? error.details : null;
+      return NextResponse.json({ error: error.message, details: errorDetails }, { status: error.statusCode });
     }
     
     return NextResponse.json({ error: 'An internal server error occurred while processing the transaction.' }, { status: 500 });

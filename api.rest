@@ -1,122 +1,203 @@
 ###
-# Ledger Admin API Tests
+# Ledger System - Comprehensive API Tests
 ###
 
+# --- Configuration ---
 @baseUrl = https://stc.pinroj.com/api
-# @baseUrl = https://stc.pinroj.com/api # Or your deployed URL
 @contentType = application/json
 
-# Placeholder for Merchant JWT Token - REPLACE THIS AFTER LOGGING IN VIA MERCHANT APP LOGIN TEST
-@merchantToken = Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI4YTdkMmQzNC1hZmVhLTRkZjAtYjc3MS0wOGNhN2Q1ZGMwNWMiLCJlbWFpbCI6ImFAYS5jb20iLCJyb2xlIjoibWVyY2hhbnQiLCJtZXJjaGFudElkIjoiOGE3ZDJkMzQtYWZlYS00ZGYwLWI3NzEtMDhjYTdkNWRjMDVjIiwiaWF0IjoxNzQ3Mjk2NzU0LCJleHAiOjE3NDczMzk5NTR9.8u6E7edBrLPmMWr8y1rq_6WW6Dh30pWeCbDJEanxPrQ
+# Admin Token - Get this by running the "Admin Login" request below and copying the token
+@adminToken = Bearer REPLACE_WITH_ADMIN_JWT_TOKEN
 
-### Authentication (Admin)
-# Login as administrator
+# Merchant Token - Get this by running the "Merchant App - Login" request below and copying the token
+@merchantToken = Bearer REPLACE_WITH_MERCHANT_JWT_TOKEN
+
+
+# ==============================================================================
+# === ADMIN PORTAL AUTHENTICATION & ACTIONS ===
+# ==============================================================================
+
+## ==============================================================================
+# === ADMIN SEEDING (For Development/Testing Only) ===
+# ==============================================================================
+# This endpoint should be protected or removed in production.
+# Requires ADMIN_SEED_SECRET to be set in the backend environment
+# and provided in the request body.
+
+### Seed Initial Administrator Account
+# @name seedAdmin
+POST {{baseUrl}}/auth/admin/register-seed
+Content-Type: {{contentType}}
+
+{
+  "email": "admin@example.com",     // Choose your desired admin email
+  "password": "password",      // Choose a strong password
+  "firstName": "Super",
+  "lastName": "Admin",
+  "seedSecret": "your_very_strong_random_secret_here_123!@#" // MUST MATCH your .env.local
+}
+
+# ==============================================================================
+# === ADMIN PORTAL AUTHENTICATION & ACTIONS (EXISTING) ===
+# ==============================================================================
+
+### Admin Login
+# @name adminLogin
 POST {{baseUrl}}/auth/login
 Content-Type: {{contentType}}
 
 {
-  "email": "admin@example.com",
-  "password": "password123"
+  "email": "admin@example.com", // Use the email you just seeded
+  "password": "password123"     // Use the password you just seeded
 }
 
-### Administrators
-# ... (your existing administrator tests) ...
+# ==============================================================================
+# === MERCHANT APP - AUTHENTICATION & REGISTRATION ===
+# ==============================================================================
 
-### Accounts
-# ... (your existing accounts tests) ...
-
-### Public Registrations
-# ... (your existing public registrations tests) ...
-
-### Merchants (Admin Management)
-# ... (your existing merchants tests) ...
-
-### Transactions (Admin/System Level - if you have such an endpoint)
-# Get all transactions (admin view)
-GET {{baseUrl}}/transactions
-
-# Get transactions filtered by account (admin view)
-GET {{baseUrl}}/transactions?accountId=REPLACE_WITH_ACCOUNT_UUID
-
-# Get transactions filtered by merchant (admin view)
-GET {{baseUrl}}/transactions?merchantId=REPLACE_WITH_MERCHANT_UUID
-
-# Create new transaction (ADMIN/SYSTEM LEVEL - if exists)
-# This endpoint might have different authorization and request body than the merchant app one
-# POST {{baseUrl}}/transactions
-# Content-Type: {{contentType}}
-# # Authorization: Bearer ADMIN_TOKEN_IF_NEEDED
-#
-# {
-#   "amount": "100.00",
-#   "type": "Debit", # Or "Credit"
-#   "accountId": "REPLACE_WITH_ACCOUNT_UUID", # The account being affected
-#   "merchantId": "REPLACE_WITH_MERCHANT_UUID", # If relevant for system transaction
-#   "status": "Completed", # Or "Pending", "Failed"
-#   "description": "System initiated transaction"
-# }
-
-# Get specific transaction (admin view)
-GET {{baseUrl}}/transactions/REPLACE_WITH_TRANSACTION_UUID
-
-# Update transaction (ADMIN/SYSTEM LEVEL - if exists)
-# PATCH {{baseUrl}}/transactions/REPLACE_WITH_TRANSACTION_UUID
-# Content-Type: {{contentType}}
-# # Authorization: Bearer ADMIN_TOKEN_IF_NEEDED
-#
-# {
-#   "status": "Declined",
-#   "declineReason": "Manual adjustment"
-# }
-
-
-### Merchant App - Authentication & Registration
-# Register new merchant (via merchant app flow simulation)
-# Note: your /merchant-app/auth/register takes 'storeName', not 'name' as per our last update
+### Merchant App - Register New Merchant
+# Use a new, unique email for each registration test.
+# @name registerMerchant
 POST {{baseUrl}}/merchant-app/auth/register
 Content-Type: {{contentType}}
 
 {
-  "storeName": "Kao Test Cafe",
-  "email": "kao.test.cafe@example.com",
+  "storeName": "The Testy Teapot",
+  "email": "teapot.test.unique@example.com", // CHANGE THIS EMAIL FOR EACH NEW REGISTRATION
   "password": "password123",
-  "location": "123 Test Street, Bangkok",
-  "category": "Cafe",
-  "contactPerson": "Kao Tester",
-  "contactPhoneNumber": "0800001234"
+  "location": "456 Test Avenue, Testville",
+  "category": "Tea House",
+  "contactPerson": "Tea Tester",
+  "contactPhoneNumber": "0801234567"
 }
 
 ### Merchant App - Login
-# Login as a merchant to get a token for subsequent merchant app requests
-# You'll need to manually copy the 'token' from this response
-# and update the @merchantToken variable above.
+# Use credentials of an ACTIVE merchant. Update @merchantToken above with the response.
+# @name merchantLogin
 POST {{baseUrl}}/merchant-app/auth/login
 Content-Type: {{contentType}}
 
 {
-  "email": "a@a.com",
-  "password": "password"
+  "email": "active.merchant@example.com", // REPLACE with an actual ACTIVE merchant email
+  "password": "password123"               // REPLACE with their password
 }
 
-# 
+### Merchant App - Get Profile (Requires @merchantToken)
+# @name getMerchantProfile
+GET {{baseUrl}}/merchant-app/profile
+Authorization: {{merchantToken}}
 
-###
-# Merchant App - Create Transaction (NEW TESTS)
-# REQUIRES @merchantToken to be set with a valid JWT
-###
 
-### Create Transaction - Successful Case
-# Assumes:
-# - @merchantToken is valid
-# - 'BENEFICIARY_DISPLAY_ID_ACTIVE_WITH_FUNDS' exists, is active, and has >= 50.75 balance
+# ==============================================================================
+# === CHILD ACCOUNT CREATION (Public Registration) ===
+# ==============================================================================
+# This is likely how you create CHILD_DISPLAY accounts for testing transactions.
+# Ensure the PIN "1111" is hashed and stored for this account if you use it in successful transaction tests.
+
+### Create Child Account (Public Registration)
+# This will create an account with status 'Active' and accountType 'CHILD_DISPLAY' by default.
+# Use a new, unique email for each registration.
+# @name createChildAccount
+POST {{baseUrl}}/public/registrations
+Content-Type: {{contentType}}
+
+{
+  "childName": "Test Child One",
+  "guardianName": "Test Guardian One",
+  "guardianDob": "1980-01-01", // YYYY-MM-DD
+  "pin": "1111", // Set a known PIN for testing transactions
+  "email": "child.one.unique@example.com", // Optional, but good for uniqueness if your schema allows
+  "guardianContact": "0900000001" // Optional
+  // "displayId" will be auto-generated by the backend. Note it down after creation.
+  // Initial balance will be 0.00. You might need an admin action to fund test accounts.
+}
+# After running this, check your database for the new account's 'displayId' and 'hashedPin'.
+# You might need to manually fund this account if tests require a starting balance.
+
+
+# ==============================================================================
+# === MERCHANT APP - CREATE TRANSACTION (POST /api/merchant-app/transactions) ===
+# ==============================================================================
+# REQUIRES @merchantToken to be set with a valid JWT.
+# REQUIRES Child Accounts to be set up with appropriate statuses, PINs, and balances.
+
+### Create Transaction - Successful Case (CORRECT PIN)
+# Beneficiary: Active, Has PIN "1111", Balance >= 50.75
 POST {{baseUrl}}/merchant-app/transactions
 Content-Type: {{contentType}}
 Authorization: {{merchantToken}}
 
 {
-  "amount": 50.75,
-  "beneficiaryDisplayId": "STC-2025-NAC6",
-  "description": "Payment for coffee and cake"
+    "amount": 50.75,
+    "beneficiaryDisplayId": "STC-2025-QAD9",
+    "enteredPin": "1111", 
+    "description": "Payment for goods - PIN Correct"
+}
+
+### Create Transaction - Incorrect PIN (Server-Side Verification)
+# Beneficiary: Active, Has PIN, but "0000" is wrong.
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+Authorization: {{merchantToken}}
+
+{
+  "amount": 10.00,
+  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_DISPLAY_ID_ACTIVE_PIN_FUNDS",
+  "enteredPin": "0000", # INCORRECT PIN
+  "description": "Test incorrect PIN (server-side)"
+}
+
+### Create Transaction - Client-Reported Max PIN Attempts Lockout
+# Beneficiary: Active, Has PIN.
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+Authorization: {{merchantToken}}
+
+{
+  "amount": 15.50,
+  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_DISPLAY_ID_ACTIVE_PIN_FUNDS",
+  "enteredPin": "9876", # Last wrong PIN or dummy
+  "clientReportedPinFailureType": "MAX_ATTEMPTS_REACHED",
+  "description": "Test client-reported PIN lockout"
+}
+
+### Create Transaction - Beneficiary Account Has No PIN Set Up
+# Beneficiary: Active, Funds OK, but `hashedPin` is NULL in DB.
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+Authorization: {{merchantToken}}
+
+{
+  "amount": 5.00,
+  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_DISPLAY_ID_NO_PIN",
+  "enteredPin": "1234", # PIN sent, but no hashedPin to compare against
+  "description": "Test beneficiary no PIN set"
+}
+
+### Create Transaction - Correct PIN, but Beneficiary Not Active
+# Beneficiary: Has PIN "1111", but status is 'Inactive' or 'Suspended'.
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+Authorization: {{merchantToken}}
+
+{
+  "amount": 20.00,
+  "beneficiaryDisplayId": "STC-2025-QAD9",
+  "enteredPin": "1111",
+  "description": "Test correct PIN, beneficiary not active"
+}
+
+### Create Transaction - Correct PIN, but Insufficient Funds
+# Beneficiary: Active, Has PIN "1111", but balance < 100.00.
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+Authorization: {{merchantToken}}
+
+{
+  "amount": 100.00,
+  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_DISPLAY_ID_LOW_FUNDS_HAS_PIN",
+  "enteredPin": "1111", # Correct PIN
+  "description": "Test correct PIN, insufficient funds"
 }
 
 ### Create Transaction - Beneficiary Not Found
@@ -126,34 +207,9 @@ Authorization: {{merchantToken}}
 
 {
   "amount": 10.00,
-  "beneficiaryDisplayId": "STC-2025-NAC7",
+  "beneficiaryDisplayId": "ID_THAT_DOES_NOT_EXIST_AT_ALL",
+  "enteredPin": "1234",
   "description": "Test non-existent beneficiary"
-}
-
-### Create Transaction - Beneficiary Not Active
-# Assumes:
-# - 'BENEFICIARY_DISPLAY_ID_INACTIVE' exists but its account status is not 'Active'
-POST {{baseUrl}}/merchant-app/transactions
-Content-Type: {{contentType}}
-Authorization: {{merchantToken}}
-
-{
-  "amount": 20.00,
-  "beneficiaryDisplayId": "STC-2025-OWM2",
-  "description": "Test inactive beneficiary"
-}
-
-### Create Transaction - Insufficient Funds
-# Assumes:
-# - 'BENEFICIARY_DISPLAY_ID_LOW_FUNDS' exists, is active, but has < 100.00 balance
-POST {{baseUrl}}/merchant-app/transactions
-Content-Type: {{contentType}}
-Authorization: {{merchantToken}}
-
-{
-  "amount": 100.00,
-  "beneficiaryDisplayId": "STC-2025-8D92",
-  "description": "Test insufficient funds"
 }
 
 ### Create Transaction - Invalid Amount (Zero)
@@ -163,7 +219,8 @@ Authorization: {{merchantToken}}
 
 {
   "amount": 0,
-  "beneficiaryDisplayId": "STC-2025-8D92",
+  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_DISPLAY_ID_ACTIVE_PIN_FUNDS",
+  "enteredPin": "1234",
   "description": "Test zero amount"
 }
 
@@ -174,28 +231,77 @@ Authorization: {{merchantToken}}
 
 {
   "amount": -10.00,
-  "beneficiaryDisplayId": "STC-2025-8D92",
+  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_DISPLAY_ID_ACTIVE_PIN_FUNDS",
+  "enteredPin": "1234",
   "description": "Test negative amount"
 }
 
-### Create Transaction - Missing beneficiaryDisplayId
+### Create Transaction - Missing `enteredPin` (Zod Validation)
 POST {{baseUrl}}/merchant-app/transactions
 Content-Type: {{contentType}}
 Authorization: {{merchantToken}}
 
 {
   "amount": 5.00,
-  "description": " "
-  // "beneficiaryDisplayId": "" // or send empty string
+  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_DISPLAY_ID_ACTIVE_PIN_FUNDS"
+  // "enteredPin" is missing
+  // "description": "Test missing enteredPin" // Description is optional
 }
 
-### Create Transaction - Invalid Token (Example: expired or tampered)
+### Create Transaction - `enteredPin` Not 4 Digits (Zod Validation)
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+Authorization: {{merchantToken}}
+
+{
+  "amount": 5.00,
+  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_DISPLAY_ID_ACTIVE_PIN_FUNDS",
+  "enteredPin": "123" // Too short
+}
+
+### Create Transaction - `enteredPin` Contains Non-Digits (Zod Validation)
+# This test assumes your client-side numpad isn't the only way to call the API.
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+Authorization: {{merchantToken}}
+
+{
+  "amount": 5.00,
+  "beneficiaryDisplayId": "STC-2025-QAD9",
+  "enteredPin": "12a3" // Contains non-digit
+}
+
+### Create Transaction - Missing `amount` (Zod Validation)
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+Authorization: {{merchantToken}}
+
+{
+  // "amount" is missing
+  "beneficiaryDisplayId": "STC-2025-QAD9",
+  "enteredPin": "1234"
+}
+
+### Create Transaction - Missing `beneficiaryDisplayId` (Zod Validation)
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+Authorization: {{merchantToken}}
+
+{
+  "amount": 5.00,
+  "enteredPin": "1234"
+  // "beneficiaryDisplayId" is missing
+}
+
+### Create Transaction - Invalid Token (Authorization Failure)
 POST {{baseUrl}}/merchant-app/transactions
 Content-Type: {{contentType}}
 Authorization: Bearer an.invalid.or.expired.token.here
 
 {
   "amount": 15.00,
-  "beneficiaryDisplayId": "BENEFICIARY_DISPLAY_ID_ACTIVE_WITH_FUNDS",
+  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_DISPLAY_ID_ACTIVE_PIN_FUNDS",
+  "enteredPin": "1234",
   "description": "Test invalid token"
 }
+
