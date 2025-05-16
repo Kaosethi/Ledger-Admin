@@ -52,7 +52,8 @@ export const GET = withAuth(
           );
         }
 
-        // filter soft deleted accounts
+        // filters
+        conditions.push(eq(accounts.accountType, "CHILD_DISPLAY"));
         conditions.push(isNull(accounts.deletedAt));
 
         // Execute query with conditions if they exist
