@@ -11,10 +11,6 @@ export async function POST(request: Request, context: any) {
   try {
     const body = await request.json();
 
-    console.log("env", env);
-    console.log("db", process.env.DATABASE_URL);
-    console.log("bun-db", Bun.env.DATABASE_URL);
-
     // Validate request body against schema
     const validatedData = createAccountSchema.parse(body);
 
