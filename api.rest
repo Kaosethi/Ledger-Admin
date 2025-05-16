@@ -260,7 +260,6 @@ Authorization: {{merchantToken}}
 }
 
 ### Create Transaction - `enteredPin` Contains Non-Digits (Zod Validation)
-# This test assumes your client-side numpad isn't the only way to call the API.
 POST {{baseUrl}}/merchant-app/transactions
 Content-Type: {{contentType}}
 Authorization: {{merchantToken}}

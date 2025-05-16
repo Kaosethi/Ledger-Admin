@@ -42,8 +42,6 @@ export async function POST(request: Request) {
 
     const merchant = foundMerchants[0];
 
-    // Ensure hashedPassword is not null before comparison
-    // (This check assumes your schema might still allow null, or as a safeguard)
     if (!merchant.hashedPassword) {
       console.error(
         "[API /merchant-app/auth/login] Merchant found but has no hashed password. Email:",

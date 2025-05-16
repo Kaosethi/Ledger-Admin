@@ -1,20 +1,51 @@
-// src/components/modals/EditAccountModal.tsx
-// MODIFIED: Changed currency symbol and code in Balance input from USD/$ to THB/฿.
-
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import type { Account, Transaction, Merchant } from "@/lib/mockData"; // Ensure this path is correct
+import type { Account, Transaction, Merchant } from "@/lib/mockData";
 import {
   formatCurrency,
   formatDate,
   renderStatusBadge,
   formatDateTime,
   tuncateUUID,
-} from "@/lib/utils"; // Ensure this path is correct
+} from "@/lib/utils";
 import { QRCodeSVG } from "qrcode.react";
 import { useReactToPrint, UseReactToPrintOptions } from "react-to-print";
-import ConfirmActionModal from "./ConfirmActionModal"; // Ensure this path is correct
+import ConfirmActionModal from "./ConfirmActionModal";
+import { useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 type AccountActionType = "suspend" | "reactivate";
+
+const suspendAccount = async (accountId: string) => {
+  const response = await fetch(`/api/accounts/${accountId}/suspend`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to suspend account");
+  }
+
+  return response.json();
+};
+
+const reactivateAccount = async (accountId: string) => {
+  const response = await fetch(`/api/accounts/${accountId}/reactive`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || "Failed to reactivate account");
+  }
+
+  return response.json();
+};
 
 interface EditAccountModalProps {
   isOpen: boolean;
@@ -51,6 +82,56 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
   }>({ actionType: null, account: null });
 
   const qrCodePrintRef = useRef<HTMLDivElement>(null);
+
+  const suspendMutation = useMutation({
+    mutationFn: suspendAccount,
+    onSuccess: (updatedAccount) => {
+      if (account) {
+        toast.success("Account suspended successfully");
+        logAdminActivity?.(
+          "Suspend Account",
+          "Account",
+          account.id,
+          `Changed status to Suspended.`
+        );
+        onSave({
+          ...account,
+          ...updatedAccount,
+          status: "Suspended",
+        });
+        handleCloseConfirmModal();
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to suspend account: ${error.message}`);
+      console.error("Error suspending account:", error);
+    },
+  });
+
+  const reactivateMutation = useMutation({
+    mutationFn: reactivateAccount,
+    onSuccess: (updatedAccount) => {
+      if (account) {
+        toast.success("Account reactivated successfully");
+        logAdminActivity?.(
+          "Reactivate Account",
+          "Account",
+          account.id,
+          `Changed status to Active.`
+        );
+        onSave({
+          ...account,
+          ...updatedAccount,
+          status: "Active",
+        });
+        handleCloseConfirmModal();
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to reactivate account: ${error.message}`);
+      console.error("Error reactivating account:", error);
+    },
+  });
 
   useEffect(() => {
     if (account && isOpen) {
@@ -100,18 +181,17 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
       changed = true;
     }
     if (!changed) {
-      onClose(); // Close if nothing changed
+      onClose();
       return;
     }
     updateData.updatedAt = new Date().toISOString();
-    // Also update lastActivity when balance or PIN changes
     updateData.lastActivity = new Date().toISOString();
     const updatedAccount: Account = { ...account, ...updateData };
     logAdminActivity?.(
       "Edit Account Details",
       "Account",
       `${account.displayId} (${tuncateUUID(account.id)})`,
-      `Updated balance or PIN.` // Logging balance change doesn't include symbol, so no change needed here.
+      `Updated balance or PIN.`
     );
     onSave(updatedAccount);
     onClose();
@@ -132,35 +212,22 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
       handleCloseConfirmModal();
       return;
     }
-    // Match status type: 'Active' | 'Inactive' | 'Suspended'
-    const newStatus: Account["status"] =
-      actionType === "suspend" ? "Suspended" : "Active";
-    const updatedAccount: Account = {
-      ...accountToUpdate,
-      status: newStatus,
-      updatedAt: new Date().toISOString(),
-      lastActivity: new Date().toISOString(), // Update lastActivity on status change too
-    };
-    logAdminActivity?.(
-      actionType === "suspend" ? "Suspend Account" : "Reactivate Account",
-      "Account",
-      accountToUpdate.id,
-      `Changed status to ${newStatus}.`
-    );
-    onSave(updatedAccount);
-    handleCloseConfirmModal();
+
+    if (actionType === "suspend") {
+      suspendMutation.mutate(accountToUpdate.id);
+    } else if (actionType === "reactivate") {
+      reactivateMutation.mutate(accountToUpdate.id);
+    }
   };
 
   const handleToggleStatus = () => {
     if (!account) return;
-    // Only allow toggling between Active and Suspended for now
-    // If Inactive, maybe a different action is needed?
     const actionType: AccountActionType | null =
       account.status === "Active"
         ? "suspend"
         : account.status === "Suspended"
         ? "reactivate"
-        : null; // Can't toggle 'Inactive' with this button
+        : null;
 
     if (actionType) {
       setConfirmActionDetails({ actionType, account });
@@ -175,23 +242,56 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
   const getConfirmModalProps = () => {
     const { actionType, account: accountToUpdate } = confirmActionDetails;
     if (!actionType || !accountToUpdate) return null;
-    // Use childName directly from the account object
     const confirmBeneficiaryName = accountToUpdate.childName || "N/A";
     const guardianName = accountToUpdate.guardianName || "N/A";
+
+    const isLoading =
+      (actionType === "suspend" && suspendMutation.isPending) ||
+      (actionType === "reactivate" && reactivateMutation.isPending);
+
+    const errorMessage =
+      (actionType === "suspend" && suspendMutation.error?.message) ||
+      (actionType === "reactivate" && reactivateMutation.error?.message);
+
     switch (actionType) {
       case "suspend":
         return {
           title: "Confirm Suspension",
-          message: `Suspend account ${accountToUpdate.id} (${guardianName} / ${confirmBeneficiaryName})?`,
-          confirmButtonText: "Suspend Account",
+          message: (
+            <>
+              <p>
+                Suspend account {accountToUpdate.displayId} (
+                {tuncateUUID(accountToUpdate.id)}) ({guardianName} /{" "}
+                {confirmBeneficiaryName})?
+              </p>
+              {errorMessage && (
+                <p className="mt-2 text-sm text-red-600">{errorMessage}</p>
+              )}
+            </>
+          ),
+          confirmButtonText: isLoading ? "Suspending..." : "Suspend Account",
           confirmButtonVariant: "danger" as const,
+          isLoading,
         };
       case "reactivate":
         return {
           title: "Confirm Reactivation",
-          message: `Reactivate account ${accountToUpdate.id} (${guardianName} / ${confirmBeneficiaryName})?`,
-          confirmButtonText: "Reactivate Account",
+          message: (
+            <>
+              <p>
+                Reactivate account {accountToUpdate.displayId} ({tuncateUUID(accountToUpdate.id)}) ({guardianName} /{" "}
+                {confirmBeneficiaryName})?
+              </p>
+              {errorMessage && (
+                <p className="mt-2 text-sm text-red-600">{errorMessage}</p>
+              )}
+            </>
+          ),
+          confirmButtonText: isLoading
+            ? "Reactivating..."
+            : "Reactivate Account",
           confirmButtonVariant: "success" as const,
+          isLoading,
         };
       default:
         return null;
@@ -236,7 +336,6 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
     return null;
   }
 
-  // Based on the toggle logic, this button now only toggles Active/Suspended
   const canToggleStatus =
     account.status === "Active" || account.status === "Suspended";
   const isActive = account.status === "Active";
@@ -246,12 +345,11 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
   const toggleStatusButtonClass = isActive
     ? "w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 disabled:opacity-50"
     : "w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50";
-  const beneficiaryName = account.childName || "N/A"; // Use childName
+  const beneficiaryName = account.childName || "N/A";
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 flex justify-center items-start py-10 px-4">
       <div className="relative mx-auto p-6 border w-full max-w-6xl shadow-lg rounded-md bg-white my-auto">
-        {/* Header */}
         <div className="flex justify-between items-center mb-4 pb-3 border-b">
           <h3 className="text-lg font-semibold text-gray-900">
             Account Details -{" "}
@@ -261,7 +359,6 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600"
           >
-            {/* Close Icon SVG */}
             <svg
               className="w-6 h-6"
               fill="none"
@@ -279,11 +376,8 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
           </button>
         </div>
 
-        {/* Body Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-          {/* Left Col */}
           <div className="md:col-span-1 space-y-6">
-            {/* Info */}
             <div>
               <h4 className="text-md font-semibold text-gray-700 mb-2">
                 Beneficiary Information
@@ -299,8 +393,7 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
                   <dt className="font-medium text-gray-500">Child Name</dt>
                   <dd className="mt-1 text-gray-900 sm:mt-0 sm:col-span-2">
                     {beneficiaryName}
-                  </dd>{" "}
-                  {/* Use variable */}
+                  </dd>
                 </div>
                 <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
                   <dt className="font-medium text-gray-500">Guardian</dt>
@@ -320,14 +413,12 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
                     {formatDate(account.createdAt)}
                   </dd>
                 </div>
-                {/* Use lastActivity */}
                 <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
                   <dt className="font-medium text-gray-500">Last Activity</dt>
                   <dd className="mt-1 text-gray-900 sm:mt-0 sm:col-span-2">
                     {formatDate(account.lastActivity)}
                   </dd>
                 </div>
-                {/* Display updatedAt if it exists */}
                 {account.updatedAt && (
                   <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
                     <dt className="font-medium text-gray-500">Updated</dt>
@@ -339,13 +430,11 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
               </dl>
             </div>
 
-            {/* Management */}
             <div className="p-4 border rounded-md">
               <h4 className="text-md font-semibold text-gray-700 mb-3">
                 Account Management
               </h4>
               <div className="space-y-4">
-                {/* Balance Input */}
                 <div>
                   <label
                     htmlFor="edit-balance"
@@ -354,8 +443,6 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
                     Balance
                   </label>
                   <div className="mt-1 relative rounded-md shadow-sm">
-                    {/* Balance Input Structure */}
-                    {/* MODIFIED: Changed $ to ฿ */}
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <span className="text-gray-500 sm:text-sm">฿</span>
                     </div>
@@ -369,13 +456,11 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
                       step="0.01"
                       min="0"
                     />
-                    {/* MODIFIED: Changed USD to THB */}
                     <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                       <span className="text-gray-500 sm:text-sm">THB</span>
                     </div>
                   </div>
                 </div>
-                {/* PIN Input */}
                 <div>
                   <label
                     htmlFor="reset-pin"
@@ -397,7 +482,6 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
                     autoComplete="new-password"
                   />
                 </div>
-                {/* Status Toggle Button */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Account Status Actions
@@ -421,14 +505,11 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
               </div>
             </div>
 
-            {/* QR Code */}
             <div className="p-4 border rounded-md">
               <h4 className="text-md font-semibold text-gray-700 mb-3">
                 Account QR Code
               </h4>
               <div ref={qrCodePrintRef}>
-                {" "}
-                {/* Ref for printing */}
                 <div className="flex justify-center items-center bg-gray-100 p-4 rounded mb-3 min-h-[180px]">
                   {isGeneratingQr ? (
                     <span className="text-gray-500 text-sm">Generating...</span>
@@ -449,7 +530,6 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row justify-center gap-3">
-                {/* Generate Button */}
                 <button
                   type="button"
                   onClick={handleGenerateQrCode}
@@ -462,7 +542,6 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
                     ? "Regenerate QR Code"
                     : "Generate QR Code"}
                 </button>
-                {/* Print Button */}
                 <button
                   type="button"
                   onClick={() => handlePrintQr()}
@@ -479,7 +558,6 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
             </div>
           </div>
 
-          {/* Right Col (Transaction History) */}
           <div className="md:col-span-2 space-y-3">
             <h4 className="text-md font-semibold text-gray-700 mb-2">
               Transaction History
@@ -492,7 +570,6 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
               ) : (
                 <table className="min-w-full divide-y divide-gray-200 text-sm">
                   <thead className="bg-gray-50 sticky top-0 z-10">
-                    {/* Transaction Table Headers */}
                     <tr>
                       <th
                         scope="col"
@@ -539,7 +616,6 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {/* Transaction Table Rows */}
                     {accountTransactions.map((tx) => {
                       const merchant = merchants.find(
                         (m) => m.id === tx.merchantId
@@ -590,7 +666,6 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
           </div>
         </div>
 
-        {/* Footer */}
         <div className="mt-6 flex justify-end space-x-3 pt-4 border-t">
           <button
             type="button"
@@ -609,7 +684,6 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
         </div>
       </div>
 
-      {/* Confirmation Modal */}
       {confirmModalProps && (
         <ConfirmActionModal
           isOpen={isConfirmModalOpen}
@@ -619,6 +693,7 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
           message={confirmModalProps.message}
           confirmButtonText={confirmModalProps.confirmButtonText}
           confirmButtonVariant={confirmModalProps.confirmButtonVariant}
+          isLoading={confirmModalProps.isLoading}
         />
       )}
     </div>
