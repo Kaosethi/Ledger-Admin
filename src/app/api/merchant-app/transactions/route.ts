@@ -22,67 +22,30 @@ function getJwtSecretKey(): Uint8Array {
 }
 
 interface AuthenticatedMerchantPayload extends jose.JWTPayload {
-  merchantId: string; // Expecting this to be the UUID of the merchant
+  merchantId: string;
   email: string;
-  // Add other relevant fields from your JWT payload if needed
 }
 
-// --- Custom Error Classes ---
+// --- Custom Error Classes (Remain the same) ---
 class ApiError extends Error {
   public statusCode: number;
   constructor(message: string, statusCode: number) {
     super(message);
     this.name = this.constructor.name;
     this.statusCode = statusCode;
-    // Ensuring the prototype chain is correct
     Object.setPrototypeOf(this, new.target.prototype);
   }
 }
-
-class UnauthorizedError extends ApiError {
-  constructor(message: string = 'Unauthorized: Invalid or missing token, or merchant configuration issue.') {
-    super(message, 401);
-  }
-}
-
-class BadRequestError extends ApiError {
-  constructor(message: string) {
-    super(message, 400);
-  }
-}
-
-class BeneficiaryNotFoundError extends ApiError {
-  constructor(message: string = "Beneficiary account not found.") {
-    super(message, 404);
-  }
-}
-
-class BeneficiaryInactiveError extends ApiError {
-  constructor(message: string = "Beneficiary account is not active.") {
-    super(message, 403); // 403 Forbidden as the action cannot be performed on this resource
-  }
-}
-
-class InsufficientFundsError extends ApiError {
-  constructor(message: string = "Insufficient funds in beneficiary account.") {
-    super(message, 403); // 403 Forbidden, or could be 400 Bad Request / 409 Conflict
-  }
-}
-
-class MerchantAccountError extends ApiError { // For server-side/configuration issues with merchant account
-  constructor(message: string = "Merchant account configuration error.") {
-    super(message, 500);
-  }
-}
-
-class TransactionProcessingError extends ApiError { // For general failures during transaction commit phase
-    constructor(message: string = "Failed to complete all transaction operations.") {
-        super(message, 500);
-    }
-}
+class UnauthorizedError extends ApiError { /* ... */ constructor(message: string = 'Unauthorized: Invalid or missing token, or merchant configuration issue.') { super(message, 401); } }
+class BadRequestError extends ApiError { /* ... */ constructor(message: string) { super(message, 400); } }
+class BeneficiaryNotFoundError extends ApiError { /* ... */ constructor(message: string = "Beneficiary account not found.") { super(message, 404); } }
+class BeneficiaryInactiveError extends ApiError { /* ... */ constructor(message: string = "Beneficiary account is not active.") { super(message, 403); } }
+class InsufficientFundsError extends ApiError { /* ... */ constructor(message: string = "Insufficient funds in beneficiary account.") { super(message, 403); } }
+class MerchantAccountError extends ApiError { /* ... */ constructor(message: string = "Merchant account configuration error.") { super(message, 500); } }
+class TransactionProcessingError extends ApiError { /* ... */ constructor(message: string = "Failed to complete all transaction operations.") { super(message, 500); } }
 
 
-// --- Helper to get Authenticated Merchant Info ---
+// --- Helper to get Authenticated Merchant Info (Remains the same) ---
 async function getAuthenticatedMerchantInfo(request: NextRequest): Promise<{ merchantId: string; merchantInternalAccountId: string; merchantBusinessName: string }> {
   const authHeader = request.headers.get('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -96,7 +59,7 @@ async function getAuthenticatedMerchantInfo(request: NextRequest): Promise<{ mer
   }
 
   try {
-    const secretKey = getJwtSecretKey(); // Ensure secret is checked/loaded
+    const secretKey = getJwtSecretKey();
     const { payload } = await jose.jwtVerify<AuthenticatedMerchantPayload>(token, secretKey, {
       algorithms: [JWT_ALGORITHM],
     });
@@ -107,7 +70,7 @@ async function getAuthenticatedMerchantInfo(request: NextRequest): Promise<{ mer
           id: merchants.id,
           internalAccountId: merchants.internalAccountId,
           businessName: merchants.businessName,
-          status: merchants.status, // Also fetch status to ensure merchant is active
+          status: merchants.status,
         })
         .from(merchants)
         .where(eq(merchants.id, payload.merchantId))
@@ -131,17 +94,15 @@ async function getAuthenticatedMerchantInfo(request: NextRequest): Promise<{ mer
     console.warn('[API Transactions] Auth: JWT valid, but merchantId missing in payload.');
     throw new UnauthorizedError('Invalid token payload.');
   } catch (error: any) {
-    if (error instanceof ApiError) throw error; // Re-throw known API errors
+    if (error instanceof ApiError) throw error;
     console.warn('[API Transactions] Auth: JWT Verification Error:', error.name, error.message);
-    // Map common jose errors to UnauthorizedError
     if (['JWSSignatureVerificationFailed', 'JWTExpired', 'JWTClaimValidationFailed', 'JWTInvalid'].includes(error.code || error.name)) {
         throw new UnauthorizedError('Token verification failed or token expired.');
     }
-    throw new UnauthorizedError('Failed to authenticate token.'); // Generic fallback
+    throw new UnauthorizedError('Failed to authenticate token.');
   }
 }
 
-// --- Request Body Interface ---
 interface CreateTransactionRequestBody {
   amount: number;
   beneficiaryDisplayId: string;
@@ -149,12 +110,12 @@ interface CreateTransactionRequestBody {
 }
 
 // --- API Route Handler: POST /api/merchant-app/transactions ---
+// --- MODIFIED TO PERSISTENTLY LOG FAILED TRANSACTIONS FOR INACTIVE/INSUFFICIENT FUNDS ---
 export async function POST(request: NextRequest) {
-  let paymentId: string | null = null; // Initialize paymentId, will be set later
+  let paymentId: string | null = null; 
 
   try {
-    // Ensure JWT secret is configured (throws if not)
-    getJwtSecretKey();
+    getJwtSecretKey(); // Check JWT_SECRET upfront
 
     const authenticatedMerchant = await getAuthenticatedMerchantInfo(request);
     const { merchantId, merchantInternalAccountId, merchantBusinessName } = authenticatedMerchant;
@@ -168,7 +129,6 @@ export async function POST(request: NextRequest) {
 
     const { amount, beneficiaryDisplayId, description: reqDescription } = requestBody;
 
-    // Validate input
     if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
       throw new BadRequestError('Invalid amount: Must be a positive number.');
     }
@@ -176,72 +136,77 @@ export async function POST(request: NextRequest) {
       throw new BadRequestError('Beneficiary display ID is required and must be a non-empty string.');
     }
 
-    paymentId = uuidv4(); // Generate a unique ID for this payment event
+    paymentId = uuidv4(); // Generate paymentId early for all scenarios (success or logged failure)
 
+    // --- STEP 1: Pre-validation of Beneficiary (outside main db.transaction) ---
+    const beneficiaryQueryResult = await db
+      .select({
+        id: accounts.id,
+        balance: accounts.balance,
+        status: accounts.status,
+        displayId: accounts.displayId,
+        childName: accounts.childName,
+      })
+      .from(accounts)
+      .where(and(
+        eq(accounts.displayId, beneficiaryDisplayId),
+        eq(accounts.accountType, "CHILD_DISPLAY")
+      ))
+      .limit(1);
+
+    if (beneficiaryQueryResult.length === 0) {
+      console.warn(`[TX PaymentID: ${paymentId}] Pre-check: Beneficiary account (CHILD_DISPLAY) with displayId '${beneficiaryDisplayId}' not found.`);
+      // No "Failed" log for "Not Found" as transactions.accountId requires a valid account.
+      throw new BeneficiaryNotFoundError(`Beneficiary account with display ID '${beneficiaryDisplayId}' not found.`);
+    }
+    const beneficiaryAccount = beneficiaryQueryResult[0];
+
+    // Check for Inactive Beneficiary
+    if (beneficiaryAccount.status !== 'Active') {
+      const reason = `Beneficiary account '${beneficiaryDisplayId}' is not active (status: ${beneficiaryAccount.status}).`;
+      console.warn(`[TX PaymentID: ${paymentId}] Pre-check: ${reason}`);
+
+      // Log the "Failed" transaction (this INSERT is its own committed operation)
+      await db.insert(transactions).values({
+          paymentId: paymentId!,
+          amount: amount.toString(),
+          type: "Debit", // Attempted debit
+          accountId: beneficiaryAccount.id, // Link to the found (but inactive) beneficiary
+          merchantId: merchantId,
+          status: "Failed",
+          declineReason: reason,
+          description: reqDescription || `Payment attempt from ${beneficiaryAccount.childName || beneficiaryDisplayId} to ${merchantBusinessName}`,
+          timestamp: new Date(),
+      });
+      console.log(`[TX PaymentID: ${paymentId}] Logged FAILED transaction due to inactive beneficiary.`);
+      throw new BeneficiaryInactiveError(reason); // Now throw to send 403 to client
+    }
+
+    // Check for Insufficient Funds
+    const beneficiaryBalance = parseFloat(beneficiaryAccount.balance || "0.00");
+    if (beneficiaryBalance < amount) {
+      const reason = `Insufficient funds in beneficiary account '${beneficiaryDisplayId}'. Available: ${beneficiaryBalance}, Required: ${amount}.`;
+      console.warn(`[TX PaymentID: ${paymentId}] Pre-check: ${reason}`);
+
+      // Log the "Failed" transaction
+      await db.insert(transactions).values({
+          paymentId: paymentId!,
+          amount: amount.toString(),
+          type: "Debit", // Attempted debit
+          accountId: beneficiaryAccount.id,
+          merchantId: merchantId,
+          status: "Failed",
+          declineReason: reason,
+          description: reqDescription || `Payment attempt from ${beneficiaryAccount.childName || beneficiaryDisplayId} to ${merchantBusinessName}`,
+          timestamp: new Date(),
+      });
+      console.log(`[TX PaymentID: ${paymentId}] Logged FAILED transaction due to insufficient funds.`);
+      throw new InsufficientFundsError(reason); // Now throw to send 403 to client
+    }
+
+    // --- STEP 2: If all pre-validations pass, proceed with the main atomic transaction ---
     const result = await db.transaction(async (tx) => {
-      // 1. Find the beneficiary (customer) account
-      const beneficiaryAccounts = await tx
-        .select({
-          id: accounts.id,
-          balance: accounts.balance,
-          status: accounts.status,
-          displayId: accounts.displayId,
-          childName: accounts.childName,
-        })
-        .from(accounts)
-        .where(and(
-          eq(accounts.displayId, beneficiaryDisplayId),
-          eq(accounts.accountType, "CHILD_DISPLAY") // Use string literal for enum
-        ))
-        .limit(1);
-
-      if (beneficiaryAccounts.length === 0) {
-        console.warn(`[TX PaymentID: ${paymentId}] Beneficiary account (CHILD_DISPLAY) with displayId '${beneficiaryDisplayId}' not found.`);
-        // THIS IS THE KEY PART FOR THE "NOT FOUND" SCENARIO - IT THROWS AN ERROR
-        // AND DOES NOT ATTEMPT TO INSERT A TRANSACTION WITH accountId: 'system'
-        throw new BeneficiaryNotFoundError(`Beneficiary account with display ID '${beneficiaryDisplayId}' not found.`);
-      }
-      const beneficiaryAccount = beneficiaryAccounts[0];
-
-      // 2. Validate beneficiary account
-      if (beneficiaryAccount.status !== 'Active') { // Ensure 'Active' matches your account_status enum string
-        const reason = `Beneficiary account '${beneficiaryDisplayId}' is not active (status: ${beneficiaryAccount.status}).`;
-        console.warn(`[TX PaymentID: ${paymentId}] ${reason}`);
-        
-        await tx.insert(transactions).values({
-            paymentId: paymentId!, 
-            amount: amount.toString(),
-            type: "Debit", 
-            accountId: beneficiaryAccount.id, 
-            merchantId: merchantId,
-            status: "Failed",
-            declineReason: reason,
-            description: reqDescription || `Payment attempt from ${beneficiaryAccount.childName || beneficiaryDisplayId} to ${merchantBusinessName}`,
-            timestamp: new Date(), 
-        });
-        throw new BeneficiaryInactiveError(reason);
-      }
-
-      const beneficiaryBalance = parseFloat(beneficiaryAccount.balance || "0.00");
-      if (beneficiaryBalance < amount) {
-        const reason = `Insufficient funds in beneficiary account '${beneficiaryDisplayId}'. Available: ${beneficiaryBalance}, Required: ${amount}.`;
-        console.warn(`[TX PaymentID: ${paymentId}] ${reason}`);
-
-        await tx.insert(transactions).values({
-            paymentId: paymentId!,
-            amount: amount.toString(),
-            type: "Debit", 
-            accountId: beneficiaryAccount.id,
-            merchantId: merchantId,
-            status: "Failed",
-            declineReason: reason,
-            description: reqDescription || `Payment attempt from ${beneficiaryAccount.childName || beneficiaryDisplayId} to ${merchantBusinessName}`,
-            timestamp: new Date(),
-        });
-        throw new InsufficientFundsError(reason);
-      }
-
-      // 3. Fetch Merchant's Internal Account (should exist and be active if authenticated correctly)
+      // Fetch Merchant's Internal Account within this transaction to ensure consistency
       const merchantInternalAcctDetails = await tx
         .select({ id: accounts.id, balance: accounts.balance, status: accounts.status })
         .from(accounts)
@@ -252,32 +217,34 @@ export async function POST(request: NextRequest) {
         .limit(1);
       
       if (merchantInternalAcctDetails.length === 0) {
-        const errMsg = `CRITICAL: Merchant internal account ${merchantInternalAccountId} not found for merchant ${merchantId}.`;
+        const errMsg = `CRITICAL (within TX): Merchant internal account ${merchantInternalAccountId} not found for merchant ${merchantId}.`;
         console.error(`[TX PaymentID: ${paymentId}] ${errMsg}`);
         throw new MerchantAccountError(errMsg); 
       }
       const merchantLedgerAccount = merchantInternalAcctDetails[0];
 
       if (merchantLedgerAccount.status !== 'Active') {
-        const errMsg = `CRITICAL: Merchant internal account ${merchantInternalAccountId} is not active (status: ${merchantLedgerAccount.status}).`;
+        const errMsg = `CRITICAL (within TX): Merchant internal account ${merchantInternalAccountId} is not active (status: ${merchantLedgerAccount.status}).`;
         console.error(`[TX PaymentID: ${paymentId}] ${errMsg}`);
+        // This error will cause the db.transaction to roll back, no "Failed" log inserted here for this.
         throw new MerchantAccountError(errMsg); 
       }
-
-      // 4. Perform ledger updates
+      
+      // Perform ledger updates
       const debitDescription = reqDescription || `Payment to ${merchantBusinessName}`;
       const creditDescription = reqDescription || `Payment from ${beneficiaryAccount.childName || beneficiaryDisplayId}`;
 
-      const newBeneficiaryBalance = (beneficiaryBalance - amount);
+      // Use beneficiaryBalance from pre-check. For higher concurrency safety, re-fetch with FOR UPDATE here.
+      const newBeneficiaryBalance = (beneficiaryBalance - amount); 
       const [updatedCustomerAccount] = await tx
         .update(accounts)
         .set({ balance: newBeneficiaryBalance.toFixed(2) }) 
-        .where(eq(accounts.id, beneficiaryAccount.id))
+        .where(eq(accounts.id, beneficiaryAccount.id)) // Use beneficiaryAccount.id from pre-check
         .returning({ id: accounts.id, balance: accounts.balance });
 
       const [debitLeg] = await tx.insert(transactions).values({
         paymentId: paymentId!,
-        accountId: beneficiaryAccount.id,
+        accountId: beneficiaryAccount.id, // Use beneficiaryAccount.id from pre-check
         merchantId: merchantId,
         type: "Debit",
         amount: amount.toString(),
@@ -306,11 +273,11 @@ export async function POST(request: NextRequest) {
       }).returning();
       
       if (!updatedCustomerAccount || !updatedMerchantAccount || !debitLeg || !creditLeg) {
-          console.error(`[TX PaymentID: ${paymentId}] Critical error during ledger updates or transaction leg insertion. One or more operations failed to return expected results.`);
+          console.error(`[TX PaymentID: ${paymentId}] Critical error during ledger updates or transaction leg insertion within DB transaction.`);
           throw new TransactionProcessingError("Failed to complete all transaction operations due to unexpected database response.");
       }
 
-      console.log(`[TX PaymentID: ${paymentId}] Transaction successful. Customer (${beneficiaryAccount.id}) new balance: ${updatedCustomerAccount.balance}, Merchant Account (${merchantInternalAccountId}) new balance: ${updatedMerchantAccount.balance}`);
+      console.log(`[TX PaymentID: ${paymentId}] SUCCESSFUL transaction. Customer (${beneficiaryAccount.id}) new balance: ${updatedCustomerAccount.balance}, Merchant Account (${merchantInternalAccountId}) new balance: ${updatedMerchantAccount.balance}`);
       return { 
         paymentId: paymentId!, 
         debitLeg, 
@@ -318,9 +285,8 @@ export async function POST(request: NextRequest) {
         updatedCustomerBalance: updatedCustomerAccount.balance,
         updatedMerchantBalance: updatedMerchantAccount.balance
       };
-    });
+    }); // End of db.transaction
 
-    // If db.transaction was successful
     return NextResponse.json(
       {
         message: 'Transaction processed successfully.',
@@ -330,19 +296,22 @@ export async function POST(request: NextRequest) {
         customerAccountBalance: result.updatedCustomerBalance,
         merchantAccountBalance: result.updatedMerchantBalance,
       },
-      { status: 201 } // 201 Created
+      { status: 201 }
     );
 
   } catch (error: any) {
-    // Log the error with paymentId if available for better traceability
-    const logPId = paymentId || "N/A";
-    console.error(`[API Transactions - PaymentID: ${logPId}] Error processing transaction: ${error.message}`, error.stack);
+    const logPId = paymentId || "N/A"; // paymentId should be set if we got past input validation
+    // Avoid logging the full error.stack to production logs if it's too verbose or sensitive
+    console.error(`[API Transactions - PaymentID: ${logPId}] Processing ended with error: ${error.message}`);
+    if (error.stack && process.env.NODE_ENV === 'development') { // Log stack in dev
+        console.error(error.stack);
+    }
+
 
     if (error instanceof ApiError) {
-      return NextResponse.json({ error: error.message, details: error.cause }, { status: error.statusCode });
+      return NextResponse.json({ error: error.message, details: error.cause || null }, { status: error.statusCode });
     }
     
-    // Default to 500 for unexpected errors
-    return NextResponse.json({ error: 'Internal Server Error while processing transaction.' }, { status: 500 });
+    return NextResponse.json({ error: 'An internal server error occurred while processing the transaction.' }, { status: 500 });
   }
 }

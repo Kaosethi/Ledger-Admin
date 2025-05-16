@@ -139,7 +139,7 @@ Authorization: {{merchantToken}}
 
 {
   "amount": 20.00,
-  "beneficiaryDisplayId": "BENEFICIARY_DISPLAY_ID_INACTIVE",
+  "beneficiaryDisplayId": "STC-2025-OWM2",
   "description": "Test inactive beneficiary"
 }
 
@@ -152,7 +152,7 @@ Authorization: {{merchantToken}}
 
 {
   "amount": 100.00,
-  "beneficiaryDisplayId": "BENEFICIARY_DISPLAY_ID_LOW_FUNDS",
+  "beneficiaryDisplayId": "STC-2025-8D92",
   "description": "Test insufficient funds"
 }
 
@@ -163,7 +163,7 @@ Authorization: {{merchantToken}}
 
 {
   "amount": 0,
-  "beneficiaryDisplayId": "BENEFICIARY_DISPLAY_ID_ACTIVE_WITH_FUNDS",
+  "beneficiaryDisplayId": "STC-2025-8D92",
   "description": "Test zero amount"
 }
 
@@ -174,7 +174,7 @@ Authorization: {{merchantToken}}
 
 {
   "amount": -10.00,
-  "beneficiaryDisplayId": "BENEFICIARY_DISPLAY_ID_ACTIVE_WITH_FUNDS",
+  "beneficiaryDisplayId": "STC-2025-8D92",
   "description": "Test negative amount"
 }
 
@@ -185,7 +185,7 @@ Authorization: {{merchantToken}}
 
 {
   "amount": 5.00,
-  "description": "Test missing beneficiaryDisplayId"
+  "description": " "
   // "beneficiaryDisplayId": "" // or send empty string
 }
 
