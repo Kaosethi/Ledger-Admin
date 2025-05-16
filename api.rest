@@ -116,8 +116,8 @@ Authorization: {{merchantToken}}
 
 {
   "amount": 10.00,
-  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_DISPLAY_ID_ACTIVE_PIN_FUNDS",
-  "enteredPin": "0000", # INCORRECT PIN
+  "beneficiaryDisplayId": "STC-2025-DWB7",
+  "enteredPin": "0000",
   "description": "Test incorrect PIN (server-side)"
 }
 
@@ -129,8 +129,8 @@ Authorization: {{merchantToken}}
 
 {
   "amount": 15.50,
-  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_DISPLAY_ID_ACTIVE_PIN_FUNDS",
-  "enteredPin": "9876", # Last wrong PIN or dummy
+  "beneficiaryDisplayId": "STC-2025-DWB7",
+  "enteredPin": "9876",
   "clientReportedPinFailureType": "MAX_ATTEMPTS_REACHED",
   "description": "Test client-reported PIN lockout"
 }
