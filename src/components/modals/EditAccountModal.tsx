@@ -292,7 +292,7 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
                 <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
                   <dt className="font-medium text-gray-500">Account ID</dt>
                   <dd className="mt-1 text-gray-900 sm:mt-0 sm:col-span-2 font-mono">
-                    {account.id}
+                    {`${account.displayId} (${tuncateUUID(account.id)})`}
                   </dd>
                 </div>
                 <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
