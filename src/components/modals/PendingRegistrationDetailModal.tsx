@@ -2,11 +2,9 @@
 "use client";
 
 import React from "react";
-import { DateTime } from "luxon"; // Keep this if you prefer Luxon for formatting
+import { DateTime } from "luxon";
 import type { PendingRegistration } from "@/lib/mockData";
-// You have formatDdMmYyyyHhMmSs and formatDate imported from lib/utils.
-// We can use formatDdMmYyyyHhMmSs if it accepts a Date object.
-import { formatDdMmYyyyHhMmSs, formatDate } from "@/lib/utils"; 
+import { formatDdMmYyyyHhMmSs, formatDate } from "@/lib/utils"; // Assuming formatDate can handle YYYY-MM-DD
 
 interface PendingRegistrationDetailModalProps {
   isOpen: boolean;
@@ -19,6 +17,7 @@ const PendingRegistrationDetailModal: React.FC<
 > = ({ isOpen, onClose, registration }) => {
   if (!isOpen || !registration) return null;
 
+  // Helper to render definition list items
   const renderDetailItem = (
     label: string,
     value: string | undefined | null
@@ -37,21 +36,28 @@ const PendingRegistrationDetailModal: React.FC<
       aria-labelledby="modal-title"
       role="dialog"
       aria-modal="true"
-      onClick={onClose} 
+      onClick={onClose} // Close if overlay is clicked
     >
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+        {/* Background overlay */}
         <span
           className="hidden sm:inline-block sm:align-middle sm:h-screen"
           aria-hidden="true"
         >
           ​
         </span>
+
+        {/* Modal Panel */}
         <div
           className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"
-          onClick={(e) => e.stopPropagation()} 
+          onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside modal
         >
           <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
             <div className="sm:flex sm:items-start">
+              {/* Optional Icon */}
+              {/* <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
+                 <svg className="h-6 w-6 text-blue-600" ... /> // Add an icon if desired
+               </div> */}
               <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
                 <h3
                   className="text-lg leading-6 font-medium text-gray-900"
@@ -65,31 +71,26 @@ const PendingRegistrationDetailModal: React.FC<
                       "Registration ID",
                       registration.displayId
                     )}
-                    {/* --- CORRECTED SECTION FOR "Submitted At" --- */}
                     {renderDetailItem(
                       "Submitted At",
-                      // Option 1: Using your existing formatDdMmYyyyHhMmSs from lib/utils.ts
-                      // This assumes formatDdMmYyyyHhMmSs can handle a Date object.
-                      registration.createdAt ? formatDdMmYyyyHhMmSs(registration.createdAt) : "N/A"
-                      
-                      // Option 2: Using Luxon (if you prefer its formatting flexibility here)
-                      // registration.createdAt ? DateTime.fromJSDate(registration.createdAt).toFormat("dd/MM/yyyy HH:mm:ss") : "N/A"
+                      DateTime.fromISO(registration.createdAt).toString()
                     )}
-                    {/* --- END CORRECTION --- */}
                     {renderDetailItem(
                       "Guardian Name",
                       registration.guardianName
                     )}
-                    {/* For Guardian DOB, if it's a string "YYYY-MM-DD", formatDate should work.
-                        If guardianDob were also a Date object, formatDate would handle it too. */}
-                    {renderDetailItem("Guardian DOB", registration.guardianDob ? formatDate(registration.guardianDob) : "N/A")}
+                    {/* Display DOB directly or use formatDate if it handles YYYY-MM-DD */}
+                    {renderDetailItem("Guardian DOB", registration.guardianDob)}
                     {renderDetailItem(
                       "Guardian Contact",
                       registration.guardianContact
                     )}
                     {renderDetailItem("Address", registration.address)}
                     {renderDetailItem("Child Name", registration.childName)}
-                    {renderDetailItem("PIN Set", "****")} 
+                    {renderDetailItem("PIN Set", "****")} {/* Mask PIN */}
+                    {/* {renderDetailItem('PIN Set', registration.pin)} */}
+                    {}
+                    {/* Uncomment to show PIN (mock only!) */}
                   </dl>
                 </div>
               </div>

@@ -364,21 +364,17 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
   };
 
   const handleGenerateQrCode = async () => {
-  if (!account || isGeneratingQr) return;
-  setIsGeneratingQr(true);
-  try {
-    const { qrToken: newToken } = await regenerateQrAPI(account.id);
-    setCurrentQrToken(newToken);
-    
-    const currentDate = new Date(); // Get the current date once
-
-    // Construct an object that fully matches the 'Account' type for onSave
-    const updatedAccountForSave: Account = { 
-      ...account, 
-      currentQrToken: newToken, 
-      // --- CORRECTED LINES ---
-      updatedAt: currentDate,    // Assign the Date object
-      lastActivity: currentDate, // Assign the Date object (or a new Date() if they can differ)
+    if (!account || isGeneratingQr) return;
+    setIsGeneratingQr(true);
+    try {
+      const { qrToken: newToken } = await regenerateQrAPI(account.id);
+      setCurrentQrToken(newToken);
+      // Construct an object that fully matches the 'Account' type for onSave
+      const updatedAccountForSave: Account = {
+        ...account,
+        currentQrToken: newToken,
+        updatedAt: new Date().toISOString(), // Convert Date to string for Account type
+        lastActivity: new Date().toISOString(), // Convert Date to string for Account type
       };
       onSave(updatedAccountForSave);
       toast.success("QR Code regenerated successfully!");
