@@ -1,30 +1,28 @@
 "use client";
 
-import { useState } from "react"; // Keep existing imports
+import { useState } from "react";
 import {
   useQuery,
   useMutation,
   useQueryClient,
-  QueryClient, // Keep QueryClient if used for instantiation
+  QueryClient,
   QueryClientProvider,
 } from "@tanstack/react-query";
 import MerchantsTab from "@/components/tabs/MerchantsTab";
-// Import Account type
+// Import Account type from lib/mockData.ts
+// Transaction type from lib/mockData.ts should define timestamp, createdAt, updatedAt as Date
 import { Merchant, Transaction, Account } from "@/lib/mockData"; 
 
-// Query client setup to manage cache - This is your original setup
-const queryClient = new QueryClient();
+const queryClientInstance = new QueryClient();
 
-// Wrapper component with QueryClientProvider - Your original wrapper
 export default function MerchantsPageWrapper() {
   return (
-    <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={queryClientInstance}>
       <MerchantsPage />
     </QueryClientProvider>
   );
 }
 
-// API functions to use with React Query
 const fetchMerchants = async (): Promise<Merchant[]> => {
   const response = await fetch("/api/merchants");
   if (!response.ok) {
@@ -35,6 +33,7 @@ const fetchMerchants = async (): Promise<Merchant[]> => {
   return response.json();
 };
 
+// VVVV MODIFIED THIS FUNCTION VVVV
 const fetchTransactions = async (): Promise<Transaction[]> => {
   const response = await fetch("/api/transactions");
   if (!response.ok) {
@@ -42,12 +41,22 @@ const fetchTransactions = async (): Promise<Transaction[]> => {
       `Failed to fetch transactions: ${response.status} ${response.statusText}`
     );
   }
-  return response.json();
+  const data = await response.json();
+  // Transform date strings from API to Date objects to match Transaction type from lib/mockData.ts
+  return data.map((tx: any) => ({ 
+    ...tx,
+    timestamp: new Date(tx.timestamp), // Convert string to Date
+    createdAt: new Date(tx.createdAt), // Convert string to Date
+    updatedAt: new Date(tx.updatedAt), // Convert string to Date
+    amount: String(tx.amount), // Ensure amount is string as per rich Transaction type
+    // Other fields like paymentId, pinVerified, metadata, reference should be present
+    // if your API returns them and lib/mockData.ts Transaction type includes them.
+  }));
 };
+// VVVV END MODIFICATION VVVV
 
-// <<<< ADD API FUNCTION TO FETCH ACCOUNTS (Minimal Change) >>>>
 const fetchAccounts = async (): Promise<Account[]> => {
-  const response = await fetch("/api/accounts"); // Assuming this endpoint exists
+  const response = await fetch("/api/accounts");
   if (!response.ok) {
     throw new Error(
       `Failed to fetch accounts: ${response.status} ${response.statusText}`
@@ -56,8 +65,6 @@ const fetchAccounts = async (): Promise<Account[]> => {
   return response.json();
 };
 
-
-// --- Mutation API functions (approveMerchant, rejectMerchant, etc.) - Kept as in your original ---
 const approveMerchant = async (id: string): Promise<Merchant> => {
   const response = await fetch(`/api/merchants/${id}/approve`, {
     method: "PATCH",
@@ -88,7 +95,7 @@ const suspendMerchant = async ({ id, reason }: { id: string; reason?: string; })
 };
 
 const reactivateMerchant = async (id: string): Promise<Merchant> => {
-  const response = await fetch(`/api/merchants/${id}/reactivate`, { // Corrected from /reactive
+  const response = await fetch(`/api/merchants/${id}/reactivate`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
   });
@@ -96,9 +103,8 @@ const reactivateMerchant = async (id: string): Promise<Merchant> => {
   return response.json();
 };
 
-// Your original MerchantsPage component structure
 function MerchantsPage() {
-  const queryClientHook = useQueryClient(); // Use the hook as you had it
+  const queryClientHook = useQueryClient();
   const [error, setError] = useState<string | null>(null); 
   const [closeModalCallback, setCloseModalCallback] = useState<(() => void) | null>(null);
 
@@ -106,55 +112,49 @@ function MerchantsPage() {
     data: merchants = [],
     isLoading: merchantsLoading,
     error: merchantsError,
-  } = useQuery<Merchant[], Error>({ // Added explicit typing for better safety
+  } = useQuery<Merchant[], Error>({
     queryKey: ["merchants"],
     queryFn: fetchMerchants,
   });
 
+  // useQuery now expects fetchTransactions to return Transaction[] with Date objects
   const { 
     data: transactions = [], 
     isLoading: transactionsLoading,
-    error: transactionsError, // Add error handling for transactions
-  } = useQuery<Transaction[], Error>({ // Added explicit typing
+    error: transactionsError,
+  } = useQuery<Transaction[], Error>({ 
     queryKey: ["transactions"],
-    queryFn: fetchTransactions,
+    queryFn: fetchTransactions, // This function now transforms dates
   });
 
-  // <<<< ADD useQuery TO FETCH ACCOUNTS (Minimal Change) >>>>
   const { 
     data: accounts = [], 
-    isLoading: accountsLoading, // New loading state
-    error: accountsError,       // New error state
-  } = useQuery<Account[], Error>({ // Added explicit typing
+    isLoading: accountsLoading,
+    error: accountsError,
+  } = useQuery<Account[], Error>({
     queryKey: ["accounts"],
     queryFn: fetchAccounts,
   });
 
-  // --- Mutations (approveMutation, rejectMutation, etc.) - Kept as in your original ---
-  const approveMutation = useMutation({ mutationFn: approveMerchant, onSuccess: () => { queryClientHook.invalidateQueries({ queryKey: ["merchants"] }); if (closeModalCallback) { closeModalCallback(); setCloseModalCallback(null); }}, onError: () => { if (closeModalCallback) { closeModalCallback(); setCloseModalCallback(null); } /* Consider toast.error here */ }});
-  const rejectMutation = useMutation({ mutationFn: rejectMerchant, onSuccess: () => { queryClientHook.invalidateQueries({ queryKey: ["merchants"] }); if (closeModalCallback) { closeModalCallback(); setCloseModalCallback(null); }}, onError: () => { if (closeModalCallback) { closeModalCallback(); setCloseModalCallback(null); } /* Consider toast.error here */ }});
-  const suspendMutation = useMutation({ mutationFn: suspendMerchant, onSuccess: () => { queryClientHook.invalidateQueries({ queryKey: ["merchants"] }); if (closeModalCallback) { closeModalCallback(); setCloseModalCallback(null); }}, onError: () => { if (closeModalCallback) { closeModalCallback(); setCloseModalCallback(null); } /* Consider toast.error here */ }});
-  const reactivateMutation = useMutation({ mutationFn: reactivateMerchant, onSuccess: () => { queryClientHook.invalidateQueries({ queryKey: ["merchants"] }); if (closeModalCallback) { closeModalCallback(); setCloseModalCallback(null); }}, onError: () => { if (closeModalCallback) { closeModalCallback(); setCloseModalCallback(null); } /* Consider toast.error here */ }});
+  const approveMutation = useMutation({ mutationFn: approveMerchant, onSuccess: () => { queryClientHook.invalidateQueries({ queryKey: ["merchants"] }); if (closeModalCallback) { closeModalCallback(); setCloseModalCallback(null); }}, onError: () => { if (closeModalCallback) { closeModalCallback(); setCloseModalCallback(null); } }});
+  const rejectMutation = useMutation({ mutationFn: rejectMerchant, onSuccess: () => { queryClientHook.invalidateQueries({ queryKey: ["merchants"] }); if (closeModalCallback) { closeModalCallback(); setCloseModalCallback(null); }}, onError: () => { if (closeModalCallback) { closeModalCallback(); setCloseModalCallback(null); } }});
+  const suspendMutation = useMutation({ mutationFn: suspendMerchant, onSuccess: () => { queryClientHook.invalidateQueries({ queryKey: ["merchants"] }); if (closeModalCallback) { closeModalCallback(); setCloseModalCallback(null); }}, onError: () => { if (closeModalCallback) { closeModalCallback(); setCloseModalCallback(null); } }});
+  const reactivateMutation = useMutation({ mutationFn: reactivateMerchant, onSuccess: () => { queryClientHook.invalidateQueries({ queryKey: ["merchants"] }); if (closeModalCallback) { closeModalCallback(); setCloseModalCallback(null); }}, onError: () => { if (closeModalCallback) { closeModalCallback(); setCloseModalCallback(null); } }});
 
-  // Custom handler for merchant updates - Kept as in your original
   const handleMerchantsUpdate = (updatedMerchants: Merchant[]) => {
     queryClientHook.setQueryData(["merchants"], updatedMerchants);
   };
 
-  // logAdminActivity - Kept as in your original
   const logAdminActivity = ( action: string, targetType?: string, targetId?: string, details?: string ) => {
     console.log(`Admin activity logged (client-side): ${action}`, { targetType, targetId, details });
   };
 
-  // --- Mutation Handlers (handleApproveMerchant, etc.) - Kept as in your original ---
   const handleApproveMerchant = (id: string, closeModal?: () => void) => { if (closeModal) setCloseModalCallback(() => closeModal); approveMutation.mutate(id); };
   const handleRejectMerchant = (id: string, reason?: string, closeModal?: () => void) => { if (closeModal) setCloseModalCallback(() => closeModal); rejectMutation.mutate({ id, declineReason: reason }); };
   const handleSuspendMerchant = (id: string, reason?: string, closeModal?: () => void) => { if (closeModal) setCloseModalCallback(() => closeModal); suspendMutation.mutate({ id, reason }); };
   const handleReactivateMerchant = (id: string, closeModal?: () => void) => { if (closeModal) setCloseModalCallback(() => closeModal); reactivateMutation.mutate(id); };
 
-  // Show error if any query fails - Updated to include accountsError
   const queryError = merchantsError || transactionsError || accountsError; 
-  // Your local 'error' state is separate, you might want to combine or handle separately
   if (queryError || error) { 
     return (
       <div className="container mx-auto p-4">
@@ -165,18 +165,16 @@ function MerchantsPage() {
     );
   }
 
-  // Updated combined loading state
   const combinedLoadingState = merchantsLoading || transactionsLoading || accountsLoading;
 
   return (
     <div className="container mx-auto p-4">
       <MerchantsTab
         merchants={merchants}
-        transactions={transactions}
-        accounts={accounts} // <<<< PASSING accounts HERE (Minimal Change)
+        transactions={transactions} // These transactions now have Date objects for timestamps
+        accounts={accounts} 
         onMerchantsUpdate={handleMerchantsUpdate}
         logAdminActivity={logAdminActivity}
-        // Use combined loading state or individual ones if MerchantsTab is updated to handle them
         merchantsLoading={combinedLoadingState} 
         
         approveMerchant={handleApproveMerchant}
