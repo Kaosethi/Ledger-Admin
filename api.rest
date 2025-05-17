@@ -103,9 +103,22 @@ Authorization: {{merchantToken}}
 
 {
     "amount": 50.75,
-    "beneficiaryDisplayId": "STC-2025-DWB7",
+    "beneficiaryDisplayId": "STC-2025-685V",
     "enteredPin": "1111", 
     "description": "Payment for goods - PIN Correct"
+}
+
+### Create Transaction - Successful Case (Amount Equals Balance)
+# Beneficiary: Active, Has PIN "1111", Balance = 25.00
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+Authorization: {{merchantToken}}
+
+{
+    "amount": 25.00, 
+    "beneficiaryDisplayId": "STC-2025-C5XU",
+    "enteredPin": "1111", 
+    "description": "Payment for goods - amount equals balance"
 }
 
 ### Create Transaction - Incorrect PIN (Server-Side Verification)
@@ -116,7 +129,7 @@ Authorization: {{merchantToken}}
 
 {
   "amount": 10.00,
-  "beneficiaryDisplayId": "STC-2025-DWB7",
+  "beneficiaryDisplayId": "STC-2025-685V",
   "enteredPin": "0000",
   "description": "Test incorrect PIN (server-side)"
 }
@@ -129,10 +142,24 @@ Authorization: {{merchantToken}}
 
 {
   "amount": 15.50,
-  "beneficiaryDisplayId": "STC-2025-DWB7",
+  "beneficiaryDisplayId": "STC-2025-685V",
   "enteredPin": "9876",
   "clientReportedPinFailureType": "MAX_ATTEMPTS_REACHED",
   "description": "Test client-reported PIN lockout"
+}
+
+### Create Transaction - Client-Reported Max PIN, Beneficiary Also Insufficient Funds
+# The client lockout should be the primary reason.
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+Authorization: {{merchantToken}}
+
+{
+  "amount": 1000.00, 
+  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_ID_LOW_FUNDS_PIN_1111", // User with low funds
+  "enteredPin": "9876",
+  "clientReportedPinFailureType": "MAX_ATTEMPTS_REACHED",
+  "description": "Test client lockout, beneficiary also low funds"
 }
 
 ### Create Transaction - Beneficiary Account Has No PIN Set Up
@@ -143,22 +170,48 @@ Authorization: {{merchantToken}}
 
 {
   "amount": 5.00,
-  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_DISPLAY_ID_NO_PIN",
-  "enteredPin": "1234", # PIN sent, but no hashedPin to compare against
+  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_ID_NO_PIN",
+  "enteredPin": "1234", 
   "description": "Test beneficiary no PIN set"
 }
 
-### Create Transaction - Correct PIN, but Beneficiary Not Active
-# Beneficiary: Has PIN "1111", but status is 'Inactive' or 'Suspended'.
+### Create Transaction - Correct PIN, but Beneficiary Not Active (Inactive)
+# Beneficiary: Has PIN "1111", but status is 'Inactive'.
 POST {{baseUrl}}/merchant-app/transactions
 Content-Type: {{contentType}}
 Authorization: {{merchantToken}}
 
 {
   "amount": 20.00,
-  "beneficiaryDisplayId": "STC-2025-QAD9",
+  "beneficiaryDisplayId": "STC-2025-QAD9", // Replace with user, PIN "1111", status 'Inactive'
   "enteredPin": "1111",
-  "description": "Test correct PIN, beneficiary not active"
+  "description": "Test correct PIN, beneficiary inactive"
+}
+
+### Create Transaction - Correct PIN, but Beneficiary Suspended
+# Beneficiary: Has PIN "1111", but status is 'Suspended'.
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+Authorization: {{merchantToken}}
+
+{
+  "amount": 20.00,
+  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_ID_SUSPENDED_PIN_1111",
+  "enteredPin": "1111",
+  "description": "Test correct PIN, beneficiary suspended"
+}
+
+### Create Transaction - Correct PIN, but Beneficiary Pending
+# Beneficiary: Has PIN "1111", but status is 'Pending'.
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+Authorization: {{merchantToken}}
+
+{
+  "amount": 20.00,
+  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_ID_PENDING_PIN_1111",
+  "enteredPin": "1111",
+  "description": "Test correct PIN, beneficiary pending"
 }
 
 ### Create Transaction - Correct PIN, but Insufficient Funds
@@ -169,9 +222,22 @@ Authorization: {{merchantToken}}
 
 {
   "amount": 100.00,
-  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_DISPLAY_ID_LOW_FUNDS_HAS_PIN",
-  "enteredPin": "1111", # Correct PIN
+  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_ID_LOW_FUNDS_PIN_1111", // User with PIN "1111", low balance
+  "enteredPin": "1111",
   "description": "Test correct PIN, insufficient funds"
+}
+
+### Create Transaction - Correct PIN, Insufficient Funds (Zero Balance trying small amount)
+# Beneficiary: Active, Has PIN "1111", balance is 0.00
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+Authorization: {{merchantToken}}
+
+{
+  "amount": 0.01,
+  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_ID_ZERO_BALANCE_PIN_1111", // User with PIN "1111", zero balance
+  "enteredPin": "1111", 
+  "description": "Test correct PIN, zero balance, tiny amount"
 }
 
 ### Create Transaction - Beneficiary Not Found
@@ -181,81 +247,90 @@ Authorization: {{merchantToken}}
 
 {
   "amount": 10.00,
-  "beneficiaryDisplayId": "ID_THAT_DOES_NOT_EXIST_AT_ALL",
+  "beneficiaryDisplayId": "ID_DOES_NOT_EXIST_XYZ123",
   "enteredPin": "1234",
   "description": "Test non-existent beneficiary"
 }
 
-### Create Transaction - Invalid Amount (Zero)
+### Create Transaction - Invalid Amount (Zero) - Zod Validation
 POST {{baseUrl}}/merchant-app/transactions
 Content-Type: {{contentType}}
 Authorization: {{merchantToken}}
 
 {
   "amount": 0,
-  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_DISPLAY_ID_ACTIVE_PIN_FUNDS",
+  "beneficiaryDisplayId": "STC-2025-DWB7",
   "enteredPin": "1234",
   "description": "Test zero amount"
 }
 
-### Create Transaction - Invalid Amount (Negative)
+### Create Transaction - Invalid Amount (Negative) - Zod Validation
 POST {{baseUrl}}/merchant-app/transactions
 Content-Type: {{contentType}}
 Authorization: {{merchantToken}}
 
 {
   "amount": -10.00,
-  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_DISPLAY_ID_ACTIVE_PIN_FUNDS",
+  "beneficiaryDisplayId": "STC-2025-DWB7",
   "enteredPin": "1234",
   "description": "Test negative amount"
 }
 
-### Create Transaction - Missing `enteredPin` (Zod Validation)
+### Create Transaction - Missing `enteredPin` - Zod Validation
 POST {{baseUrl}}/merchant-app/transactions
 Content-Type: {{contentType}}
 Authorization: {{merchantToken}}
 
 {
   "amount": 5.00,
-  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_DISPLAY_ID_ACTIVE_PIN_FUNDS"
-  // "enteredPin" is missing
-  // "description": "Test missing enteredPin" // Description is optional
+  "beneficiaryDisplayId": "STC-2025-DWB7"
 }
 
-### Create Transaction - `enteredPin` Not 4 Digits (Zod Validation)
+### Create Transaction - `enteredPin` Not 4 Digits - Zod Validation
 POST {{baseUrl}}/merchant-app/transactions
 Content-Type: {{contentType}}
 Authorization: {{merchantToken}}
 
 {
   "amount": 5.00,
-  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_DISPLAY_ID_ACTIVE_PIN_FUNDS",
-  "enteredPin": "123" // Too short
+  "beneficiaryDisplayId": "STC-2025-DWB7",
+  "enteredPin": "123" 
 }
 
-### Create Transaction - `enteredPin` Contains Non-Digits (Zod Validation)
+### Create Transaction - `enteredPin` Contains Non-Digits - Zod Validation
 POST {{baseUrl}}/merchant-app/transactions
 Content-Type: {{contentType}}
 Authorization: {{merchantToken}}
 
 {
   "amount": 5.00,
-  "beneficiaryDisplayId": "STC-2025-QAD9",
-  "enteredPin": "12a3" // Contains non-digit
+  "beneficiaryDisplayId": "STC-2025-DWB7",
+  "enteredPin": "12a3" 
 }
 
-### Create Transaction - Missing `amount` (Zod Validation)
+### Create Transaction - `enteredPin` with Spaces (Check Zod/Trim Behavior)
+# Expect Zod to fail if not trimmed, or PIN verification to fail if trimmed spaces reach it.
 POST {{baseUrl}}/merchant-app/transactions
 Content-Type: {{contentType}}
 Authorization: {{merchantToken}}
 
 {
-  // "amount" is missing
-  "beneficiaryDisplayId": "STC-2025-QAD9",
+  "amount": 5.00,
+  "beneficiaryDisplayId": "STC-2025-DWB7",
+  "enteredPin": " 1111 " 
+}
+
+### Create Transaction - Missing `amount` - Zod Validation
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+Authorization: {{merchantToken}}
+
+{
+  "beneficiaryDisplayId": "STC-2025-DWB7",
   "enteredPin": "1234"
 }
 
-### Create Transaction - Missing `beneficiaryDisplayId` (Zod Validation)
+### Create Transaction - Missing `beneficiaryDisplayId` - Zod Validation
 POST {{baseUrl}}/merchant-app/transactions
 Content-Type: {{contentType}}
 Authorization: {{merchantToken}}
@@ -263,18 +338,93 @@ Authorization: {{merchantToken}}
 {
   "amount": 5.00,
   "enteredPin": "1234"
-  // "beneficiaryDisplayId" is missing
+}
+
+### Create Transaction - Max Length Description
+# Adjust the description length to match your database column limit.
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+Authorization: {{merchantToken}}
+
+{
+    "amount": 5.00,
+    "beneficiaryDisplayId": "STC-2025-DWB7",
+    "enteredPin": "1111", 
+    "description": "This_is_a_very_long_description_designed_to_test_the_maximum_allowed_length_of_the_description_field_in_the_transactions_table_to_ensure_that_it_handles_long_strings_correctly_without_truncation_or_errors_if_this_string_is_too_long_for_the_database_column_it_should_either_be_truncated_by_drizzle_or_the_database_or_preferably_validated_by_zod_before_insertion_add_more_characters_here_to_reach_your_limit_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+}
+
+### Create Transaction - Empty Description String
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+Authorization: {{merchantToken}}
+
+{
+    "amount": 5.00,
+    "beneficiaryDisplayId": "STC-2025-DWB7",
+    "enteredPin": "1111", 
+    "description": "" 
+}
+
+### Create Transaction - BeneficiaryDisplayId Case Sensitivity
+# Assuming 'STC-2025-DWB7' exists, test if 'stc-2025-dwb7' also works.
+# This depends on your DB collation and query (eq vs ilike/lower).
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+Authorization: {{merchantToken}}
+
+{
+    "amount": 50.75,
+    "beneficiaryDisplayId": "stc-2025-dwb7", 
+    "enteredPin": "1111", 
+    "description": "Test case sensitivity of beneficiaryDisplayId"
 }
 
 ### Create Transaction - Invalid Token (Authorization Failure)
 POST {{baseUrl}}/merchant-app/transactions
 Content-Type: {{contentType}}
-Authorization: Bearer an.invalid.or.expired.token.here
+Authorization: Bearer an.invalid.or.expired.or.simply.fake.token.here.abcdefg
 
 {
   "amount": 15.00,
-  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_DISPLAY_ID_ACTIVE_PIN_FUNDS",
+  "beneficiaryDisplayId": "STC-2025-DWB7",
   "enteredPin": "1234",
   "description": "Test invalid token"
 }
+
+### Create Transaction - No Authorization Header
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+# Authorization header is missing
+
+{
+  "amount": 15.00,
+  "beneficiaryDisplayId": "STC-2025-DWB7",
+  "enteredPin": "1234",
+  "description": "Test no authorization header"
+}
+
+### Create Transaction - Malformed Authorization Header (No Bearer)
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+Authorization: {{merchantToken}} # Missing "Bearer " prefix
+
+{
+  "amount": 15.00,
+  "beneficiaryDisplayId": "STC-2025-DWB7",
+  "enteredPin": "1234",
+  "description": "Test malformed auth header (no Bearer)"
+}
+
+### Create Transaction - Malformed Authorization Header (Bearer but no token)
+POST {{baseUrl}}/merchant-app/transactions
+Content-Type: {{contentType}}
+Authorization: Bearer 
+
+{
+  "amount": 15.00,
+  "beneficiaryDisplayId": "STC-2025-DWB7",
+  "enteredPin": "1234",
+  "description": "Test malformed auth header (Bearer but no token)"
+}
+
 
