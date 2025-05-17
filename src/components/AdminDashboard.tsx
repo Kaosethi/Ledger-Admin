@@ -83,28 +83,31 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   );
 
   const logAdminActivity = useCallback(
-    (
-      action: string,
-      targetType: string = "System",
-      targetId: string = "-",
-      details: string = ""
-    ): void => {
-      const newLog: AdminLog = {
-        id: `LOG-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-        timestamp: new Date().toISOString(),
-        adminUsername: adminEmail || "Unknown Admin",
-        action: action,
-        targetId: targetId,
-        targetType: targetType as AdminLog["targetType"],
-        details: details,
-      };
-      setAppData((prevData) => ({
-        ...prevData,
-        adminActivityLog: [newLog, ...prevData.adminActivityLog],
-      }));
-    },
-    [adminEmail]
-  );
+  (
+    action: string,
+    targetType: string = "System",
+    targetId: string = "-",
+    details: string = ""
+  ): void => {
+    const newLog: AdminLog = { // AdminLog now expects timestamp: Date
+      id: `LOG-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      // --- CORRECTED LINE ---
+      timestamp: new Date(), // Assign the Date object directly
+      // --- END CORRECTION ---
+      adminUsername: adminEmail || "Unknown Admin",
+      action: action,
+      targetId: targetId,
+      targetType: targetType as AdminLog["targetType"], // Ensure AdminLog["targetType"] is defined correctly
+      details: details,
+    };
+    setAppData((prevData) => ({
+      ...prevData,
+      adminActivityLog: [newLog, ...prevData.adminActivityLog],
+    }));
+  },
+  [adminEmail]
+);
+
 
   const handleLogout = useCallback(() => {
     logAdminActivity("Logout", "System", "-", "Admin logged out.");
