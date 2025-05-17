@@ -27,7 +27,7 @@
     },
 
     // Other
-    "incremental": true, // Enable incremental compilation
+    "incremental": true, // Enable incremental compilations
     "plugins": [
       {
         "name": "next"
