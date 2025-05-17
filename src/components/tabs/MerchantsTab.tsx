@@ -200,23 +200,32 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
     }
   };
 
-  const getConfirmModalProps = () => {
-    const { actionType, merchant, reason } = confirmActionDetails;
+   const getConfirmModalProps = () => {
+    const { actionType, merchant, reason } = confirmActionDetails; 
     if (!actionType || !merchant) return null;
     const merchantName = merchant.businessName;
 
-    let message: React.ReactNode;
+    let message: React.ReactNode; 
 
     switch (actionType) {
       case "approve":
+        // No quotes used around merchantName, so no " needed.
         message = <>Approve application for <strong>{merchantName}</strong>?</>;
-        return { title: "Confirm Approval", message, confirmButtonText: approvalLoading ? "Approving..." : "Approve", confirmButtonVariant: "success" as const, isLoading: approvalLoading };
+        return { 
+            title: "Confirm Approval", 
+            message: message,
+            confirmButtonText: approvalLoading ? "Approving..." : "Approve", 
+            confirmButtonVariant: "success" as const, 
+            isLoading: approvalLoading 
+        };
       
       case "reject":
         if (reason) {
             message = (
                 <>
+                    {/* Line 219 area based on new error */}
                     <p>Reject application for <strong>"{merchantName}"</strong> with reason:</p>
+                    {/* Line 220 area based on new error */}
                     <p className="mt-1 text-sm italic text-gray-600">"{reason}"</p>
                     <p className="mt-2 font-semibold text-red-700">This action may have significant consequences.</p>
                 </>
@@ -224,33 +233,57 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
         } else {
             message = (
                 <>
+                    {/* Line 227 area based on new error */}
                     <p>Reject application for <strong>"{merchantName}"</strong>?</p>
                     <p className="mt-1 text-sm text-yellow-600">Note: No specific reason was provided for this rejection.</p>
                     <p className="mt-2 font-semibold text-red-700">This action may have significant consequences.</p>
                 </>
             );
         }
-        return { title: "Confirm Rejection", message, confirmButtonText: rejectionLoading ? "Rejecting..." : "Confirm Rejection", confirmButtonVariant: "danger" as const, isLoading: rejectionLoading };
+        return { 
+            title: "Confirm Rejection", 
+            message: message, 
+            confirmButtonText: rejectionLoading ? "Rejecting..." : "Confirm Rejection", 
+            confirmButtonVariant: "danger" as const, 
+            isLoading: rejectionLoading 
+        };
       
       case "suspend":
         if (reason) {
              message = (
                 <>
+                    {/* Line 239 area based on new error */}
                     <p>Suspend merchant <strong>"{merchantName}"</strong> with reason:</p>
+                    {/* Line 240 area based on new error */}
                     <p className="mt-1 text-sm italic text-gray-600">"{reason}"</p>
                 </>
             );
         } else {
+            // No quotes used around merchantName, so no " needed.
             message = <>Suspend merchant <strong>{merchantName}</strong>?</>;
         }
-        return { title: "Confirm Suspension", message, confirmButtonText: suspensionLoading ? "Suspending..." : "Suspend", confirmButtonVariant: "danger" as const, isLoading: suspensionLoading };
+        return { 
+            title: "Confirm Suspension", 
+            message: message, 
+            confirmButtonText: suspensionLoading ? "Suspending..." : "Suspend", 
+            confirmButtonVariant: "danger" as const, 
+            isLoading: suspensionLoading 
+        };
       
       case "reactivate":
+        // No quotes used around merchantName, so no " needed.
         message = <>Reactivate merchant <strong>{merchantName}</strong>?</>;
-        return { title: "Confirm Reactivation", message, confirmButtonText: reactivationLoading ? "Reactivating..." : "Reactivate", confirmButtonVariant: "success" as const, isLoading: reactivationLoading };
+        return { 
+            title: "Confirm Reactivation", 
+            message: message,
+            confirmButtonText: reactivationLoading ? "Reactivating..." : "Reactivate", 
+            confirmButtonVariant: "success" as const, 
+            isLoading: reactivationLoading 
+        };
       
       default: 
-        const _exhaustiveCheck: never = actionType; // Should not be reached
+        const _exhaustiveCheck: never = actionType;
+        console.warn("Unhandled actionType in getConfirmModalProps:", _exhaustiveCheck);
         return null;
     }
   };
