@@ -1,17 +1,13 @@
 // src/components/modals/TransactionDetailModal.tsx
-// REFINED: UI using shadcn/ui Dialog components and Tailwind CSS for better presentation.
-// FIXED: Ensure amount uses formatCurrency with Math.abs() and defaults to THB/฿.
-// ADDED: Use renderStatusBadge utility for consistent status display.
-// FIXED: Removed incorrect import and type assertion for TransactionStatus.
-
 import React from "react";
-import type { Transaction } from "@/lib/mockData";
-// REMOVED: Incorrect import for TransactionStatus
+// This MUST be the "rich" Transaction type from lib/mockData.ts
+// which includes paymentId, and Date objects for timestamps, string for amount.
+import type { Transaction, Account, Merchant } from "@/lib/mockData"; 
 import {
   formatCurrency,
-  formatDdMmYyyy,
-  formatTime,
-  renderStatusBadge, // ADDED: Import renderStatusBadge
+  formatDateTime, // Using this for Date & Time
+  renderStatusBadge,
+  tuncateUUID, // Using your specified spelling
 } from "@/lib/utils";
 import {
   Dialog,
@@ -19,117 +15,107 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogClose, // ADDED: For the close button
-} from "@/components/ui/dialog"; // ADDED: Shadcn Dialog components
-import { Button } from "@/components/ui/button"; // ADDED: Shadcn Button
+  DialogClose,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 interface TransactionDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   transaction: Transaction | null;
+  // Optional: Pass looked-up account and merchant if readily available
+  // This avoids needing to pass the whole arrays or do lookups inside the modal
+  account?: Account | null; 
+  merchant?: Merchant | null;
 }
+
+// Helper for rendering detail items consistently
+const DetailItem: React.FC<{ label: string; value?: string | React.ReactNode; valueClassName?: string; fullWidthValue?: boolean }> = ({
+  label,
+  value,
+  valueClassName = "text-gray-900",
+  fullWidthValue = false,
+}) => (
+  <>
+    <dt className="font-medium text-gray-500">{label}</dt>
+    <dd className={`mt-1 ${fullWidthValue ? 'sm:col-span-2' : 'sm:col-span-1'} ${valueClassName} break-words`}>
+      {value === undefined || value === null || value === "" ? "N/A" : value}
+    </dd>
+  </>
+);
+
 
 const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
   isOpen,
   onClose,
   transaction,
+  account,  // Consuming optional looked-up account
+  merchant, // Consuming optional looked-up merchant
 }) => {
-  // Handle modal visibility using the Dialog's 'open' prop controlled by 'isOpen'
-  if (!transaction) return null; // Don't render if no transaction
+  if (!isOpen || !transaction) return null;
 
-  // Use merchantId directly if available
-  const merchantDisplay = transaction.merchantId || "N/A";
+  const { date, time } = formatDateTime(transaction.timestamp); // tx.timestamp is Date
+  const amountValue = parseFloat(transaction.amount); // tx.amount is string
+
+  const showDeclineReason = 
+    (transaction.status === "Failed" || transaction.status === "Declined") && 
+    transaction.declineReason;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-lg bg-white p-0">
+      <DialogContent className="sm:max-w-xl bg-white p-0"> {/* Increased max-width slightly */}
         <DialogHeader className="p-6 pb-4 border-b">
           <DialogTitle className="text-lg font-semibold text-gray-900">
             Transaction Details
           </DialogTitle>
-          {/* Optional: Add DialogDescription here if needed */}
-          {/* <DialogDescription>Details for transaction {transaction.id}</DialogDescription> */}
         </DialogHeader>
 
-        {/* Body Content - Use dl for semantic key-value pairs */}
-        <div className="p-6 space-y-4 text-sm">
-          <dl className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-3">
-            {/* Date */}
-            <dt className="font-medium text-gray-500">Date</dt>
-            <dd className="sm:col-span-2 text-gray-900">
-              {formatDdMmYyyy(transaction.timestamp)}
-            </dd>
+        <div className="p-6 text-sm max-h-[70vh] overflow-y-auto"> {/* Added max-height and scroll */}
+          {/* Section 1: Overview */}
+          <div className="mb-4">
+            <h4 className="text-md font-semibold text-gray-700 mb-2 border-b pb-1">Overview</h4>
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+              <DetailItem label="Payment ID:" value={tuncateUUID(transaction.paymentId)} valueClassName="font-mono"/>
+              <DetailItem label="Date & Time:" value={`${date} ${time}`} />
+              <DetailItem label="Status:" value={renderStatusBadge(transaction.status, "transaction")} />
+              <DetailItem label="Type:" value={transaction.type} />
+              <DetailItem label="Amount:" value={`THB ${formatCurrency(Math.abs(amountValue))}`} valueClassName="font-semibold"/>
+            </dl>
+          </div>
 
-            {/* Time */}
-            <dt className="font-medium text-gray-500">Time</dt>
-            <dd className="sm:col-span-2 text-gray-900">
-              {formatTime(transaction.timestamp)}
-            </dd>
+          {/* Section 2: Parties */}
+          <div className="mb-4">
+            <h4 className="text-md font-semibold text-gray-700 mb-2 border-b pb-1">Parties Involved</h4>
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+              <DetailItem label="Account Name:" value={account?.childName} />
+              <DetailItem label="Account ID:" value={account?.displayId || (transaction.accountId ? tuncateUUID(transaction.accountId) : undefined)} valueClassName="font-mono"/>
+              <DetailItem label="Merchant Name:" value={merchant?.businessName} />
+              <DetailItem label="Merchant ID:" value={transaction.merchantId ? tuncateUUID(transaction.merchantId) : undefined} valueClassName="font-mono"/>
+            </dl>
+          </div>
+          
+          {/* Section 3: Details */}
+          <div className="mb-4">
+            <h4 className="text-md font-semibold text-gray-700 mb-2 border-b pb-1">Details</h4>
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+              {/* Description will now hold the category */}
+              <DetailItem label="Category/Purpose:" value={transaction.description} fullWidthValue={true}/> 
+              <DetailItem label="System Txn ID:" value={tuncateUUID(transaction.id)} valueClassName="font-mono"/>
+            </dl>
+          </div>
 
-            {/* Merchant ID */}
-            <dt className="font-medium text-gray-500">Merchant ID</dt>
-            <dd className="sm:col-span-2 text-gray-900 font-mono">
-              {merchantDisplay}
-            </dd>
-
-            {/* Account ID */}
-            <dt className="font-medium text-gray-500">Account ID</dt>
-            <dd className="sm:col-span-2 text-gray-900 font-mono">
-              {transaction.accountId}
-            </dd>
-
-            {/* Transaction ID */}
-            <dt className="font-medium text-gray-500">Transaction ID</dt>
-            <dd className="sm:col-span-2 text-gray-900 font-mono break-all">
-              {transaction.id}
-            </dd>
-
-            {/* Type */}
-            <dt className="font-medium text-gray-500">Type</dt>
-            <dd className="sm:col-span-2 text-gray-900">{transaction.type}</dd>
-
-            {/* Description */}
-            <dt className="font-medium text-gray-500">Description</dt>
-            <dd className="sm:col-span-2 text-gray-900">
-              {transaction.description || "N/A"}
-            </dd>
-
-            {/* Status */}
-            <dt className="font-medium text-gray-500 self-center">Status</dt>
-            <dd className="sm:col-span-2">
-              {/* Use renderStatusBadge utility */}
-              {/* REMOVED: Incorrect type assertion */}
-              {renderStatusBadge(transaction.status, "transaction")}
-            </dd>
-
-            {/* Amount */}
-<dt className="font-medium text-gray-500">Amount</dt>
-<dd className="sm:col-span-2 text-gray-900 font-semibold text-base">
-  {/* MODIFIED: Parse transaction.amount (string) to a number before Math.abs */}
-  {/* formatCurrency defaults to THB/฿ from utils.ts */}
-  {transaction && typeof transaction.amount === 'string' 
-    ? formatCurrency(Math.abs(parseFloat(transaction.amount))) 
-    : transaction && typeof transaction.amount === 'number' 
-        ? formatCurrency(Math.abs(transaction.amount)) // Fallback if it's somehow still a number
-        : "N/A" /* Fallback for undefined or null amount */
-  }
-</dd>
-
-            {/* Decline Reason (Optional) */}
-            {transaction.declineReason && (
-              <>
-                <dt className="font-medium text-gray-500">Decline Reason</dt>
-                <dd className="sm:col-span-2 text-red-700">
-                  {transaction.declineReason}
-                </dd>
-              </>
-            )}
-          </dl>
+          {/* Conditional Section: Decline Information */}
+          {showDeclineReason && (
+            <div className="mb-4">
+              <h4 className="text-md font-semibold text-red-700 mb-2 border-b border-red-300 pb-1">Decline Information</h4>
+              <dl className="grid grid-cols-1 gap-x-4 gap-y-2"> {/* Single column for decline reason */}
+                <DetailItem label="Decline Reason:" value={transaction.declineReason} valueClassName="text-red-600" fullWidthValue={true}/>
+              </dl>
+            </div>
+          )}
         </div>
 
-        {/* Footer */}
         <DialogFooter className="p-4 border-t bg-gray-50 sm:justify-end">
-          {/* Use DialogClose for accessibility benefits */}
           <DialogClose asChild>
             <Button type="button" variant="outline">
               Close
