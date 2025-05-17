@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { administrators, adminLogs } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { verifyPassword } from "./password";
+import { env } from "../config";
 
 // Define the expected interface for our authentication service
 interface AuthService {
@@ -81,7 +82,7 @@ const authConfig = betterAuth({
   sessionStrategy: "jwt",
   jwt: {
     // Secret key from environment variables
-    secret: process.env.JWT_SECRET || "fallback-secret-should-be-changed",
+    secret: env.JWT_SECRET,
     // Token expiration time (12 hours)
     expiresIn: 60 * 60 * 12,
   },

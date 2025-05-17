@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { withAuth } from "@/lib/auth/middleware";
 import { JWTPayload } from "@/lib/auth/jwt";
+import { env } from "@/lib/config";
 
 // POST /api/qr-sign - Create a signed QR code payload (protected)
 export const POST = withAuth(
@@ -15,7 +16,7 @@ export const POST = withAuth(
     }
     const qrPayload = { type, account, ver };
     const sig = crypto
-      .createHmac("sha256", process.env.JWT_SECRET!)
+      .createHmac("sha256", env.JWT_SECRET)
       .update(JSON.stringify(qrPayload))
       .digest("base64")
       .slice(0, 32);

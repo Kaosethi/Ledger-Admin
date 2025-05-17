@@ -1,4 +1,5 @@
 import * as jose from "jose";
+import { env } from "../config";
 
 // Define the payload structure - make it compatible with jose's JWTPayload
 export interface JWTPayload extends jose.JWTPayload {
@@ -13,7 +14,7 @@ export interface JWTPayload extends jose.JWTPayload {
 // Create a new JWT token
 export async function createJWT(payload: JWTPayload): Promise<string> {
   const secret = new TextEncoder().encode(
-    process.env.JWT_SECRET || "fallback-secret-should-be-changed"
+    env.JWT_SECRET || "fallback-secret-should-be-changed"
   );
 
   const token = await new jose.SignJWT(payload)
@@ -28,9 +29,7 @@ export async function createJWT(payload: JWTPayload): Promise<string> {
 // Verify a JWT token
 export async function verifyJWT(token: string): Promise<JWTPayload | null> {
   try {
-    const secret = new TextEncoder().encode(
-      process.env.JWT_SECRET || "fallback-secret-should-be-changed"
-    );
+    const secret = new TextEncoder().encode(env.JWT_SECRET);
 
     const { payload } = await jose.jwtVerify(token, secret);
 

@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { administrators } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import mockDataInstance, { AdminUser } from "@/lib/mockData";
+import { env } from "@/lib/config";
 
 // Authentication schema for login
 const loginSchema = z.object({
@@ -42,9 +43,6 @@ export async function POST(request: NextRequest) {
     // Bypass authentication for test credentials
     if (email === TEST_EMAIL && password === TEST_PASSWORD) {
       // Create a JWT token for test user
-      const jwtSecret =
-        process.env.JWT_SECRET ||
-        "default-mock-secret-do-not-use-in-production";
       const token = await new SignJWT({
         sub: "test-admin-id",
         email: TEST_EMAIL,
@@ -53,7 +51,7 @@ export async function POST(request: NextRequest) {
         .setProtectedHeader({ alg: "HS256" })
         .setIssuedAt()
         .setExpirationTime("8h")
-        .sign(new TextEncoder().encode(jwtSecret));
+        .sign(new TextEncoder().encode(env.JWT_SECRET));
 
       const response = NextResponse.json({
         message: "Logged in successfully (test user)",
@@ -70,7 +68,7 @@ export async function POST(request: NextRequest) {
         value: token,
         httpOnly: true,
         path: "/",
-        secure: process.env.NODE_ENV === "production",
+        secure: env.NODE_ENV === "production",
         maxAge: 60 * 60 * 8, // 8 hours
       });
 
@@ -140,8 +138,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create a JWT token
-    const jwtSecret =
-      process.env.JWT_SECRET || "default-mock-secret-do-not-use-in-production";
+    const jwtSecret = env.JWT_SECRET;
     const token = await new SignJWT({
       sub: String(admin[0].id),
       email: admin[0].email,
@@ -169,7 +166,7 @@ export async function POST(request: NextRequest) {
       value: token,
       httpOnly: true,
       path: "/",
-      // secure: process.env.NODE_ENV === "production",
+      secure: env.NODE_ENV === "production",
       maxAge: 60 * 60 * 8, // 8 hours
     });
 

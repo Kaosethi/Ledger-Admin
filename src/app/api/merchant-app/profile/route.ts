@@ -4,9 +4,9 @@ import { db } from '@/lib/db'; // MODIFIED: Import Drizzle client
 import { merchants } from '@/lib/db/schema'; // MODIFIED: Import merchants schema
 import { eq } from 'drizzle-orm'; // MODIFIED: Import Drizzle 'eq' operator
 import * as jose from 'jose'; // MODIFIED: Import jose
+import { env } from '@/lib/config';
 
-const JWT_SECRET_STRING = process.env.JWT_SECRET;
-const JWT_ALGORITHM = 'HS256';
+const JWT_ALGORITHM = "HS256";
 
 interface AuthenticatedMerchantPayload extends jose.JWTPayload {
   merchantId: string; // Expect merchantId in the JWT payload
@@ -16,10 +16,10 @@ interface AuthenticatedMerchantPayload extends jose.JWTPayload {
 
 // Helper function to get the secret key as Uint8Array
 function getJwtSecretKey(): Uint8Array {
-  if (!JWT_SECRET_STRING) {
+  if (!env.JWT_SECRET) {
     throw new Error('JWT_SECRET environment variable is not set.');
   }
-  return new TextEncoder().encode(JWT_SECRET_STRING);
+  return new TextEncoder().encode(env.JWT_SECRET);
 }
 
 async function getAuthenticatedMerchantId(request: NextRequest): Promise<string | null> {
