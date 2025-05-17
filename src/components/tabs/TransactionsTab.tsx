@@ -1,7 +1,6 @@
 // src/components/tabs/TransactionsTab.tsx
 "use client";
-import React, { useState, useRef } from "react";
-// THIS IMPORT MUST RESOLVE TO THE "RICH" TRANSACTION TYPE FROM lib/mockData.ts
+import React, { useState } from "react"; // CORRECT
 import type { Transaction, Merchant, Account } from "@/lib/mockData";
 
 import {
@@ -13,22 +12,22 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button"; // For the Details button
+import { Button } from "@/components/ui/button";
 import { 
     formatCurrency, 
-    formatDateTime, // Use this for combined date and time if preferred, or split
+    formatDateTime,
     renderStatusBadge,
     tuncateUUID 
 } from "@/lib/utils";
-import TransactionDetailModal from "../modals/TransactionDetailModal"; // Assuming this is ready for rich data
+import TransactionDetailModal from "../modals/TransactionDetailModal";
 
 interface TransactionsTabProps {
-  transactions: Transaction[]; // EXPECTING RICH TRANSACTION TYPE HERE
+  transactions: Transaction[];    // EXPECTING RICH TRANSACTION TYPE HERE
   merchants: Merchant[];
   accounts: Account[];
   transactionsLoading?: boolean;
-  // For Detail Modal (we'll add state for this later when re-adding filters/details)
-  // onOpenDetailModal: (transaction: Transaction) => void; 
+  accountsLoading?: boolean;     // ADDED to accept from page.tsx
+  merchantsLoading?: boolean;    // ADDED to accept from page.tsx
 }
 
 const TransactionsTab: React.FC<TransactionsTabProps> = ({
@@ -36,9 +35,9 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
   merchants = [],
   accounts = [],
   transactionsLoading = false,
-  // onOpenDetailModal, // Will be used later
+  accountsLoading = false,     // Initialize, though not used for skeletons yet
+  merchantsLoading = false,    // Initialize, though not used for skeletons yet
 }) => {
-  // Minimal state for now, will add filters, pagination, detail modal state later
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedTransactionForDetail, setSelectedTransactionForDetail] = useState<Transaction | null>(null);
 
@@ -49,15 +48,19 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
 
   const handleCloseDetailModal = () => {
     setIsDetailModalOpen(false);
-    setTimeout(() => setSelectedTransactionForDetail(null), 300); // For modal animation
+    setTimeout(() => setSelectedTransactionForDetail(null), 300); 
   };
 
+  // For simplicity, we'll still primarily use transactionsLoading for the main table skeleton.
+  // accountsLoading and merchantsLoading are now available if you want to add more specific
+  // loading indicators later (e.g., a spinner in a cell if merchant name is still loading).
+  const showOverallSkeletons = transactionsLoading; // Could be: transactionsLoading || accountsLoading || merchantsLoading;
 
   return (
     <div className="space-y-6">
       <div className="bg-white p-4 rounded-lg shadow">
         <h2 className="text-xl font-semibold mb-4">Transaction History</h2>
-        {/* Filters will go here later */}
+        {/* Filters and other controls will be re-added here based on the more complete version */}
       </div>
 
       <div className="bg-white p-4 rounded-lg shadow overflow-x-auto">
@@ -77,8 +80,8 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {transactionsLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
+            {showOverallSkeletons ? ( // Using the combined or primary loading state
+              Array.from({ length: 5 }).map((_, i) => ( // Number of skeleton rows
                 <TableRow key={`skeleton-${i}`}>
                   <TableCell><Skeleton className="h-5 w-full" /></TableCell>
                   <TableCell><Skeleton className="h-5 w-full" /></TableCell>
@@ -120,7 +123,7 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
                     <TableCell className="text-center">
                       {renderStatusBadge(tx.status, "transaction")}
                     </TableCell>
-                    {/* This is tx.paymentId from the rich Transaction type */}
+                    {/* This should be tx.paymentId from the rich Transaction type */}
                     <TableCell className="font-mono text-xs" title={tx.paymentId}> 
                       {tuncateUUID(tx.paymentId)}
                     </TableCell>
