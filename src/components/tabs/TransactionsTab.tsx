@@ -19,17 +19,21 @@ import { Skeleton } from "@/components/ui/skeleton"; // For loading state
 import { formatDdMmYyyy, formatTime, formatCurrency, renderStatusBadge } from "@/lib/utils"; // Basic utils
 
 interface TransactionsTabProps {
-  transactions: Transaction[]; // Will be typed with the simpler Transaction for now
-  merchants: Merchant[];     // Not heavily used in this minimal version
-  accounts: Account[];       // Not heavily used in this minimal version
+  transactions: Transaction[];
+  merchants: Merchant[];
+  accounts: Account[];
   transactionsLoading?: boolean;
+  accountsLoading?: boolean; // ADD THIS
+  merchantsLoading?: boolean; // ADD THIS
 }
 
 const TransactionsTab: React.FC<TransactionsTabProps> = ({
   transactions = [],
-  merchants = [], // Included for prop consistency but not used extensively here
-  accounts = [],  // Included for prop consistency but not used extensively here
+  merchants = [],
+  accounts = [],
   transactionsLoading = false,
+  accountsLoading = false, // Add default value
+  merchantsLoading = false, // Add default value
 }) => {
   // No filtering, pagination, or complex state in this minimal version yet
 
