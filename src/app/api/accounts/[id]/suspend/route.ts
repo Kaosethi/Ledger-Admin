@@ -8,6 +8,8 @@ import { JWTPayload } from "@/lib/auth/jwt";
 // PATCH /api/accounts/[id]/suspend - Suspend an account (set status to Suspended)
 export const PATCH = withAuth(
   async (request: NextRequest, context: any, payload: JWTPayload) => {
+    const { id } = await context.params;
+
     try {
       const now = new Date();
 
@@ -20,7 +22,7 @@ export const PATCH = withAuth(
           lastActivity: now,
         })
         .where(
-          and(isNull(accounts.deletedAt), eq(accounts.id, context.params.id))
+          and(isNull(accounts.deletedAt), eq(accounts.id, id))
         )
         .returning();
 
