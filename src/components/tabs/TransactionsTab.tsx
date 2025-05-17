@@ -1,7 +1,7 @@
 // src/components/tabs/TransactionsTab.tsx
 "use client";
-import React, { useState } from "react"; // CORRECT
-import type { Transaction, Merchant, Account } from "@/lib/mockData";
+import React, { useState, useMemo } from "react";
+import type { Transaction, Merchant, Account } from "@/lib/mockData"; // EXPECTING RICH TYPE
 
 import {
   Table,
@@ -13,21 +13,47 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { 
     formatCurrency, 
     formatDateTime,
     renderStatusBadge,
-    tuncateUUID 
+    tuncateUUID,
+    cn // Assuming cn is in your utils
 } from "@/lib/utils";
 import TransactionDetailModal from "../modals/TransactionDetailModal";
+import {
+  DownloadIcon, // We'll add CSV export later
+  ChevronLeftIcon, 
+  ChevronRightIcon,
+  XIcon,
+  CalendarIcon,
+} from "lucide-react";
+import { format as formatDateFns } from "date-fns";
+
+const ITEMS_PER_PAGE = 10; // For pagination later
 
 interface TransactionsTabProps {
-  transactions: Transaction[];    // EXPECTING RICH TRANSACTION TYPE HERE
+  transactions: Transaction[];
   merchants: Merchant[];
   accounts: Account[];
   transactionsLoading?: boolean;
-  accountsLoading?: boolean;     // ADDED to accept from page.tsx
-  merchantsLoading?: boolean;    // ADDED to accept from page.tsx
+  accountsLoading?: boolean;
+  merchantsLoading?: boolean;
 }
 
 const TransactionsTab: React.FC<TransactionsTabProps> = ({
@@ -35,11 +61,90 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
   merchants = [],
   accounts = [],
   transactionsLoading = false,
-  accountsLoading = false,     // Initialize, though not used for skeletons yet
-  merchantsLoading = false,    // Initialize, though not used for skeletons yet
+  // accountsLoading and merchantsLoading are accepted but not used for specific skeletons yet
 }) => {
+  // --- Filter State ---
+  const [fromDate, setFromDate] = useState<Date | undefined>(undefined);
+  const [toDate, setToDate] = useState<Date | undefined>(undefined);
+  const [filterAccountId, setFilterAccountId] = useState<string>("");
+  const [filterMerchantName, setFilterMerchantName] = useState<string>(""); // Filter by name
+  const [filterStatus, setFilterStatus] = useState<string>("all"); // "all" or specific status
+  const [filterPaymentId, setFilterPaymentId] = useState<string>("");
+
+  const [currentPage, setCurrentPage] = useState(1); // For pagination later
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedTransactionForDetail, setSelectedTransactionForDetail] = useState<Transaction | null>(null);
+
+  const clearFilters = () => {
+    setFromDate(undefined);
+    setToDate(undefined);
+    setFilterAccountId("");
+    setFilterMerchantName("");
+    setFilterStatus("all");
+    setFilterPaymentId("");
+    setCurrentPage(1);
+  };
+
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter((tx) => {
+      const txDate = tx.timestamp; // Already a Date object from rich Transaction type
+
+      if (fromDate) {
+        const startOfDayFromDate = new Date(fromDate);
+        startOfDayFromDate.setHours(0, 0, 0, 0);
+        if (txDate < startOfDayFromDate) return false;
+      }
+      if (toDate) {
+        const endOfDayToDate = new Date(toDate);
+        endOfDayToDate.setHours(23, 59, 59, 999);
+        if (txDate > endOfDayToDate) return false;
+      }
+
+      if (filterAccountId.trim() !== "") {
+        const account = accounts.find(acc => acc.id === tx.accountId);
+        if (!account?.displayId.toLowerCase().includes(filterAccountId.trim().toLowerCase()) &&
+            !tx.accountId.toLowerCase().includes(filterAccountId.trim().toLowerCase())) {
+          return false;
+        }
+      }
+
+      if (filterMerchantName.trim() !== "") {
+        const merchant = merchants.find(m => m.id === tx.merchantId);
+        if (!merchant?.businessName.toLowerCase().includes(filterMerchantName.trim().toLowerCase())) {
+          return false;
+        }
+      }
+      
+      if (filterStatus !== "all" && tx.status !== filterStatus) {
+        return false;
+      }
+
+      if (filterPaymentId.trim() !== "" && !tx.paymentId.toLowerCase().includes(filterPaymentId.trim().toLowerCase())) {
+        return false;
+      }
+      
+      return true;
+    });
+  }, [
+    transactions, 
+    fromDate, 
+    toDate, 
+    filterAccountId, 
+    filterMerchantName, 
+    filterStatus, 
+    filterPaymentId, 
+    accounts, 
+    merchants
+  ]);
+
+  // --- Pagination Logic (will be expanded) ---
+  const totalPages = Math.ceil(filteredTransactions.length / ITEMS_PER_PAGE);
+  const transactionsToDisplay = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    return filteredTransactions.slice(startIndex, endIndex);
+  }, [filteredTransactions, currentPage]);
+
 
   const handleViewDetailsClick = (transaction: Transaction) => {
     setSelectedTransactionForDetail(transaction);
@@ -50,19 +155,80 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
     setIsDetailModalOpen(false);
     setTimeout(() => setSelectedTransactionForDetail(null), 300); 
   };
+  
+  const transactionStatuses: Transaction['status'][] = ["Pending", "Completed", "Failed", "Declined"];
 
-  // For simplicity, we'll still primarily use transactionsLoading for the main table skeleton.
-  // accountsLoading and merchantsLoading are now available if you want to add more specific
-  // loading indicators later (e.g., a spinner in a cell if merchant name is still loading).
-  const showOverallSkeletons = transactionsLoading; // Could be: transactionsLoading || accountsLoading || merchantsLoading;
 
   return (
     <div className="space-y-6">
+      {/* Filter Section */}
       <div className="bg-white p-4 rounded-lg shadow">
-        <h2 className="text-xl font-semibold mb-4">Transaction History</h2>
-        {/* Filters and other controls will be re-added here based on the more complete version */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-3 items-end">
+          {/* From Date */}
+          <div>
+            <Label htmlFor="fromDate" className="mb-1 block text-sm font-medium">From Date:</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button id="fromDate" variant={"outline"} className={cn("w-full justify-start text-left font-normal",!fromDate && "text-muted-foreground")}>
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {fromDate ? formatDateFns(fromDate, "dd/MM/yyyy") : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={fromDate} onSelect={setFromDate} initialFocus /></PopoverContent>
+            </Popover>
+          </div>
+          {/* To Date */}
+          <div>
+            <Label htmlFor="toDate" className="mb-1 block text-sm font-medium">To Date:</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button id="toDate" variant={"outline"} className={cn("w-full justify-start text-left font-normal", !toDate && "text-muted-foreground")}>
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {toDate ? formatDateFns(toDate, "dd/MM/yyyy") : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={toDate} onSelect={setToDate} disabled={(date) => fromDate ? date < fromDate : false} initialFocus /></PopoverContent>
+            </Popover>
+          </div>
+          {/* Account ID Filter */}
+          <div>
+            <Label htmlFor="filterAccountId" className="mb-1 block text-sm font-medium">Account ID:</Label>
+            <Input id="filterAccountId" type="text" placeholder="Filter by Account ID" value={filterAccountId} onChange={(e) => setFilterAccountId(e.target.value)} className="w-full"/>
+          </div>
+          {/* Merchant Name Filter */}
+          <div>
+            <Label htmlFor="filterMerchantName" className="mb-1 block text-sm font-medium">Merchant Name:</Label>
+            <Input id="filterMerchantName" type="text" placeholder="Filter by Merchant Name" value={filterMerchantName} onChange={(e) => setFilterMerchantName(e.target.value)} className="w-full"/>
+          </div>
+          {/* Status Filter */}
+          <div>
+            <Label htmlFor="filterStatus" className="mb-1 block text-sm font-medium">Status:</Label>
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger id="filterStatus" className="w-full"><SelectValue placeholder="All Statuses" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                {transactionStatuses.map(status => (
+                    <SelectItem key={status} value={status}>{status}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {/* Payment ID Filter */}
+          <div>
+            <Label htmlFor="filterPaymentId" className="mb-1 block text-sm font-medium">Payment ID:</Label>
+            <Input id="filterPaymentId" type="text" placeholder="Filter by Payment ID" value={filterPaymentId} onChange={(e) => setFilterPaymentId(e.target.value)} className="w-full"/>
+          </div>
+          {/* Action Buttons - spanning across to align better */}
+          <div className="flex space-x-2 items-end pt-2 sm:pt-0 md:col-start-3 lg:col-start-4 lg:col-span-1 justify-end">
+            <Button onClick={clearFilters} variant="outline" className="w-full sm:w-auto">
+              <XIcon className="mr-2 h-4 w-4" /> Clear
+            </Button>
+             {/* CSV Export button will be added back here later */}
+          </div>
+        </div>
       </div>
 
+      {/* Table Section - unchanged from previous working version */}
       <div className="bg-white p-4 rounded-lg shadow overflow-x-auto">
         <Table>
           <TableHeader>
@@ -80,8 +246,8 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {showOverallSkeletons ? ( // Using the combined or primary loading state
-              Array.from({ length: 5 }).map((_, i) => ( // Number of skeleton rows
+            {transactionsLoading ? (
+              Array.from({ length: ITEMS_PER_PAGE }).map((_, i) => (
                 <TableRow key={`skeleton-${i}`}>
                   <TableCell><Skeleton className="h-5 w-full" /></TableCell>
                   <TableCell><Skeleton className="h-5 w-full" /></TableCell>
@@ -95,68 +261,57 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
                   <TableCell><Skeleton className="h-8 w-full" /></TableCell>
                 </TableRow>
               ))
-            ) : transactions && transactions.length > 0 ? (
-              transactions.map((tx) => {
-                // Assuming tx.timestamp is a Date object from the rich Transaction type
+            ) : transactionsToDisplay.length > 0 ? (
+              transactionsToDisplay.map((tx) => {
                 const { date, time } = formatDateTime(tx.timestamp);
                 const account = accounts.find(acc => acc.id === tx.accountId);
                 const merchant = merchants.find(m => m.id === tx.merchantId);
-                // Assuming tx.amount is a string from the rich Transaction type
                 const amountValue = parseFloat(tx.amount);
 
                 return (
                   <TableRow key={tx.id}>
                     <TableCell>{date}</TableCell>
                     <TableCell>{time}</TableCell>
-                    <TableCell title={account?.id || ""}>
-                      {account?.displayId || (tx.accountId ? tuncateUUID(tx.accountId) : "N/A")}
-                    </TableCell>
+                    <TableCell title={account?.id || ""}>{account?.displayId || (tx.accountId ? tuncateUUID(tx.accountId) : "N/A")}</TableCell>
                     <TableCell>{account?.childName || "N/A"}</TableCell>
-                    <TableCell title={merchant?.id || ""}>
-                      {tx.merchantId ? tuncateUUID(tx.merchantId) : "N/A"}
-                    </TableCell>
+                    <TableCell title={merchant?.id || ""}>{tx.merchantId ? tuncateUUID(tx.merchantId) : "N/A"}</TableCell>
                     <TableCell>{merchant?.businessName || (tx.merchantId ? "Unknown" : "N/A")}</TableCell>
                     <TableCell className={`text-right font-medium ${tx.type === "Credit" || (tx.type === "Adjustment" && amountValue > 0) ? "text-green-600" : "text-red-600"}`}>
                       {tx.type === "Credit" || (tx.type === "Adjustment" && amountValue > 0) ? "+" : "-"}
                       {formatCurrency(Math.abs(amountValue))}
                     </TableCell>
+                    <TableCell className="text-center">{renderStatusBadge(tx.status, "transaction")}</TableCell>
+                    <TableCell className="font-mono text-xs" title={tx.paymentId}>{tuncateUUID(tx.paymentId)}</TableCell>
                     <TableCell className="text-center">
-                      {renderStatusBadge(tx.status, "transaction")}
-                    </TableCell>
-                    {/* This should be tx.paymentId from the rich Transaction type */}
-                    <TableCell className="font-mono text-xs" title={tx.paymentId}> 
-                      {tuncateUUID(tx.paymentId)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleViewDetailsClick(tx)}
-                      >
-                        Details
-                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => handleViewDetailsClick(tx)}>Details</Button>
                     </TableCell>
                   </TableRow>
                 );
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={10} className="text-center text-gray-500 py-10">
-                  No transactions available.
-                </TableCell>
+                <TableCell colSpan={10} className="text-center text-gray-500 py-10">No transactions found matching your criteria.</TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
-      {/* Pagination will go here later */}
+      
+      {/* Pagination Section - Basic for now */}
+      {totalPages > 1 && !transactionsLoading && (
+        <div className="flex items-center justify-between pt-4">
+          <div className="text-sm text-gray-700">
+            Showing page <strong>{currentPage}</strong> of <strong>{totalPages}</strong>
+          </div>
+          <div className="space-x-2">
+            <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Previous</Button>
+            <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Next</Button>
+          </div>
+        </div>
+      )}
 
       {selectedTransactionForDetail && (
-        <TransactionDetailModal
-            isOpen={isDetailModalOpen}
-            onClose={handleCloseDetailModal}
-            transaction={selectedTransactionForDetail}
-        />
+        <TransactionDetailModal isOpen={isDetailModalOpen} onClose={handleCloseDetailModal} transaction={selectedTransactionForDetail} />
       )}
     </div>
   );
