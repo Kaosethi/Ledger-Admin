@@ -193,17 +193,25 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
     }
   };
   
+// Inside MerchantsTab.tsx
+
   const getConfirmModalProps = () => {
     const { actionType, merchant, reason } = confirmActionDetails; 
     if (!actionType || !merchant) return null;
     const merchantName = merchant.businessName;
 
-    let message: React.ReactNode;
+    let message: React.ReactNode; // To hold the constructed message
 
     switch (actionType) {
       case "approve":
         message = <>Approve application for <strong>{merchantName}</strong>?</>;
-        return { title: "Confirm Approval", message, confirmButtonText: approvalLoading ? "Approving..." : "Approve", confirmButtonVariant: "success" as const, isLoading: approvalLoading };
+        return { 
+            title: "Confirm Approval", 
+            message: message, // Use the constructed message
+            confirmButtonText: approvalLoading ? "Approving..." : "Approve", 
+            confirmButtonVariant: "success" as const, 
+            isLoading: approvalLoading 
+        };
       
       case "reject":
         if (reason) {
@@ -223,30 +231,48 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
                 </>
             );
         }
-        return { title: "Confirm Rejection", message, confirmButtonText: rejectionLoading ? "Rejecting..." : "Confirm Rejection", confirmButtonVariant: "danger" as const, isLoading: rejectionLoading };
+        return { 
+            title: "Confirm Rejection", 
+            message: message, 
+            confirmButtonText: rejectionLoading ? "Rejecting..." : "Confirm Rejection", 
+            confirmButtonVariant: "danger" as const, 
+            isLoading: rejectionLoading 
+        };
       
       case "suspend":
-        // Assuming suspend might also have a reason in the future, prepare for it
-        if (reason) {
+        if (reason) { // If suspend could also take a reason (passed from detail modal)
              message = (
                 <>
-                    <p>Suspend merchant 
-                    <strong>"{merchantName}"</strong> with reason:</p>
+                    <p>Suspend merchant <strong>"{merchantName}"</strong> with reason:</p>
                     <p className="mt-1 text-sm italic text-gray-600">"{reason}"</p>
                 </>
             );
         } else {
             message = <>Suspend merchant <strong>{merchantName}</strong>?</>;
         }
-        return { title: "Confirm Suspension", message, confirmButtonText: suspensionLoading ? "Suspending..." : "Suspend", confirmButtonVariant: "danger" as const, isLoading: suspensionLoading };
+        return { 
+            title: "Confirm Suspension", 
+            message: message, 
+            confirmButtonText: suspensionLoading ? "Suspending..." : "Suspend", 
+            confirmButtonVariant: "danger" as const, 
+            isLoading: suspensionLoading 
+        };
       
       case "reactivate":
         message = <>Reactivate merchant <strong>{merchantName}</strong>?</>;
-        return { title: "Confirm Reactivation", message, confirmButtonText: reactivationLoading ? "Reactivating..." : "Reactivate", confirmButtonVariant: "success" as const, isLoading: reactivationLoading };
+        return { 
+            title: "Confirm Reactivation", 
+            message: message,
+            confirmButtonText: reactivationLoading ? "Reactivating..." : "Reactivate", 
+            confirmButtonVariant: "success" as const, 
+            isLoading: reactivationLoading 
+        };
       
       default: 
-        // Should not be reached due to typed actionType
+        // This should ideally not be reached if actionType is correctly typed
+        // as AllowedMerchantActionForModal which excludes 'deactivate'
         const _exhaustiveCheck: never = actionType;
+        console.warn("Unhandled actionType in getConfirmModalProps:", _exhaustiveCheck);
         return null;
     }
   };
