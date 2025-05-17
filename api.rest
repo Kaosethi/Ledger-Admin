@@ -48,7 +48,7 @@ Content-Type: {{contentType}}
 }
 
 ### Merchant App - Login
-# Use credentials of an ACTIVE merchant. Update @merchantToken above with the response.
+# Use credentials of an ACTIVE merchant. Update @merchantToken
 # @name merchantLogin
 POST {{baseUrl}}/merchant-app/auth/login
 Content-Type: {{contentType}}
