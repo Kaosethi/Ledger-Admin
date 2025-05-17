@@ -39,7 +39,7 @@ const suspendAccountAPI = async (accountId: string): Promise<Account> => {
   return response.json();
 };
 
-const reactivateAccountAPI = async (accountId: string): Promise<Account> => {
+const reactivateAccountAPI = async (accountId: string): Promise<Account> => { 
   const response = await fetch(`/api/accounts/${accountId}/reactivate`, { 
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -376,11 +376,13 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
 
           <div className="md:col-span-2 space-y-3">
             <h4 className="text-md font-semibold text-gray-700 mb-2">Transaction History</h4>
-            <div className="transaction-history-table-container border rounded-md shadow-sm overflow-hidden">
+            {/* MODIFIED: Added w-full, overflow-x-auto to this div, removed overflow-hidden */}
+            <div className="transaction-history-table-container w-full border rounded-md shadow-sm overflow-x-auto">
               {accountTransactionsForDisplay.length === 0 ? (
                 <p className="text-sm text-gray-500 p-4 text-center">No transaction history found for this account.</p>
               ) : (
-                <table className="transaction-history-actual-table min-w-full divide-y divide-gray-200 text-sm">
+                // MODIFIED: Replaced min-w-full with w-full and min-w-[1080px] (or adjust value as needed), added border-collapse
+                <table className="transaction-history-actual-table w-full min-w-[1080px] border-collapse divide-y divide-gray-200 text-sm">
                   <thead className="bg-gray-50 sticky top-0 z-10">
                     <tr>
                       <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Date</th>
@@ -446,20 +448,3 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
 };
 
 export default EditAccountModal;
-
-/*
-  ADD THIS CSS TO YOUR GLOBAL STYLESHEET OR COMPONENT'S CSS MODULE:
-
-  .transaction-history-table-container {
-    width: 100%;
-    overflow-x: auto; // Enables horizontal scrolling if content overflows
-    -webkit-overflow-scrolling: touch; // Smoother scrolling on iOS
-  }
-
-  .transaction-history-actual-table {
-    width: 100%; 
-    min-width: 1080px; // << ADJUST THIS VALUE! Example: 1080px. Based on your columns.
-                      // Sum of typical column widths: Date(100) + Time(80) + MerchName(180) + MerchID(120) + TxnID(120) + Amount(100) + Status(100) + Desc(280) = 1080px
-    border-collapse: collapse;
-  }
-*/
