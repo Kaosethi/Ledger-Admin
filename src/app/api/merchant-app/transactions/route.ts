@@ -143,6 +143,7 @@ export async function POST(request: NextRequest) {
     const { amount, beneficiaryDisplayId, enteredPin, description: reqDescription, clientReportedPinFailureType } = validationResult.data;
 
     paymentId = uuidv4();
+    console.log(`[TX PaymentID: ${paymentId}] PROCESSING STARTED for beneficiary '${beneficiaryDisplayId}', amount: ${amount}.`); // DEBUG Log start
 
     const beneficiaryQueryResult = await db
       .select({
@@ -154,84 +155,92 @@ export async function POST(request: NextRequest) {
       .limit(1);
 
     if (beneficiaryQueryResult.length === 0) {
-      // No DB log here, as beneficiary not found, no transaction attempt to record.
       console.warn(`[TX PaymentID: ${paymentId}] Pre-check: Beneficiary with displayId '${beneficiaryDisplayId}' not found.`);
       throw new BeneficiaryNotFoundError(`Beneficiary account with display ID '${beneficiaryDisplayId}' not found.`);
     }
     const beneficiaryAccount = beneficiaryQueryResult[0];
+    console.log(`[TX PaymentID: ${paymentId}] Beneficiary account found: ID ${beneficiaryAccount.id}, Status ${beneficiaryAccount.status}`); // DEBUG Log
 
     // STEP 1: Handle Client-Reported Max PIN Attempts or Perform Server-Side PIN Verification
     if (clientReportedPinFailureType === PIN_FAILURE_TYPE_MAX_ATTEMPTS) {
-      // DEFINITIVE FAILURE: Client reported max attempts. LOG THIS.
       const reason = "PIN entry locked: Too many incorrect attempts (reported by client).";
       console.warn(`[TX PaymentID: ${paymentId}] Client reported max PIN attempts for beneficiary '${beneficiaryDisplayId}'.`);
+      
+      console.log(`[TX PaymentID: ${paymentId}] >>> ABOUT TO INSERT for MAX_ATTEMPTS_REACHED`); // DEBUG LOG
       await db.insert(transactions).values({
           paymentId: paymentId!, amount: amount.toString(), type: "Debit", accountId: beneficiaryAccount.id, merchantId: merchantId,
           status: "Failed", declineReason: reason, pinVerified: false,
           description: reqDescription || `Payment attempt from ${beneficiaryAccount.childName || beneficiaryDisplayId} to ${merchantBusinessName}`,
           timestamp: new Date(),
       });
+      console.log(`[TX PaymentID: ${paymentId}] <<< INSERTED for MAX_ATTEMPTS_REACHED`); // DEBUG LOG
+
       console.log(`[TX PaymentID: ${paymentId}] Logged FAILED transaction due to client-reported max PIN attempts.`);
       throw new PinEntryLockedError(reason);
     } else {
       // Proceed with server-side PIN verification
       if (!beneficiaryAccount.hashedPin) {
-        // Beneficiary has no PIN set. This is a setup issue.
-        // For cleaner merchant history, DO NOT LOG to transactions table.
-        // Client app should inform merchant "Customer has no PIN".
         const reason = `Beneficiary account '${beneficiaryDisplayId}' does not have a PIN set up.`;
-        console.warn(`[TX PaymentID: ${paymentId}] Pre-check: ${reason}`);
-        // No db.insert(transactions) here for this case.
-        throw new IncorrectPinError(reason); // Or a more specific error like "BeneficiaryPinNotSetError"
+        console.warn(`[TX PaymentID: ${paymentId}] Pre-check: ${reason} (Not logging to DB)`);
+        console.log(`[TX PaymentID: ${paymentId}] >>> NO DB INSERT for 'NO PIN SET' path.`); // DEBUG LOG
+        throw new IncorrectPinError(reason); 
       }
 
+      console.log(`[TX PaymentID: ${paymentId}] Verifying PIN for beneficiary '${beneficiaryDisplayId}'. Entered PIN length: ${enteredPin.length}`); // DEBUG Log
       const isPinValid = await verifyPassword(enteredPin, beneficiaryAccount.hashedPin);
       
       if (!isPinValid) {
-        // Server verified incorrect PIN. DO NOT LOG this individual attempt.
-        // Client will handle retries or report max attempts.
         const reason = `Incorrect PIN provided for beneficiary '${beneficiaryDisplayId}'.`;
         console.warn(`[TX PaymentID: ${paymentId}] Pre-check: ${reason} (Not logging this attempt to DB).`);
+        console.log(`[TX PaymentID: ${paymentId}] >>> IN 'isPinValid === false' BLOCK. NO DB INSERT INTENDED HERE.`); // DEBUG LOG
         throw new IncorrectPinError(reason);
       }
-      // PIN IS VALID if we reach here. `pinVerified` for subsequent logs will be true.
+      console.log(`[TX PaymentID: ${paymentId}] PIN VERIFIED SUCCESSFULLY for beneficiary '${beneficiaryDisplayId}'.`); // DEBUG LOG
     }
 
     // PIN IS CONSIDERED VALID
-    // Proceed with other pre-checks (status, balance) - these failures WILL be logged.
+    console.log(`[TX PaymentID: ${paymentId}] PIN is valid. Proceeding to account status and balance checks.`); // DEBUG Log
 
     if (beneficiaryAccount.status !== 'Active') {
-      // DEFINITIVE FAILURE: PIN was okay, but account inactive. LOG THIS.
       const reason = `Beneficiary account '${beneficiaryDisplayId}' is not active (status: ${beneficiaryAccount.status}).`;
       console.warn(`[TX PaymentID: ${paymentId}] Pre-check: ${reason}`);
+      
+      console.log(`[TX PaymentID: ${paymentId}] >>> ABOUT TO INSERT for INACTIVE ACCOUNT`); // DEBUG LOG
       await db.insert(transactions).values({
           paymentId: paymentId!, amount: amount.toString(), type: "Debit", accountId: beneficiaryAccount.id, merchantId: merchantId,
-          status: "Failed", declineReason: reason, pinVerified: true, // PIN was okay
+          status: "Failed", declineReason: reason, pinVerified: true,
           description: reqDescription || `Payment attempt from ${beneficiaryAccount.childName || beneficiaryDisplayId} to ${merchantBusinessName}`,
           timestamp: new Date(),
       });
+      console.log(`[TX PaymentID: ${paymentId}] <<< INSERTED for INACTIVE ACCOUNT`); // DEBUG LOG
+
       console.log(`[TX PaymentID: ${paymentId}] Logged FAILED transaction due to inactive beneficiary.`);
       throw new BeneficiaryInactiveError(reason);
     }
 
     const beneficiaryBalance = parseFloat(beneficiaryAccount.balance || "0.00");
+    console.log(`[TX PaymentID: ${paymentId}] Beneficiary balance: ${beneficiaryBalance}. Amount to transact: ${amount}.`); // DEBUG Log
     if (beneficiaryBalance < amount) {
-      // DEFINITIVE FAILURE: PIN was okay, but insufficient funds. LOG THIS.
       const reason = `Insufficient funds in beneficiary account '${beneficiaryDisplayId}'. Available: ${beneficiaryBalance}, Required: ${amount}.`;
       console.warn(`[TX PaymentID: ${paymentId}] Pre-check: ${reason}`);
+      
+      console.log(`[TX PaymentID: ${paymentId}] >>> ABOUT TO INSERT for INSUFFICIENT FUNDS`); // DEBUG LOG
       await db.insert(transactions).values({
           paymentId: paymentId!, amount: amount.toString(), type: "Debit", accountId: beneficiaryAccount.id, merchantId: merchantId,
-          status: "Failed", declineReason: reason, pinVerified: true, // PIN was okay
+          status: "Failed", declineReason: reason, pinVerified: true,
           description: reqDescription || `Payment attempt from ${beneficiaryAccount.childName || beneficiaryDisplayId} to ${merchantBusinessName}`,
           timestamp: new Date(),
       });
+      console.log(`[TX PaymentID: ${paymentId}] <<< INSERTED for INSUFFICIENT FUNDS`); // DEBUG LOG
+
       console.log(`[TX PaymentID: ${paymentId}] Logged FAILED transaction due to insufficient funds.`);
       throw new InsufficientFundsError(reason);
     }
 
     // STEP 2: All pre-validations passed. Proceed with the main atomic transaction
+    console.log(`[TX PaymentID: ${paymentId}] All pre-checks passed. Starting DB transaction.`); // DEBUG Log
     const result = await db.transaction(async (tx) => {
-      // ... (rest of the successful transaction logic - no changes here) ...
+      console.log(`[TX PaymentID: ${paymentId}] Inside DB transaction callback.`); // DEBUG Log
       const merchantInternalAcctDetails = await tx
         .select({ id: accounts.id, balance: accounts.balance, status: accounts.status })
         .from(accounts)
@@ -245,28 +254,35 @@ export async function POST(request: NextRequest) {
         throw new MerchantAccountError(errMsg); 
       }
       const merchantLedgerAccount = merchantInternalAcctDetails[0];
+      console.log(`[TX PaymentID: ${paymentId}] Merchant internal account validated. Status: ${merchantLedgerAccount.status}, Balance: ${merchantLedgerAccount.balance}`); // DEBUG Log
       
       const debitDescription = reqDescription || `Payment to ${merchantBusinessName}`;
       const creditDescription = reqDescription || `Payment from ${beneficiaryAccount.childName || beneficiaryDisplayId}`;
 
       const newBeneficiaryBalance = (beneficiaryBalance - amount); 
+      console.log(`[TX PaymentID: ${paymentId}] Updating beneficiary account ${beneficiaryAccount.id} balance from ${beneficiaryBalance} to ${newBeneficiaryBalance.toFixed(2)}.`); // DEBUG Log
       await tx.update(accounts).set({ balance: newBeneficiaryBalance.toFixed(2) }).where(eq(accounts.id, beneficiaryAccount.id));
 
+      console.log(`[TX PaymentID: ${paymentId}] >>> ABOUT TO INSERT DEBIT LEG`); // DEBUG Log
       const [debitLeg] = await tx.insert(transactions).values({
         paymentId: paymentId!, accountId: beneficiaryAccount.id, merchantId: merchantId,
         type: "Debit", amount: amount.toString(), status: "Completed", pinVerified: true,
         description: debitDescription, timestamp: new Date(),
       }).returning();
+      console.log(`[TX PaymentID: ${paymentId}] <<< INSERTED DEBIT LEG. ID: ${debitLeg.id}`); // DEBUG Log
 
       const merchantCurrentBalance = parseFloat(merchantLedgerAccount.balance || "0.00");
       const newMerchantBalance = (merchantCurrentBalance + amount);
+      console.log(`[TX PaymentID: ${paymentId}] Updating merchant account ${merchantInternalAccountId} balance from ${merchantCurrentBalance} to ${newMerchantBalance.toFixed(2)}.`); // DEBUG Log
       await tx.update(accounts).set({ balance: newMerchantBalance.toFixed(2) }).where(eq(accounts.id, merchantInternalAccountId));
         
+      console.log(`[TX PaymentID: ${paymentId}] >>> ABOUT TO INSERT CREDIT LEG`); // DEBUG Log
       const [creditLeg] = await tx.insert(transactions).values({
         paymentId: paymentId!, accountId: merchantInternalAccountId, merchantId: merchantId, 
         type: "Credit", amount: amount.toString(), status: "Completed", pinVerified: true,
         description: creditDescription, timestamp: new Date(),
       }).returning();
+      console.log(`[TX PaymentID: ${paymentId}] <<< INSERTED CREDIT LEG. ID: ${creditLeg.id}`); // DEBUG Log
       
       const [updatedCustomerAccountRes, updatedMerchantAccountRes] = await Promise.all([
           tx.select({ id: accounts.id, balance: accounts.balance }).from(accounts).where(eq(accounts.id, beneficiaryAccount.id)).limit(1),
@@ -286,6 +302,7 @@ export async function POST(request: NextRequest) {
       };
     });
 
+    console.log(`[TX PaymentID: ${paymentId}] DB transaction completed. Preparing successful response.`); // DEBUG Log
     return NextResponse.json({
         message: 'Transaction processed successfully.', paymentId: result.paymentId,
         debitTransaction: result.debitLeg, creditTransaction: result.creditLeg,
@@ -293,10 +310,9 @@ export async function POST(request: NextRequest) {
       },{ status: 201 });
 
   } catch (error: any) {
-    const logPId = paymentId || "N/A";
+    const logPId = paymentId || "N/A_BEFORE_PAYMENTID_GEN";
     const errorMessage = error.message || 'Unknown error occurred.';
-    // Log all errors that reach this top-level catch block for debugging
-    console.error(`[API Transactions - PaymentID: ${logPId}] Processing ended with error: ${errorMessage}`, error instanceof Error ? error.stack : error);
+    console.error(`[API Transactions - PaymentID: ${logPId}] Processing ended with error: ${errorMessage}`, error instanceof Error ? error.stack : JSON.stringify(error));
 
 
     if (error instanceof ApiError) {
