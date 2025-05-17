@@ -1,6 +1,4 @@
 // src/lib/utils.ts
-// MODIFIED: formatCurrency function defaults and fallback for THB
-
 import React from "react";
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -17,27 +15,26 @@ export function generateFallbackId() {
   return `STC-${year}-${randomChars}`;
 }
 
-// MODIFIED: formatCurrency to default to THB and use Baht symbol
 export const formatCurrency = (
   amount: number | undefined | null,
-  currency: string = "THB", // MODIFIED: Default currency to THB
-  locale: string = "en-US" // Kept as en-US, Intl.NumberFormat will use THB symbol
+  currency: string = "THB",
+  locale: string = "en-US" 
 ): string => {
   if (amount === undefined || amount === null || isNaN(amount)) {
-    return "฿ -.--"; // MODIFIED: Fallback symbol to Baht and placeholder
+    return "฿ -.--"; 
   }
   try {
     return new Intl.NumberFormat(locale, {
       style: "currency",
-      currency: currency, // This will now be 'THB' by default
+      currency: currency,
     }).format(amount);
   } catch (error) {
     console.error("Error formatting currency:", error);
-    // This will also use 'THB' (or the provided currency) if currency default is changed
     return `${currency} ${amount.toFixed(2)}`;
   }
 };
 
+// This function is already correctly typed to accept Date objects or strings
 export const formatDate = (
   dateInput: string | Date | null | undefined,
   locale: string = "en-US",
@@ -55,7 +52,7 @@ export const formatDate = (
 
     const defaultOptions: Intl.DateTimeFormatOptions = {
       year: "numeric",
-      month: "numeric",
+      month: "short", // Changed to 'short' for better display like "May"
       day: "numeric",
       ...options,
     };
@@ -66,8 +63,14 @@ export const formatDate = (
   }
 };
 
+// Functions like formatDdMmYyyy, formatTime, formatDdMmYyyyHhMmSs
+// also expect string inputs. If you pass Date objects to them from your component,
+// they would need similar adjustments or you'd call .toISOString() before passing.
+// For simplicity, I'll assume they are used where strings are already available
+// or that `formatDateTime` is the primary one used in the modal.
+
 export const formatDdMmYyyy = (
-  isoString: string | null | undefined
+  isoString: string | null | undefined // Stays as string input
 ): string => {
   if (!isoString) return "N/A";
   try {
@@ -83,59 +86,46 @@ export const formatDdMmYyyy = (
   }
 };
 
-export const formatTime = (isoString: string | null | undefined): string => {
+export const formatTime = (isoString: string | null | undefined): string => { // Stays as string input
   if (!isoString) return "N/A";
   try {
     const date = new Date(isoString);
     if (isNaN(date.getTime())) return "Invalid Date";
     const hours = date.getHours().toString().padStart(2, "0");
     const minutes = date.getMinutes().toString().padStart(2, "0");
-    const seconds = date.getSeconds().toString().padStart(2, "0");
-    return `${hours}:${minutes}:${seconds}`;
+    // const seconds = date.getSeconds().toString().padStart(2, "0"); // Usually not needed for display
+    return `${hours}:${minutes}`; // Removed seconds for cleaner time
   } catch (e) {
     console.error("Error in formatTime:", e);
     return "Invalid Time";
   }
 };
 
-export const formatDdMmYyyyHhMmSs = (
-  isoString: string | null | undefined
-): string => {
-  if (!isoString) return "N/A";
-  try {
-    const date = new Date(isoString);
-    if (isNaN(date.getTime())) return "Invalid Date";
-    const day = date.getDate().toString().padStart(2, "0");
-    const month = (date.getMonth() + 1).toString().padStart(2, "0");
-    const year = date.getFullYear();
-    const hours = date.getHours().toString().padStart(2, "0");
-    const minutes = date.getMinutes().toString().padStart(2, "0");
-    const seconds = date.getSeconds().toString().padStart(2, "0");
-    return `${day}/${month}/${year}, ${hours}:${minutes}:${seconds}`;
-  } catch (e) {
-    console.error("Error formatting date/time:", e);
-    return "Invalid Date";
-  }
-};
-
+// This function combines date and time formatting
 export const formatDateTime = (
-  isoString: string | null | undefined,
+  dateTimeInput: string | Date | null | undefined, // MODIFIED: parameter type and name
   locale: string = "en-US"
 ): { date: string; time: string } => {
-  if (!isoString) return { date: "N/A", time: "N/A" };
+  if (!dateTimeInput) return { date: "N/A", time: "N/A" };
   try {
-    const dateObj = new Date(isoString);
+    // MODIFIED: Handle both string and Date object inputs
+    const dateObj =
+      typeof dateTimeInput === "string"
+        ? new Date(dateTimeInput)
+        : dateTimeInput;
+
     if (isNaN(dateObj.getTime()))
       return { date: "Invalid Date", time: "Invalid Time" };
 
     const dateOptions: Intl.DateTimeFormatOptions = {
       year: "numeric",
-      month: "short",
+      month: "short", // Consistent with formatDate
       day: "numeric",
     };
     const timeOptions: Intl.DateTimeFormatOptions = {
-      hour: "2-digit",
+      hour: "numeric", // Use 'numeric' for non-padded hour in AM/PM
       minute: "2-digit",
+      hour12: true, // For AM/PM format like "11:55 AM"
     };
 
     const date = dateObj.toLocaleDateString(locale, dateOptions);
@@ -146,6 +136,7 @@ export const formatDateTime = (
     return { date: "Error", time: "Error" };
   }
 };
+
 
 export const renderStatusBadge = (
   status: string | undefined | null,
@@ -158,111 +149,41 @@ export const renderStatusBadge = (
 
   const lowerCaseStatus = status?.toLowerCase();
 
+  // ... (rest of your renderStatusBadge logic - no changes needed here for the date issue)
   switch (type) {
     case "account":
       switch (lowerCaseStatus) {
-        case "active":
-          bgColor = "bg-green-100";
-          textColor = "text-green-800";
-          break;
-        case "inactive":
-        case "rejected":
-          bgColor = "bg-gray-100";
-          textColor = "text-gray-600";
-          break;
-        case "suspended":
-          bgColor = "bg-yellow-100";
-          textColor = "text-yellow-800";
-          break;
-        case "pending":
-          bgColor = "bg-blue-100";
-          textColor = "text-blue-800";
-          break;
+        case "active": bgColor = "bg-green-100"; textColor = "text-green-800"; break;
+        case "inactive": case "rejected": bgColor = "bg-gray-100"; textColor = "text-gray-600"; break;
+        case "suspended": bgColor = "bg-yellow-100"; textColor = "text-yellow-800"; break;
+        case "pending": bgColor = "bg-blue-100"; textColor = "text-blue-800"; break;
       }
       break;
     case "merchant":
       switch (lowerCaseStatus) {
-        case "active":
-          bgColor = "bg-green-100";
-          textColor = "text-green-800";
-          break;
-        case "pending":
-          bgColor = "bg-blue-100";
-          textColor = "text-blue-800";
-          break;
-        case "suspended":
-          bgColor = "bg-yellow-100";
-          textColor = "text-yellow-800";
-          break;
-        case "rejected":
-          bgColor = "bg-red-100";
-          textColor = "text-red-800";
-          break;
+        case "active": bgColor = "bg-green-100"; textColor = "text-green-800"; break;
+        case "pending_approval": // Added to match your actual status
+        case "pending": bgColor = "bg-blue-100"; textColor = "text-blue-800"; break;
+        case "suspended": bgColor = "bg-yellow-100"; textColor = "text-yellow-800"; break;
+        case "rejected": bgColor = "bg-red-100"; textColor = "text-red-800"; break;
       }
       break;
     case "transaction":
       switch (lowerCaseStatus) {
-        case "completed":
-          bgColor = "bg-green-100";
-          textColor = "text-green-800";
-          break;
-        case "pending":
-          bgColor = "bg-blue-100";
-          textColor = "text-blue-800";
-          break;
-        case "failed":
-          bgColor = "bg-red-100";
-          textColor = "text-red-800";
-          break;
-        case "declined":
-          bgColor = "bg-red-100";
-          textColor = "text-red-800";
-          break;
+        case "completed": bgColor = "bg-green-100"; textColor = "text-green-800"; break;
+        case "pending": bgColor = "bg-blue-100"; textColor = "text-blue-800"; break;
+        case "failed": bgColor = "bg-red-100"; textColor = "text-red-800"; break;
+        case "declined": bgColor = "bg-red-100"; textColor = "text-red-800"; break;
       }
       break;
-    case "pending":
+    // Removed "pending" type as it seems redundant with "merchant" or "account" types
+    default: // Default handling for any other status or if type is not specified
       switch (lowerCaseStatus) {
-        case "pending":
-          bgColor = "bg-blue-100";
-          textColor = "text-blue-800";
-          break;
-        case "approved":
-          bgColor = "bg-green-100";
-          textColor = "text-green-800";
-          break;
-        case "rejected":
-          bgColor = "bg-red-100";
-          textColor = "text-red-800";
-          break;
-      }
-      break;
-    default:
-      switch (lowerCaseStatus) {
-        case "active":
-        case "completed":
-        case "approved":
-          bgColor = "bg-green-100";
-          textColor = "text-green-800";
-          break;
-        case "inactive":
-          bgColor = "bg-gray-100";
-          textColor = "text-gray-600";
-          break;
-        case "pending":
-        case "pending_approval":
-          bgColor = "bg-blue-100";
-          textColor = "text-blue-800";
-          break;
-        case "suspended":
-          bgColor = "bg-yellow-100";
-          textColor = "text-yellow-800";
-          break;
-        case "failed":
-        case "declined":
-        case "rejected":
-          bgColor = "bg-red-100";
-          textColor = "text-red-800";
-          break;
+        case "active": case "completed": case "approved": bgColor = "bg-green-100"; textColor = "text-green-800"; break;
+        case "inactive": bgColor = "bg-gray-100"; textColor = "text-gray-600"; break;
+        case "pending": case "pending_approval": bgColor = "bg-blue-100"; textColor = "text-blue-800"; break;
+        case "suspended": bgColor = "bg-yellow-100"; textColor = "text-yellow-800"; break;
+        case "failed": case "declined": case "rejected": bgColor = "bg-red-100"; textColor = "text-red-800"; break;
       }
       break;
   }
@@ -275,7 +196,10 @@ export const renderStatusBadge = (
   );
 };
 
-// only return first 8 characters of the UUID
-export const tuncateUUID = (uuid: string): string => {
-  return uuid.slice(0, 8);
+// Corrected typo from tuncateUUID to truncateUUID
+export const truncateUUID = (uuid: string | null | undefined, first = 8, last = 4): string => {
+  if (!uuid) return "N/A"; // Handle null or undefined input
+  // If the UUID is short (e.g., already truncated or not a full UUID), return as is.
+  if (uuid.length <= first + last + 3) return uuid; // +3 for "..."
+  return `${uuid.substring(0, first)}...${uuid.substring(uuid.length - last)}`;
 };

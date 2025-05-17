@@ -155,8 +155,8 @@ Content-Type: {{contentType}}
 Authorization: {{merchantToken}}
 
 {
-  "amount": 1000.00, 
-  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_ID_LOW_FUNDS_PIN_1111", // User with low funds
+  "amount": 1000.00,
+  "beneficiaryDisplayId": "STC-2025-7KVS",
   "enteredPin": "9876",
   "clientReportedPinFailureType": "MAX_ATTEMPTS_REACHED",
   "description": "Test client lockout, beneficiary also low funds"
@@ -170,7 +170,7 @@ Authorization: {{merchantToken}}
 
 {
   "amount": 5.00,
-  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_ID_NO_PIN",
+  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_ID_NO_PIN", ---UNTESTED
   "enteredPin": "1234", 
   "description": "Test beneficiary no PIN set"
 }
@@ -183,7 +183,7 @@ Authorization: {{merchantToken}}
 
 {
   "amount": 20.00,
-  "beneficiaryDisplayId": "STC-2025-QAD9", // Replace with user, PIN "1111", status 'Inactive'
+  "beneficiaryDisplayId": "STC-2025-HUWE",
   "enteredPin": "1111",
   "description": "Test correct PIN, beneficiary inactive"
 }
@@ -196,7 +196,7 @@ Authorization: {{merchantToken}}
 
 {
   "amount": 20.00,
-  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_ID_SUSPENDED_PIN_1111",
+  "beneficiaryDisplayId": "STC-2025-HUWE",
   "enteredPin": "1111",
   "description": "Test correct PIN, beneficiary suspended"
 }
@@ -209,7 +209,7 @@ Authorization: {{merchantToken}}
 
 {
   "amount": 20.00,
-  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_ID_PENDING_PIN_1111",
+  "beneficiaryDisplayId": "STC-2025-HUWE",
   "enteredPin": "1111",
   "description": "Test correct PIN, beneficiary pending"
 }
@@ -222,7 +222,7 @@ Authorization: {{merchantToken}}
 
 {
   "amount": 100.00,
-  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_ID_LOW_FUNDS_PIN_1111", // User with PIN "1111", low balance
+  "beneficiaryDisplayId": "STC-2025-C5XU",
   "enteredPin": "1111",
   "description": "Test correct PIN, insufficient funds"
 }
@@ -235,7 +235,7 @@ Authorization: {{merchantToken}}
 
 {
   "amount": 0.01,
-  "beneficiaryDisplayId": "REPLACE_WITH_CHILD_ID_ZERO_BALANCE_PIN_1111", // User with PIN "1111", zero balance
+  "beneficiaryDisplayId": "STC-2025-C5XU",
   "enteredPin": "1111", 
   "description": "Test correct PIN, zero balance, tiny amount"
 }
@@ -348,7 +348,7 @@ Authorization: {{merchantToken}}
 
 {
     "amount": 5.00,
-    "beneficiaryDisplayId": "STC-2025-DWB7",
+    "beneficiaryDisplayId": "STC-2025-685V",
     "enteredPin": "1111", 
     "description": "This_is_a_very_long_description_designed_to_test_the_maximum_allowed_length_of_the_description_field_in_the_transactions_table_to_ensure_that_it_handles_long_strings_correctly_without_truncation_or_errors_if_this_string_is_too_long_for_the_database_column_it_should_either_be_truncated_by_drizzle_or_the_database_or_preferably_validated_by_zod_before_insertion_add_more_characters_here_to_reach_your_limit_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 }
@@ -360,7 +360,7 @@ Authorization: {{merchantToken}}
 
 {
     "amount": 5.00,
-    "beneficiaryDisplayId": "STC-2025-DWB7",
+    "beneficiaryDisplayId": "STC-2025-685V",
     "enteredPin": "1111", 
     "description": "" 
 }
@@ -374,7 +374,7 @@ Authorization: {{merchantToken}}
 
 {
     "amount": 50.75,
-    "beneficiaryDisplayId": "stc-2025-dwb7", 
+    "beneficiaryDisplayId": "STC-2025-685v", 
     "enteredPin": "1111", 
     "description": "Test case sensitivity of beneficiaryDisplayId"
 }

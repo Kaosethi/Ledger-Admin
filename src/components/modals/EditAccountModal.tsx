@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import type { Account, Transaction, Merchant } from "@/lib/mockData";
+import { Account, Merchant } from "@/lib/mockData"; // Assuming these base types
+import { selectTransactionSchema } from "@/lib/db/schema"; // For Zod type inference
+import { z } from "zod";
 import {
   formatCurrency,
-  formatDate,
+  formatDate, // Assumed to handle Date object or string
   renderStatusBadge,
-  formatDateTime,
-  tuncateUUID,
+  formatDateTime, // Assumed to handle Date object or string for its timestamp input
+  truncateUUID,
 } from "@/lib/utils";
 import { QRCodeSVG } from "qrcode.react";
 import { useReactToPrint, UseReactToPrintOptions } from "react-to-print";
@@ -13,47 +15,72 @@ import ConfirmActionModal from "./ConfirmActionModal";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+// Infer the select type from Drizzle Zod schema. This will have paymentId and other DB fields.
+type DrizzleTransaction = z.infer<typeof selectTransactionSchema>;
+
+// Interface for what's displayed in the transaction table, including looked-up merchant name
+interface DisplayTransaction extends DrizzleTransaction {
+  merchantNameDisplay: string; 
+}
+
 type AccountActionType = "suspend" | "reactivate";
 
-const suspendAccount = async (accountId: string) => {
+// --- API Call Helper Functions ---
+const suspendAccountAPI = async (accountId: string): Promise<Account> => {
   const response = await fetch(`/api/accounts/${accountId}/suspend`, {
     method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
   });
-
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to suspend account");
+    const errorData = await response.json();
+    throw new Error(errorData.error || "Failed to suspend account");
   }
-
   return response.json();
 };
 
-const reactivateAccount = async (accountId: string) => {
-  const response = await fetch(`/api/accounts/${accountId}/reactive`, {
+const reactivateAccountAPI = async (accountId: string): Promise<Account> => {
+  const response = await fetch(`/api/accounts/${accountId}/reactivate`, { // Ensure endpoint is correct
     method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
   });
-
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to reactivate account");
+    const errorData = await response.json();
+    throw new Error(errorData.error || "Failed to reactivate account");
   }
-
   return response.json();
+};
+
+const updateAccountDetailsAPI = async (accountId: string, payload: { balance?: number; newPin?: string }): Promise<Account> => {
+  const response = await fetch(`/api/accounts/${accountId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || "Failed to update account details");
+  }
+  return response.json();
+};
+
+const regenerateQrAPI = async (accountId: string): Promise<{ qrToken: string }> => {
+  const response = await fetch(`/api/accounts/${accountId}/regenerate-qr`, {
+    method: "POST",
+  });
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.error || "Failed to regenerate QR code");
+  }
+  return response.json(); 
 };
 
 interface EditAccountModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (updatedAccount: Account) => void;
+  onSave: (updatedAccount: Account) => void; 
   account: Account | null;
-  allTransactions: Transaction[];
-  merchants: Merchant[];
+  allTransactions: DrizzleTransaction[]; 
+  merchants: Merchant[]; 
   logAdminActivity?: (
     action: string,
     targetType?: string,
@@ -84,158 +111,134 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
   const qrCodePrintRef = useRef<HTMLDivElement>(null);
 
   const suspendMutation = useMutation({
-    mutationFn: suspendAccount,
-    onSuccess: (updatedAccount) => {
+    mutationFn: suspendAccountAPI,
+    onSuccess: (updatedAccountData) => { 
       if (account) {
         toast.success("Account suspended successfully");
-        logAdminActivity?.(
-          "Suspend Account",
-          "Account",
-          account.id,
-          `Changed status to Suspended.`
-        );
-        onSave({
-          ...account,
-          ...updatedAccount,
-          status: "Suspended",
-        });
+        logAdminActivity?.("Suspend Account", "Account", account.id, `Changed status to Suspended.`);
+        onSave({ ...account, ...updatedAccountData, status: "Suspended" });
         handleCloseConfirmModal();
       }
     },
-    onError: (error: Error) => {
-      toast.error(`Failed to suspend account: ${error.message}`);
-      console.error("Error suspending account:", error);
-    },
+    onError: (error: Error) => toast.error(`Failed to suspend account: ${error.message}`),
   });
 
   const reactivateMutation = useMutation({
-    mutationFn: reactivateAccount,
-    onSuccess: (updatedAccount) => {
+    mutationFn: reactivateAccountAPI,
+    onSuccess: (updatedAccountData) => {
       if (account) {
         toast.success("Account reactivated successfully");
-        logAdminActivity?.(
-          "Reactivate Account",
-          "Account",
-          account.id,
-          `Changed status to Active.`
-        );
-        onSave({
-          ...account,
-          ...updatedAccount,
-          status: "Active",
-        });
+        logAdminActivity?.("Reactivate Account", "Account", account.id, `Changed status to Active.`);
+        onSave({ ...account, ...updatedAccountData, status: "Active" });
         handleCloseConfirmModal();
       }
     },
-    onError: (error: Error) => {
-      toast.error(`Failed to reactivate account: ${error.message}`);
-      console.error("Error reactivating account:", error);
-    },
+    onError: (error: Error) => toast.error(`Failed to reactivate account: ${error.message}`),
   });
 
   useEffect(() => {
     if (account && isOpen) {
       setBalanceStr(account.balance?.toString() || "0");
       setNewPin("");
-      setCurrentQrToken(null);
+      setCurrentQrToken(account.currentQrToken || null);
       setIsConfirmModalOpen(false);
       setConfirmActionDetails({ actionType: null, account: null });
     }
   }, [account, isOpen]);
 
-  const accountTransactions = useMemo(() => {
+  const accountTransactionsForDisplay: DisplayTransaction[] = useMemo(() => {
     if (!account) return [];
     return allTransactions
       .filter((tx) => tx.accountId === account.id)
+      .map(tx => {
+        const merchant = merchants.find(m => m.id === tx.merchantId);
+        return {
+          ...tx,
+          merchantNameDisplay: merchant?.businessName || (tx.merchantId ? truncateUUID(tx.merchantId) : "N/A"),
+        };
+      })
       .sort(
         (a, b) =>
           new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
       );
-  }, [allTransactions, account]);
+  }, [allTransactions, account, merchants]);
 
   const handlePrintQr = useReactToPrint({
     content: () => qrCodePrintRef.current,
-    documentTitle: `QR-Code-${account?.id || "Account"}`,
+    documentTitle: `QR-Code-${account?.displayId || "Account"}`,
     removeAfterPrint: true,
   } as UseReactToPrintOptions);
 
-  const handleSaveChanges = () => {
+  const handleSaveChanges = async () => {
     if (!account) return;
     const balance = parseFloat(balanceStr);
     if (isNaN(balance) || balance < 0) {
-      alert("Please enter a valid non-negative balance.");
+      toast.error("Please enter a valid non-negative balance.");
       return;
     }
     if (newPin && (newPin.length !== 4 || !/^\d{4}$/.test(newPin))) {
-      alert("PIN must be exactly 4 digits.");
+      toast.error("PIN must be exactly 4 digits.");
       return;
     }
-    const updateData: Partial<Account> = {};
-    let changed = false;
-    if (balance !== account.balance) {
-      updateData.balance = balance;
-      changed = true;
+
+    const payload: { balance?: number; newPin?: string } = {};
+    let detailsLog = "";
+
+    // Ensure account.balance is treated as a number for comparison
+    const currentBalance = typeof account.balance === 'string' ? parseFloat(account.balance) : account.balance ?? 0;
+
+    if (balance !== currentBalance) {
+      payload.balance = balance;
+      detailsLog += `Balance changed from ${formatCurrency(currentBalance)} to ${formatCurrency(balance)}. `;
     }
-    if (newPin && newPin !== account.pin) {
-      updateData.pin = newPin;
-      changed = true;
+    if (newPin) {
+      payload.newPin = newPin;
+      detailsLog += `PIN update attempted. `;
     }
-    if (!changed) {
+
+    if (Object.keys(payload).length === 0) {
+      toast.info("No changes to save.");
+      return;
+    }
+
+    try {
+      const updatedAccountFromServer = await updateAccountDetailsAPI(account.id, payload);
+      toast.success("Account updated successfully!");
+      if(logAdminActivity && detailsLog) {
+        logAdminActivity(
+          "Edit Account Details", "Account", 
+          `${account.displayId} (${truncateUUID(account.id)})`,
+          detailsLog.trim()
+        );
+      }
+      onSave(updatedAccountFromServer); 
       onClose();
-      return;
+    } catch (error) {
+      toast.error(`Error updating account: ${error instanceof Error ? error.message : String(error)}`);
     }
-    updateData.updatedAt = new Date().toISOString();
-    updateData.lastActivity = new Date().toISOString();
-    const updatedAccount: Account = { ...account, ...updateData };
-    logAdminActivity?.(
-      "Edit Account Details",
-      "Account",
-      `${account.displayId} (${tuncateUUID(account.id)})`,
-      `Updated balance or PIN.`
-    );
-    onSave(updatedAccount);
-    onClose();
   };
 
   const handleCloseConfirmModal = () => {
     setIsConfirmModalOpen(false);
-    setTimeout(
-      () => setConfirmActionDetails({ actionType: null, account: null }),
-      300
-    );
+    setTimeout(() => setConfirmActionDetails({ actionType: null, account: null }), 300);
   };
 
   const handleConfirmStatusAction = () => {
-    const { actionType, account: accountToUpdate } = confirmActionDetails;
-    if (!actionType || !accountToUpdate) {
-      console.error("Confirmation details missing.");
-      handleCloseConfirmModal();
-      return;
-    }
-
-    if (actionType === "suspend") {
-      suspendMutation.mutate(accountToUpdate.id);
-    } else if (actionType === "reactivate") {
-      reactivateMutation.mutate(accountToUpdate.id);
-    }
+    const { actionType: currentActionType, account: accountToUpdate } = confirmActionDetails;
+    if (!currentActionType || !accountToUpdate) return;
+    if (currentActionType === "suspend") suspendMutation.mutate(accountToUpdate.id);
+    else if (currentActionType === "reactivate") reactivateMutation.mutate(accountToUpdate.id);
   };
 
   const handleToggleStatus = () => {
     if (!account) return;
     const actionType: AccountActionType | null =
-      account.status === "Active"
-        ? "suspend"
-        : account.status === "Suspended"
-        ? "reactivate"
-        : null;
-
+      account.status === "Active" ? "suspend" : account.status === "Suspended" ? "reactivate" : null;
     if (actionType) {
       setConfirmActionDetails({ actionType, account });
       setIsConfirmModalOpen(true);
     } else {
-      alert(
-        `Account status is currently '${account.status}' and cannot be changed with this button.`
-      );
+      toast.info(`Account status is currently '${account.status}' and cannot be changed with this button.`);
     }
   };
 
@@ -244,14 +247,9 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
     if (!actionType || !accountToUpdate) return null;
     const confirmBeneficiaryName = accountToUpdate.childName || "N/A";
     const guardianName = accountToUpdate.guardianName || "N/A";
-
-    const isLoading =
-      (actionType === "suspend" && suspendMutation.isPending) ||
-      (actionType === "reactivate" && reactivateMutation.isPending);
-
-    const errorMessage =
-      (actionType === "suspend" && suspendMutation.error?.message) ||
-      (actionType === "reactivate" && reactivateMutation.error?.message);
+    const isLoading = (actionType === "suspend" && suspendMutation.isPending) || (actionType === "reactivate" && reactivateMutation.isPending);
+    const errorObject = actionType === "suspend" ? suspendMutation.error : reactivateMutation.error;
+    const errorMessage = errorObject instanceof Error ? errorObject.message : null;
 
     switch (actionType) {
       case "suspend":
@@ -261,7 +259,7 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
             <>
               <p>
                 Suspend account {accountToUpdate.displayId} (
-                {tuncateUUID(accountToUpdate.id)}) ({guardianName} /{" "}
+                {truncateUUID(accountToUpdate.id)}) ({guardianName} /{" "}
                 {confirmBeneficiaryName})?
               </p>
               {errorMessage && (
@@ -279,7 +277,7 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
           message: (
             <>
               <p>
-                Reactivate account {accountToUpdate.displayId} ({tuncateUUID(accountToUpdate.id)}) ({guardianName} /{" "}
+                Reactivate account {accountToUpdate.displayId} ({truncateUUID(accountToUpdate.id)}) ({guardianName} /{" "}
                 {confirmBeneficiaryName})?
               </p>
               {errorMessage && (
@@ -287,9 +285,7 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
               )}
             </>
           ),
-          confirmButtonText: isLoading
-            ? "Reactivating..."
-            : "Reactivate Account",
+          confirmButtonText: isLoading ? "Reactivating..." : "Reactivate Account",
           confirmButtonVariant: "success" as const,
           isLoading,
         };
@@ -297,34 +293,19 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
         return null;
     }
   };
-
+  
   const handleGenerateQrCode = async () => {
     if (!account || isGeneratingQr) return;
     setIsGeneratingQr(true);
-    setCurrentQrToken(null);
-
     try {
-      console.log(
-        `Simulating API call to POST /api/beneficiaries/${account.id}/regenerate-qr`
-      );
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const newToken = crypto.randomUUID();
-      console.log(`Simulated API response: New token is ${newToken}`);
+      const { qrToken: newToken } = await regenerateQrAPI(account.id);
       setCurrentQrToken(newToken);
-      logAdminActivity?.(
-        "Generate QR Code",
-        "Account",
-        account.id,
-        `Generated new QR token.`
-      );
+      const updatedAccountData = { ...account, currentQrToken: newToken, updatedAt: new Date(), lastActivity: new Date() };
+      onSave(updatedAccountData as unknown as Account); // Cast if Account type has string dates
+      toast.success("QR Code regenerated successfully!");
+      logAdminActivity?.("Regenerate QR Code", "Account", account.id, `Generated new QR token.`);
     } catch (error) {
-      console.error("Error generating QR code token:", error);
-      alert(
-        `Failed to generate QR code token: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
-      setCurrentQrToken(null);
+      toast.error(`Failed to generate QR code: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setIsGeneratingQr(false);
     }
@@ -332,46 +313,25 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
 
   const confirmModalProps = getConfirmModalProps();
 
-  if (!isOpen || !account) {
-    return null;
-  }
+  if (!isOpen || !account) return null;
 
-  const canToggleStatus =
-    account.status === "Active" || account.status === "Suspended";
+  const canToggleStatus = account.status === "Active" || account.status === "Suspended";
   const isActive = account.status === "Active";
-  const toggleStatusButtonText = isActive
-    ? "Suspend Account"
-    : "Reactivate Account";
+  const toggleStatusButtonText = isActive ? "Suspend Account" : "Reactivate Account";
   const toggleStatusButtonClass = isActive
     ? "w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 disabled:opacity-50"
     : "w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50";
   const beneficiaryName = account.childName || "N/A";
+  const displayAccountId = `${account.displayId} (${truncateUUID(account.id)})`;
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 flex justify-center items-start py-10 px-4">
       <div className="relative mx-auto p-6 border w-full max-w-6xl shadow-lg rounded-md bg-white my-auto">
         <div className="flex justify-between items-center mb-4 pb-3 border-b">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Account Details -{" "}
-            {`${account.displayId} (${tuncateUUID(account.id)})`}
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M6 18L18 6M6 6l12 12"
-              ></path>
+          <h3 className="text-lg font-semibold text-gray-900">Account Details - {displayAccountId}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
             </svg>
           </button>
         </div>
@@ -379,283 +339,71 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
           <div className="md:col-span-1 space-y-6">
             <div>
-              <h4 className="text-md font-semibold text-gray-700 mb-2">
-                Beneficiary Information
-              </h4>
+              <h4 className="text-md font-semibold text-gray-700 mb-2">Beneficiary Information</h4>
               <dl className="divide-y divide-gray-100 border border-gray-200 rounded-md p-4 text-sm">
-                <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
-                  <dt className="font-medium text-gray-500">Account ID</dt>
-                  <dd className="mt-1 text-gray-900 sm:mt-0 sm:col-span-2 font-mono">
-                    {`${account.displayId} (${tuncateUUID(account.id)})`}
-                  </dd>
-                </div>
-                <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
-                  <dt className="font-medium text-gray-500">Child Name</dt>
-                  <dd className="mt-1 text-gray-900 sm:mt-0 sm:col-span-2">
-                    {beneficiaryName}
-                  </dd>
-                </div>
-                <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
-                  <dt className="font-medium text-gray-500">Guardian</dt>
-                  <dd className="mt-1 text-gray-900 sm:mt-0 sm:col-span-2">
-                    {account.guardianName || "N/A"}
-                  </dd>
-                </div>
-                <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4 items-center">
-                  <dt className="font-medium text-gray-500">Status</dt>
-                  <dd className="mt-1 sm:mt-0 sm:col-span-2">
-                    {renderStatusBadge(account.status, "account")}
-                  </dd>
-                </div>
-                <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
-                  <dt className="font-medium text-gray-500">Created</dt>
-                  <dd className="mt-1 text-gray-900 sm:mt-0 sm:col-span-2">
-                    {formatDate(account.createdAt)}
-                  </dd>
-                </div>
-                <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
-                  <dt className="font-medium text-gray-500">Last Activity</dt>
-                  <dd className="mt-1 text-gray-900 sm:mt-0 sm:col-span-2">
-                    {formatDate(account.lastActivity)}
-                  </dd>
-                </div>
-                {account.updatedAt && (
-                  <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
-                    <dt className="font-medium text-gray-500">Updated</dt>
-                    <dd className="mt-1 text-gray-900 sm:mt-0 sm:col-span-2">
-                      {formatDate(account.updatedAt)}
-                    </dd>
-                  </div>
-                )}
+                <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4"><dt className="font-medium text-gray-500">Account ID</dt><dd className="mt-1 text-gray-900 sm:mt-0 sm:col-span-2 font-mono">{displayAccountId}</dd></div>
+                <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4"><dt className="font-medium text-gray-500">Child Name</dt><dd className="mt-1 text-gray-900 sm:mt-0 sm:col-span-2">{beneficiaryName}</dd></div>
+                <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4"><dt className="font-medium text-gray-500">Guardian</dt><dd className="mt-1 text-gray-900 sm:mt-0 sm:col-span-2">{account.guardianName || "N/A"}</dd></div>
+                <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4 items-center"><dt className="font-medium text-gray-500">Status</dt><dd className="mt-1 sm:mt-0 sm:col-span-2">{renderStatusBadge(account.status as DrizzleTransaction['status'], "account")}</dd></div>
+                <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4"><dt className="font-medium text-gray-500">Created</dt><dd className="mt-1 text-gray-900 sm:mt-0 sm:col-span-2">{formatDate(account.createdAt)}</dd></div>
+                <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4"><dt className="font-medium text-gray-500">Last Activity</dt><dd className="mt-1 text-gray-900 sm:mt-0 sm:col-span-2">{formatDate(account.lastActivity)}</dd></div>
+                {account.updatedAt && <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4"><dt className="font-medium text-gray-500">Updated</dt><dd className="mt-1 text-gray-900 sm:mt-0 sm:col-span-2">{formatDate(account.updatedAt)}</dd></div>}
               </dl>
             </div>
-
             <div className="p-4 border rounded-md">
-              <h4 className="text-md font-semibold text-gray-700 mb-3">
-                Account Management
-              </h4>
+              <h4 className="text-md font-semibold text-gray-700 mb-3">Account Management</h4>
               <div className="space-y-4">
-                <div>
-                  <label
-                    htmlFor="edit-balance"
-                    className="block text-sm font-medium text-gray-700"
-                  >
-                    Balance
-                  </label>
-                  <div className="mt-1 relative rounded-md shadow-sm">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <span className="text-gray-500 sm:text-sm">฿</span>
-                    </div>
-                    <input
-                      type="number"
-                      id="edit-balance"
-                      value={balanceStr}
-                      onChange={(e) => setBalanceStr(e.target.value)}
-                      className="block w-full pl-7 pr-12 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary text-sm"
-                      placeholder="0.00"
-                      step="0.01"
-                      min="0"
-                    />
-                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                      <span className="text-gray-500 sm:text-sm">THB</span>
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <label
-                    htmlFor="reset-pin"
-                    className="block text-sm font-medium text-gray-700"
-                  >
-                    Reset PIN
-                    <span className="text-xs text-gray-500 ml-1">
-                      (Leave blank to keep current)
-                    </span>
-                  </label>
-                  <input
-                    type="password"
-                    id="reset-pin"
-                    value={newPin}
-                    onChange={(e) => setNewPin(e.target.value)}
-                    maxLength={4}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:outline-none focus:ring-primary focus:border-primary text-sm"
-                    placeholder="Enter new 4-digit PIN"
-                    autoComplete="new-password"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Account Status Actions
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleToggleStatus}
-                    className={toggleStatusButtonClass}
-                    disabled={!canToggleStatus}
-                  >
-                    {canToggleStatus
-                      ? toggleStatusButtonText
-                      : `Status: ${account.status}`}
-                  </button>
-                  {!canToggleStatus && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Status can only be toggled between Active and Suspended.
-                    </p>
-                  )}
-                </div>
+                <div><label htmlFor="edit-balance" className="block text-sm font-medium text-gray-700">Balance</label><div className="mt-1 relative rounded-md shadow-sm"><div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><span className="text-gray-500 sm:text-sm">฿</span></div><input type="number" id="edit-balance" value={balanceStr} onChange={(e) => setBalanceStr(e.target.value)} className="block w-full pl-7 pr-12 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary text-sm" placeholder="0.00" step="0.01" min="0"/><div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none"><span className="text-gray-500 sm:text-sm">THB</span></div></div></div>
+                <div><label htmlFor="reset-pin" className="block text-sm font-medium text-gray-700">Reset PIN<span className="text-xs text-gray-500 ml-1">(Leave blank to keep current)</span></label><input type="password" id="reset-pin" value={newPin} onChange={(e) => setNewPin(e.target.value)} maxLength={4} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 focus:outline-none focus:ring-primary focus:border-primary text-sm" placeholder="Enter new 4-digit PIN" autoComplete="new-password"/></div>
+                <div><label className="block text-sm font-medium text-gray-700 mb-1">Account Status Actions</label><button type="button" onClick={handleToggleStatus} className={toggleStatusButtonClass} disabled={!canToggleStatus || suspendMutation.isPending || reactivateMutation.isPending}>{canToggleStatus ? toggleStatusButtonText : `Status: ${account.status}`}</button>{!canToggleStatus && <p className="text-xs text-gray-500 mt-1">Status can only be toggled between Active and Suspended.</p>}</div>
               </div>
             </div>
-
             <div className="p-4 border rounded-md">
-              <h4 className="text-md font-semibold text-gray-700 mb-3">
-                Account QR Code
-              </h4>
-              <div ref={qrCodePrintRef}>
-                <div className="flex justify-center items-center bg-gray-100 p-4 rounded mb-3 min-h-[180px]">
-                  {isGeneratingQr ? (
-                    <span className="text-gray-500 text-sm">Generating...</span>
-                  ) : currentQrToken ? (
-                    <QRCodeSVG
-                      value={currentQrToken}
-                      size={140}
-                      bgColor={"#ffffff"}
-                      fgColor={"#000000"}
-                      level={"H"}
-                      includeMargin={true}
-                    />
-                  ) : (
-                    <span className="text-gray-500 text-sm text-center">
-                      Click &quot;Generate QR Code&quot; to display the code.
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="flex flex-col sm:flex-row justify-center gap-3">
-                <button
-                  type="button"
-                  onClick={handleGenerateQrCode}
-                  disabled={isGeneratingQr}
-                  className="py-1 px-3 border border-transparent rounded-md shadow-sm text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-                >
-                  {isGeneratingQr
-                    ? "Generating..."
-                    : currentQrToken
-                    ? "Regenerate QR Code"
-                    : "Generate QR Code"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handlePrintQr()}
-                  disabled={!currentQrToken || isGeneratingQr}
-                  className="py-1 px-3 border border-gray-300 rounded-md shadow-sm text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
-                >
-                  Print QR Code
-                </button>
-              </div>
-              <p className="mt-2 text-xs text-gray-500 text-center">
-                Regenerating creates a new code and invalidates the previous
-                one.
-              </p>
+              <h4 className="text-md font-semibold text-gray-700 mb-3">Account QR Code</h4>
+              <div ref={qrCodePrintRef} className="bg-white p-2 inline-block"> <div className="flex justify-center items-center bg-gray-100 p-4 rounded mb-3 min-h-[180px] min-w-[180px]">{isGeneratingQr ? <span className="text-gray-500 text-sm">Generating...</span> : currentQrToken ? <QRCodeSVG value={currentQrToken} size={140} bgColor={"#ffffff"} fgColor={"#000000"} level={"H"} includeMargin={false}/> : <span className="text-gray-500 text-sm text-center">Click "Generate QR Code" to display the code.</span>}</div></div>
+              <div className="flex flex-col sm:flex-row justify-center gap-3"><button type="button" onClick={handleGenerateQrCode} disabled={isGeneratingQr} className="py-1 px-3 border border-transparent rounded-md shadow-sm text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50">{isGeneratingQr ? "Generating..." : currentQrToken ? "Regenerate QR Code" : "Generate QR Code"}</button><button type="button" onClick={() => handlePrintQr()} disabled={!currentQrToken || isGeneratingQr} className="py-1 px-3 border border-gray-300 rounded-md shadow-sm text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50">Print QR Code</button></div>
+              <p className="mt-2 text-xs text-gray-500 text-center">Regenerating creates a new code and invalidates the previous one.</p>
             </div>
           </div>
 
           <div className="md:col-span-2 space-y-3">
-            <h4 className="text-md font-semibold text-gray-700 mb-2">
-              Transaction History
-            </h4>
-            <div className="border rounded-md shadow-sm overflow-hidden max-h-[calc(100vh-20rem)] overflow-y-auto">
-              {accountTransactions.length === 0 ? (
-                <p className="text-sm text-gray-500 p-4 text-center">
-                  No transaction history found for this account.
-                </p>
+            <h4 className="text-md font-semibold text-gray-700 mb-2">Transaction History</h4>
+            <div className="transaction-history-table-container border rounded-md shadow-sm overflow-hidden">
+              {accountTransactionsForDisplay.length === 0 ? (
+                <p className="text-sm text-gray-500 p-4 text-center">No transaction history found for this account.</p>
               ) : (
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <table className="transaction-history-actual-table min-w-full divide-y divide-gray-200 text-sm">
                   <thead className="bg-gray-50 sticky top-0 z-10">
                     <tr>
-                      <th
-                        scope="col"
-                        className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Date
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Time
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Merchant Name
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Merchant ID
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Txn ID
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Amount
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider"
-                      >
-                        Status
-                      </th>
+                      <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Date</th>
+                      <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Time</th>
+                      <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Merchant Name</th>
+                      <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Merchant ID</th>
+                      <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Txn ID (PaymentID)</th>
+                      <th scope="col" className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Amount (THB)</th>
+                      <th scope="col" className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Status</th>
+                      <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Description</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {accountTransactions.map((tx) => {
-                      const merchant = merchants.find(
-                        (m) => m.id === tx.merchantId
-                      );
-                      const merchantDisplay =
-                        merchant?.businessName || tx.merchantId || "N/A";
+                    {accountTransactionsForDisplay.map((tx) => {
                       const { date, time } = formatDateTime(tx.timestamp);
+                      const displayTxnId = tx.paymentId; 
+                      const merchantDisplay = tx.merchantNameDisplay; 
+
                       return (
                         <tr key={tx.id}>
-                          <td className="px-3 py-2 whitespace-nowrap">
-                            {date}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-xs">
-                            {time}
-                          </td>
-                          <td
-                            className="px-3 py-2 whitespace-nowrap truncate max-w-[150px]"
-                            title={merchantDisplay}
-                          >
-                            {merchantDisplay}
-                          </td>
-                          <td className="px-3 py-2 whitespace-nowrap font-mono text-xs">
-                            {tx.merchantId || "N/A"}
-                          </td>
-                          <td
-                            className="px-3 py-2 whitespace-nowrap font-mono text-xs truncate max-w-[100px]"
-                            title={tx.id}
-                          >
-                            {tx.id}
-                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap">{date}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-xs">{time}</td>
+                          <td className="px-3 py-2 whitespace-nowrap truncate max-w-[150px]" title={merchantDisplay}>{merchantDisplay}</td>
+                          <td className="px-3 py-2 whitespace-nowrap font-mono text-xs">{tx.merchantId ? truncateUUID(tx.merchantId) : "N/A"}</td>
+                          <td className="px-3 py-2 whitespace-nowrap font-mono text-xs truncate max-w-[100px]" title={displayTxnId || ""}>{displayTxnId ? truncateUUID(displayTxnId) : "N/A"}</td>
                           <td className="px-3 py-2 whitespace-nowrap text-right font-medium">
-                            {tx.type === "Credit" ||
-                            (tx.type === "Adjustment" && tx.amount > 0)
-                              ? "+"
-                              : "-"}
-                            {formatCurrency(Math.abs(tx.amount))}
+                            {tx.type === "Credit" || (tx.type === "Adjustment" && parseFloat(tx.amount) > 0) ? "+" : "-"}
+                            {formatCurrency(Math.abs(parseFloat(tx.amount)))}
                           </td>
-                          <td className="px-3 py-2 whitespace-nowrap text-center">
-                            {renderStatusBadge(tx.status, "transaction")}
-                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-center">{renderStatusBadge(tx.status, "transaction")}</td>
+                          <td className="px-3 py-2 whitespace-nowrap truncate max-w-[200px]" title={tx.description || ""}>{tx.description || ""}</td>
                         </tr>
                       );
                     })}
@@ -667,20 +415,8 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
         </div>
 
         <div className="mt-6 flex justify-end space-x-3 pt-4 border-t">
-          <button
-            type="button"
-            onClick={onClose}
-            className="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSaveChanges}
-            className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-          >
-            Save Changes
-          </button>
+          <button type="button" onClick={onClose} className="py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300">Cancel</button>
+          <button type="button" onClick={handleSaveChanges} className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary" disabled={suspendMutation.isPending || reactivateMutation.isPending || isGeneratingQr}>Save Changes</button>
         </div>
       </div>
 
@@ -689,11 +425,11 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
           isOpen={isConfirmModalOpen}
           onClose={handleCloseConfirmModal}
           onConfirm={handleConfirmStatusAction}
-          title={confirmModalProps.title}
-          message={confirmModalProps.message}
-          confirmButtonText={confirmModalProps.confirmButtonText}
+          title={confirmModalProps.title!} 
+          message={confirmModalProps.message!} 
+          confirmButtonText={confirmModalProps.confirmButtonText!} 
           confirmButtonVariant={confirmModalProps.confirmButtonVariant}
-          isLoading={confirmModalProps.isLoading}
+          isLoading={confirmModalProps.isLoading || false}
         />
       )}
     </div>
@@ -701,3 +437,19 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
 };
 
 export default EditAccountModal;
+
+/*
+  ADD THIS CSS TO YOUR GLOBAL STYLESHEET OR COMPONENT'S CSS MODULE:
+
+  .transaction-history-table-container {
+    width: 100%;
+    overflow-x: auto; // Enables horizontal scrolling if content overflows
+    -webkit-overflow-scrolling: touch; // Smoother scrolling on iOS
+  }
+
+  .transaction-history-actual-table {
+    width: 100%; 
+    min-width: 1080px; // << ADJUST THIS VALUE! Example: 1080px. Based on your columns.
+    border-collapse: collapse;
+  }
+*/
