@@ -103,12 +103,17 @@ const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
             </dd>
 
             {/* Amount */}
-            <dt className="font-medium text-gray-500">Amount</dt>
-            <dd className="sm:col-span-2 text-gray-900 font-semibold text-base">
-              {/* MODIFIED: Removed manual +/- sign. Use formatCurrency with absolute value */}
-              {/* formatCurrency defaults to THB/฿ from utils.ts */}
-              {formatCurrency(Math.abs(transaction.amount))}
-            </dd>
+<dt className="font-medium text-gray-500">Amount</dt>
+<dd className="sm:col-span-2 text-gray-900 font-semibold text-base">
+  {/* MODIFIED: Parse transaction.amount (string) to a number before Math.abs */}
+  {/* formatCurrency defaults to THB/฿ from utils.ts */}
+  {transaction && typeof transaction.amount === 'string' 
+    ? formatCurrency(Math.abs(parseFloat(transaction.amount))) 
+    : transaction && typeof transaction.amount === 'number' 
+        ? formatCurrency(Math.abs(transaction.amount)) // Fallback if it's somehow still a number
+        : "N/A" /* Fallback for undefined or null amount */
+  }
+</dd>
 
             {/* Decline Reason (Optional) */}
             {transaction.declineReason && (
