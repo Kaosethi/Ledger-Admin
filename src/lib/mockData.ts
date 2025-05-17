@@ -62,15 +62,21 @@ export interface Merchant {
 
 // --- Transaction Interface ---
 export interface Transaction {
-    id: string;
+    id: string; // Primary key
+    paymentId: string; // User-facing Transaction ID
     accountId: string;
     merchantId?: string | null;
-    type: 'Credit' | 'Debit' | 'Adjustment';
-    amount: number;
-    timestamp: string;
+    type: "Debit" | "Credit" | "Adjustment";
+    amount: string; // Changed from number to string
+    timestamp: Date; // Primary transaction time, changed from string to Date
     description?: string | null;
-    status: 'Completed' | 'Pending' | 'Failed' | 'Declined';
+    status: "Pending" | "Completed" | "Failed" | "Declined";
     declineReason?: string | null;
+    createdAt: Date; // DB audit field
+    updatedAt: Date; // DB audit field
+    pinVerified: boolean | null;
+    metadata: string | null;
+    reference?: string | null;
 }
 
 // --- AdminLog Interface ---
@@ -125,6 +131,16 @@ const getDateString = (offsetDays: number = 0): string => {
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}Z`;
 }
+const getDateObject = (offsetDays: number = 0, sameTimeAsOffsetRoot: boolean = false): Date => {
+    const date = new Date();
+    date.setDate(date.getDate() + offsetDays);
+    if (!sameTimeAsOffsetRoot) {
+        date.setHours(Math.floor(Math.random() * 24));
+        date.setMinutes(Math.floor(Math.random() * 60));
+        date.setSeconds(Math.floor(Math.random() * 60));
+    }
+    return date;
+};
 
 // --- Mock Data Instance ---
 const mockDataInstance: AppData = {
@@ -142,8 +158,25 @@ const mockDataInstance: AppData = {
         // ... other merchant objects ...
     ],
     transactions: [
-       { id: 'TX-2024-0001', accountId: 'ACC-001', merchantId: 'MER-001', type: 'Debit', amount: 50.25, timestamp: '2024-03-10T14:00:00Z', description: 'Grocery purchase', status: 'Completed', },
-    ],
+   { 
+       id: 'TX-DB-0001', // DB primary key
+       paymentId: 'PAY-USER-0001', // User-facing ID
+       accountId: 'ACC-001', 
+       merchantId: 'MER-001', 
+       type: 'Debit', 
+       amount: '50.25', // String
+       timestamp: getDateObject(-1), // Date object
+       description: 'Grocery purchase', 
+       status: 'Completed', 
+       declineReason: null,
+       createdAt: getDateObject(-1, true), // Date object
+       updatedAt: getDateObject(-1, true), // Date object
+       pinVerified: true, 
+       metadata: null, 
+       reference: 'REF-123',
+    },
+    // ... more rich transactions
+],
     adminActivityLog: [
         { id: uuidv4(), timestamp: getDateString(-2), adminUsername: 'admin@example.com', action: 'Login Success', targetType: 'System'},
     ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()) as AdminLog[],
