@@ -3,8 +3,6 @@
 
 import React, { useState, useMemo } from "react";
 
-// Import types from @/lib/mockData
-// ASSUMING Merchant type here has date fields (updatedAt, submittedAt, createdAt) as STRING
 import type {
   Merchant,
   Transaction,
@@ -12,7 +10,6 @@ import type {
   BackendMerchantStatus,
 } from "@/lib/mockData";
 
-// formatDate should accept string or Date. renderStatusBadge and tuncateUUID are fine.
 import { formatDate, renderStatusBadge, tuncateUUID } from "@/lib/utils"; 
 import MerchantDetailModal, {
   AllowedMerchantActionForModal,
@@ -21,10 +18,10 @@ import ConfirmActionModal from "../modals/ConfirmActionModal";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface MerchantsTabProps {
-  merchants: Merchant[]; // Assumed to have string dates based on your last message
-  transactions: Transaction[]; // Assumed to have Date objects for timestamps (rich type)
-  accounts: Account[];       // Assumed to have string dates for now
-  onMerchantsUpdate?: (updatedMerchants: Merchant[]) => void; // Expects Merchant[] with string dates
+  merchants: Merchant[];
+  transactions: Transaction[];
+  accounts: Account[]; 
+  onMerchantsUpdate?: (updatedMerchants: Merchant[]) => void;
   logAdminActivity?: (
     action: string,
     targetType?: string,
@@ -54,7 +51,6 @@ const tableHeaderClasses =
   "px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider";
 const tableCellClasses = "px-4 py-4 whitespace-nowrap text-sm text-gray-700";
 const tableCellCenterClasses = `${tableCellClasses} text-center`;
-// const tableCellActionsClasses = `${tableCellClasses} text-center`; // Not used, but kept if needed
 
 const MerchantsTab: React.FC<MerchantsTabProps> = ({
   merchants = [],
@@ -166,8 +162,8 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
         logActionText = "Reactivate Merchant";
         break;
       default:
-        const exhaustiveCheck: never = actionType;
-        console.error("Unknown action type:", exhaustiveCheck);
+        const exhaustiveCheck: never = actionType; // Should not happen with AllowedMerchantActionForModal
+        console.error("Unhandled action type in MerchantsTab:", exhaustiveCheck);
         handleCloseConfirmModal();
         return;
     }
@@ -177,7 +173,6 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
     }
   };
 
-  // This function is called when NOT using react-query mutations (fallback)
   const updateMerchantStatus = (
     merchantToUpdate: Merchant,
     newStatus: BackendMerchantStatus,
@@ -189,10 +184,8 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
           ? { 
               ...m, 
               status: newStatus, 
-              // VVVV MODIFIED HERE VVVV
-              updatedAt: new Date().toISOString(), // Ensure updatedAt is a STRING for onMerchantsUpdate
-              // VVVV END MODIFICATION VVVV
-              declineReason: newStatus === 'rejected' ? (reason || m.declineReason || "Rejected by admin") : (newStatus === 'active' || newStatus === 'pending_approval' ? null : m.declineReason) // Clear reason if not rejected
+              updatedAt: new Date().toISOString(), 
+              declineReason: newStatus === 'rejected' ? (reason || m.declineReason || "Rejected by admin") : (newStatus === 'active' || newStatus === 'pending_approval' ? null : m.declineReason) 
             }
           : m
       );
@@ -205,19 +198,56 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
     if (!actionType || !merchant) return null;
     const merchantName = merchant.businessName;
 
-    let messageContent: React.ReactNode = `Are you sure you want to ${actionType} "${merchantName}"?`;
-    if (actionType === 'reject' && reason) {
-        messageContent = (<><p>Reject application for "{merchantName}" with reason:</p><p className="mt-1 text-sm italic text-gray-600">"{reason}"</p><p className="mt-2 font-semibold text-red-700">This action cannot be undone easily.</p></>);
-    } else if (actionType === 'reject') {
-        messageContent = (<><p>Reject application for "{merchantName}"?</p><p className="mt-1 text-sm text-yellow-600">Note: No reason was provided.</p><p className="mt-2 font-semibold text-red-700">This action cannot be undone easily.</p></>);
-    }
+    let message: React.ReactNode;
 
     switch (actionType) {
-      case "approve": return { title: "Confirm Approval", message: messageContent, confirmButtonText: approvalLoading ? "Approving..." : "Approve", confirmButtonVariant: "success" as const, isLoading: approvalLoading };
-      case "reject": return { title: "Confirm Rejection", message: messageContent, confirmButtonText: rejectionLoading ? "Rejecting..." : "Confirm Rejection", confirmButtonVariant: "danger" as const, isLoading: rejectionLoading };
-      case "suspend": return { title: "Confirm Suspension", message: messageContent, confirmButtonText: suspensionLoading ? "Suspending..." : "Suspend", confirmButtonVariant: "danger" as const, isLoading: suspensionLoading };
-      case "reactivate": return { title: "Confirm Reactivation", message: messageContent, confirmButtonText: reactivationLoading ? "Reactivating..." : "Reactivate", confirmButtonVariant: "success" as const, isLoading: reactivationLoading };
-      default: return null;
+      case "approve":
+        message = <>Approve application for <strong>{merchantName}</strong>?</>;
+        return { title: "Confirm Approval", message, confirmButtonText: approvalLoading ? "Approving..." : "Approve", confirmButtonVariant: "success" as const, isLoading: approvalLoading };
+      
+      case "reject":
+        if (reason) {
+            message = (
+                <>
+                    <p>Reject application for <strong>"{merchantName}"</strong> with reason:</p>
+                    <p className="mt-1 text-sm italic text-gray-600">"{reason}"</p>
+                    <p className="mt-2 font-semibold text-red-700">This action may have consequences.</p>
+                </>
+            );
+        } else {
+            message = (
+                <>
+                    <p>Reject application for <strong>"{merchantName}"</strong>?</p>
+                    <p className="mt-1 text-sm text-yellow-600">Note: No specific reason was provided for this rejection.</p>
+                    <p className="mt-2 font-semibold text-red-700">This action may have consequences.</p>
+                </>
+            );
+        }
+        return { title: "Confirm Rejection", message, confirmButtonText: rejectionLoading ? "Rejecting..." : "Confirm Rejection", confirmButtonVariant: "danger" as const, isLoading: rejectionLoading };
+      
+      case "suspend":
+        // Assuming suspend might also have a reason in the future, prepare for it
+        if (reason) {
+             message = (
+                <>
+                    <p>Suspend merchant 
+                    <strong>"{merchantName}"</strong> with reason:</p>
+                    <p className="mt-1 text-sm italic text-gray-600">"{reason}"</p>
+                </>
+            );
+        } else {
+            message = <>Suspend merchant <strong>{merchantName}</strong>?</>;
+        }
+        return { title: "Confirm Suspension", message, confirmButtonText: suspensionLoading ? "Suspending..." : "Suspend", confirmButtonVariant: "danger" as const, isLoading: suspensionLoading };
+      
+      case "reactivate":
+        message = <>Reactivate merchant <strong>{merchantName}</strong>?</>;
+        return { title: "Confirm Reactivation", message, confirmButtonText: reactivationLoading ? "Reactivating..." : "Reactivate", confirmButtonVariant: "success" as const, isLoading: reactivationLoading };
+      
+      default: 
+        // Should not be reached due to typed actionType
+        const _exhaustiveCheck: never = actionType;
+        return null;
     }
   };
   const confirmModalProps = getConfirmModalProps();
@@ -251,9 +281,8 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
                   <tr key={merchant.id}>
                     <td className={`${tableCellClasses} font-semibold text-gray-900`}>{merchant.businessName}</td>
                     <td className={tableCellClasses}>{merchant.contactEmail || "N/A"}</td>
-                    {/* Assuming merchant.submittedAt is string, formatDate should handle it */}
                     <td className={tableCellClasses}>{formatDate(merchant.submittedAt)}</td> 
-                    <td className={`${tableCellClasses} text-center`}> {/* Corrected class application */}
+                    <td className={`${tableCellClasses} text-center`}>
                       <button
                         onClick={() => handleViewDetails(merchant.id)}
                         className="px-2 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-1 view-merchant-details-btn"
@@ -303,10 +332,9 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
                       <td className={tableCellClasses}>{merchant.businessName}</td>
                       <td className={tableCellClasses}>{merchant.contactEmail || "N/A"}</td>
                       <td className={tableCellCenterClasses}>{renderStatusBadge(merchant.status, "merchant")}</td>
-                      {/* Assuming merchant.updatedAt and merchant.submittedAt are strings */}
                       <td className={tableCellClasses}>{formatDate(merchant.updatedAt || merchant.submittedAt)}</td> 
                       <td className={tableCellCenterClasses}>{txCount}</td>
-                      <td className={`${tableCellClasses} text-center`}> {/* Corrected class application */}
+                      <td className={`${tableCellClasses} text-center`}>
                         <button
                           onClick={() => handleViewDetails(merchant.id)}
                            className="px-2 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-1 view-merchant-details-btn"
@@ -330,7 +358,7 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
           onClose={handleCloseDetailModal}
           onRequestConfirm={handleRequestConfirm}
           merchant={selectedMerchant}
-          transactions={transactions} // These should be rich transactions for the modal's internal table
+          transactions={transactions} 
           accounts={accounts} 
         />
       )}
@@ -339,9 +367,9 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
           isOpen={isConfirmModalOpen}
           onClose={handleCloseConfirmModal}
           onConfirm={handleConfirmAction}
-          title={confirmModalProps.title!} // Added non-null assertion assuming it's always set when modal is open
-          message={confirmModalProps.message!} // Added non-null assertion
-          confirmButtonText={confirmModalProps.confirmButtonText!} // Added non-null assertion
+          title={confirmModalProps.title!} 
+          message={confirmModalProps.message!} 
+          confirmButtonText={confirmModalProps.confirmButtonText!} 
           confirmButtonVariant={confirmModalProps.confirmButtonVariant}
           isLoading={confirmModalProps.isLoading}
         />
