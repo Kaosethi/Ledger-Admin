@@ -1,7 +1,7 @@
 import React, { useState, useRef, useMemo, useEffect } from "react";
 import type {
-  Account,
-  Transaction,
+  Account, // This 'Account' type is from mockData. Consider if it should be DrizzleAccount.
+  // Transaction, // We will replace this with DrizzleTransaction below
   Merchant,
   PendingRegistration,
 } from "@/lib/mockData"; // Ensure path is correct
@@ -11,6 +11,7 @@ import {
   formatDate,
   renderStatusBadge,
   formatDdMmYyyyHhMmSs,
+  tuncateUUID, // <<<< Added this based on our previous discussion about the typo
 } from "@/lib/utils"; // Ensure path is correct
 import BulkEditModal from "../modals/BulkEditModal"; // Ensure path is correct
 import EditAccountModal from "../modals/EditAccountModal"; // Ensure path is correct
@@ -21,6 +22,13 @@ import PendingRegistrationDetailModal from "../modals/PendingRegistrationDetailM
 import { DateTime } from "luxon";
 import { Skeleton } from "@/components/ui/skeleton";
 
+// --- ADD THESE IMPORTS AND TYPE DEFINITIONS ---
+import { selectTransactionSchema, selectAccountSchema } from "@/lib/db/schema"; 
+import { z } from "zod"; 
+
+type DrizzleTransaction = z.infer<typeof selectTransactionSchema>;
+type DrizzleAccount = z.infer<typeof selectAccountSchema>; 
+
 interface AccountsTabProps {
   accounts: Account[];
   onAccountsUpdate?: (updatedAccounts: Account[]) => void;
@@ -30,7 +38,7 @@ interface AccountsTabProps {
     targetId?: string,
     details?: string
   ) => void;
-  allTransactions: Transaction[];
+  allTransactions: DrizzleTransaction[];
   merchants: Merchant[];
   pendingRegistrations: PendingRegistration[];
   onPendingRegistrationsUpdate: (updatedList: PendingRegistration[]) => void;
