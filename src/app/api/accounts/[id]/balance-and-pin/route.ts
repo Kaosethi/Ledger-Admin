@@ -6,7 +6,6 @@ import { withAuth } from "@/lib/auth/middleware";
 import { z } from "zod";
 import { hashPassword } from "@/lib/auth/password";
 
-// Define a schema for the request body
 const updateSchema = z.object({
   balance: z.number().min(0).max(5000).optional(),
   pin: z

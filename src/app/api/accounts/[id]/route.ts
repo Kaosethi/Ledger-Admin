@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { accounts } from "@/lib/db/schema";
-import { eq, isNull, and } from "drizzle-orm";
+import { eq, ne, isNull, and } from "drizzle-orm";
 import { withAuth } from "@/lib/auth/middleware";
 import { JWTPayload } from "@/lib/auth/jwt";
+import { z } from "zod";
+
+// Schema for updating insensitive data only
+const updateSchema = z.object({
+  guardianName: z.string().min(1, "Guardian name is required").optional(),
+  guardianDob: z.string().optional(),
+  guardianContact: z.string().optional(),
+  email: z.string().email("Invalid email address").optional(),
+  address: z.string().optional(),
+  notes: z.string().optional(),
+});
 
 // GET /api/accounts/[id] - Get a specific account by ID
 export const GET = withAuth(
@@ -35,17 +46,29 @@ export const GET = withAuth(
   }
 );
 
-// PATCH /api/accounts/[id] - Update an account
+// PATCH /api/accounts/[id] - Update an account (insensitive fields only)
 export const PATCH = withAuth(
   async (request: NextRequest, context: any, payload: JWTPayload) => {
     try {
       const body = await request.json();
 
-      // Update account
+      // Validate that only insensitive fields are being updated
+      const validatedData = updateSchema.parse(body);
+
+      // Update account with only the validated insensitive fields
       const updatedAccount = await db
         .update(accounts)
-        .set(body)
-        .where(eq(accounts.id, context.params.id))
+        .set({
+          ...validatedData,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            isNull(accounts.deletedAt),
+            eq(accounts.id, context.params.id),
+            ne(accounts.status, "Suspended")
+          )
+        )
         .returning();
 
       if (!updatedAccount.length) {
@@ -58,6 +81,18 @@ export const PATCH = withAuth(
       return NextResponse.json(updatedAccount[0]);
     } catch (error) {
       console.error("Error updating account:", error);
+
+      // Handle validation errors
+      if (error instanceof z.ZodError) {
+        return NextResponse.json(
+          {
+            error: "Validation error",
+            details: error.format(),
+          },
+          { status: 400 }
+        );
+      }
+
       return NextResponse.json(
         { error: "Failed to update account" },
         { status: 500 }
