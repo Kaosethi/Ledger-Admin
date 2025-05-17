@@ -23,6 +23,11 @@ import mockDataInstance, {
   PendingRegistration,
   AdminUser,
 } from "@/lib/mockData"; // Ensure Merchant here is the API-aligned type
+import { z } from "zod";
+import { selectTransactionSchema } from "@/lib/db/schema";
+
+// Define DrizzleTransaction type
+type DrizzleTransaction = z.infer<typeof selectTransactionSchema>;
 
 // --- Props Interface ---
 interface AdminDashboardProps {
@@ -52,6 +57,30 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       pendingRegistrations: mockDataInstance.pendingRegistrations || [],
     };
   });
+
+  // Convert Transaction[] to DrizzleTransaction[]
+  const convertToDrizzleTransactions = useCallback(
+    (transactions: Transaction[]): DrizzleTransaction[] => {
+      return transactions.map((transaction) => ({
+        id: transaction.id,
+        paymentId: transaction.id, // Use transaction.id as fallback for missing payment_id
+        timestamp: new Date(transaction.timestamp),
+        amount: transaction.amount.toString(), // Convert to string for numeric type
+        type: transaction.type,
+        accountId: transaction.accountId,
+        merchantId: transaction.merchantId || "", // Provide fallback for null/undefined
+        status: transaction.status,
+        declineReason: transaction.declineReason || null,
+        pinVerified: false, // Default value
+        description: transaction.description || null,
+        reference: null, // Default value
+        metadata: null, // Default value
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }));
+    },
+    []
+  );
 
   const logAdminActivity = useCallback(
     (
@@ -184,7 +213,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             accounts={appData.accounts}
             onAccountsUpdate={handleAccountsUpdate}
             logAdminActivity={logAdminActivity}
-            allTransactions={appData.transactions}
+            allTransactions={convertToDrizzleTransactions(appData.transactions)}
             merchants={appData.merchants}
             pendingRegistrations={appData.pendingRegistrations}
             onPendingRegistrationsUpdate={handlePendingRegistrationsUpdate}
