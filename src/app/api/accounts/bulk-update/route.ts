@@ -5,6 +5,7 @@ import { eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { withAuth } from "@/lib/auth/middleware";
 import { z } from "zod";
+import { removeSensitiveData } from "@/lib/utils";
 
 export const POST = withAuth(async function POST(request: Request) {
   try {
@@ -93,7 +94,9 @@ export const POST = withAuth(async function POST(request: Request) {
           .returning();
 
         if (updatedAccount) {
-          updatedAccounts.push(updatedAccount);
+          // Remove sensitive data before adding to response
+          const safeAccount = removeSensitiveData(updatedAccount);
+          updatedAccounts.push(safeAccount);
 
           // Log the activity
           const changes = [];
@@ -130,7 +133,7 @@ export const POST = withAuth(async function POST(request: Request) {
       totalFailed: failedUpdates,
     });
   } catch (error) {
-    console.error("Error in bulk update accounts API:", error);
+    console.error("Error in bulk update:", error);
     return NextResponse.json(
       { error: "Failed to process bulk update" },
       { status: 500 }

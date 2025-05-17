@@ -9,6 +9,7 @@ import { JWTPayload } from "@/lib/auth/jwt";
 import { env } from "@/lib/config";
 import { and, eq, ilike, isNull, or } from "drizzle-orm";
 import { hashPassword } from "@/lib/auth/password";
+import { removeSensitiveData } from "@/lib/utils";
 
 // GET /api/accounts - Get all accounts (protected)
 export const GET = withAuth(
@@ -73,7 +74,9 @@ export const GET = withAuth(
           `Found ${filteredAccounts.length} accounts after filtering`
         );
         if (filteredAccounts && filteredAccounts.length > 0) {
-          return NextResponse.json(filteredAccounts);
+          // Remove sensitive data before returning
+          const safeAccounts = filteredAccounts.map(removeSensitiveData);
+          return NextResponse.json(safeAccounts);
         }
       } catch (dbError) {
         console.warn("Database error, falling back to mock data:", dbError);
@@ -104,11 +107,15 @@ export const GET = withAuth(
       console.log(
         `Returning ${mockResults.length} mock accounts after filtering`
       );
-      return NextResponse.json(mockResults);
+      // Remove sensitive data from mock results
+      const safeMockResults = mockResults.map(removeSensitiveData);
+      return NextResponse.json(safeMockResults);
     } catch (error) {
       console.error("Error fetching accounts:", error);
       // Final fallback to mock data
-      return NextResponse.json(mockDataInstance.accounts);
+      const safeMockAccounts =
+        mockDataInstance.accounts.map(removeSensitiveData);
+      return NextResponse.json(safeMockAccounts);
     }
   }
 );
@@ -155,14 +162,10 @@ export const POST = withAuth(
           .values(accountData)
           .returning();
 
-        // Add the pin to the response for frontend compatibility
-        // This won't expose the hashed value but allows the frontend to work with the PIN
-        const responseAccount = { ...newAccount[0] };
-        if (pin) {
-          (responseAccount as any).pin = pin;
-        }
+        // Remove sensitive data before returning
+        const safeAccount = removeSensitiveData(newAccount[0]);
 
-        return NextResponse.json(responseAccount, { status: 201 });
+        return NextResponse.json(safeAccount, { status: 201 });
       } catch (dbError) {
         console.warn(
           "Database error on POST, returning mock response:",
@@ -178,12 +181,10 @@ export const POST = withAuth(
           balance: 0,
         };
 
-        // Add the pin to the mock response for frontend compatibility
-        if (pin) {
-          (mockResponse as any).pin = pin;
-        }
+        // Remove sensitive data before returning
+        const safeMockResponse = removeSensitiveData(mockResponse);
 
-        return NextResponse.json(mockResponse, { status: 201 });
+        return NextResponse.json(safeMockResponse, { status: 201 });
       }
     } catch (error) {
       console.error("Error creating account:", error);

@@ -3,8 +3,7 @@ import { db } from "@/lib/db";
 import { accounts, createAccountSchema } from "@/lib/db/schema";
 import { z } from "zod";
 import { hashPassword } from "@/lib/auth/password";
-import { env } from "@/lib/config";
-import { generateFallbackId } from "@/lib/utils";
+import { generateFallbackId, removeSensitiveData } from "@/lib/utils";
 
 // POST /api/registrations - Public endpoint to create a new account without qr code
 export async function POST(request: Request, context: any) {
@@ -48,13 +47,10 @@ export async function POST(request: Request, context: any) {
         .values(accountData)
         .returning();
 
-      // Add the pin to the response for frontend compatibility
-      const responseAccount = { ...newAccount[0] };
-      if (pin) {
-        (responseAccount as any).pin = pin;
-      }
+      // Remove sensitive data before returning
+      const safeAccount = removeSensitiveData(newAccount[0]);
 
-      return NextResponse.json(responseAccount, { status: 201 });
+      return NextResponse.json(safeAccount, { status: 201 });
     } catch (dbError) {
       console.warn("Database error on POST, returning mock response:", dbError);
 
@@ -67,12 +63,10 @@ export async function POST(request: Request, context: any) {
         balance: 0,
       };
 
-      // Add the pin to the mock response for frontend compatibility
-      if (pin) {
-        (mockResponse as any).pin = pin;
-      }
+      // Remove sensitive data before returning
+      const safeMockResponse = removeSensitiveData(mockResponse);
 
-      return NextResponse.json(mockResponse, { status: 201 });
+      return NextResponse.json(safeMockResponse, { status: 201 });
     }
   } catch (error) {
     console.error("Error creating account:", error);

@@ -231,3 +231,8 @@ export const tuncateUUID = (uuid: string | null | undefined, first = 8, last = 4
   }
   return `${uuid.substring(0, first)}...${uuid.substring(uuid.length - last)}`;
 };
+
+export const removeSensitiveData = (account: any) => {
+  const { hashedPin, ...safeAccount } = account;
+  return safeAccount;
+};

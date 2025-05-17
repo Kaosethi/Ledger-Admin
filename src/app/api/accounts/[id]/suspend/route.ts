@@ -4,6 +4,7 @@ import { accounts } from "@/lib/db/schema";
 import { eq, isNull, and } from "drizzle-orm";
 import { withAuth } from "@/lib/auth/middleware";
 import { JWTPayload } from "@/lib/auth/jwt";
+import { removeSensitiveData } from "@/lib/utils";
 
 // PATCH /api/accounts/[id]/suspend - Suspend an account (set status to Suspended)
 export const PATCH = withAuth(
@@ -21,9 +22,7 @@ export const PATCH = withAuth(
           updatedAt: now,
           lastActivity: now,
         })
-        .where(
-          and(isNull(accounts.deletedAt), eq(accounts.id, id))
-        )
+        .where(and(isNull(accounts.deletedAt), eq(accounts.id, id)))
         .returning();
 
       if (!updatedAccount.length) {
@@ -33,7 +32,9 @@ export const PATCH = withAuth(
         );
       }
 
-      return NextResponse.json(updatedAccount[0]);
+      // Remove sensitive data before returning
+      const safeAccount = removeSensitiveData(updatedAccount[0]);
+      return NextResponse.json(safeAccount);
     } catch (error) {
       console.error("Error suspending account:", error);
       return NextResponse.json(

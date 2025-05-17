@@ -4,9 +4,10 @@ import { accounts } from "@/lib/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { withAuth } from "@/lib/auth/middleware";
 import { JWTPayload } from "@/lib/auth/jwt";
+import { removeSensitiveData } from "@/lib/utils";
 
 // PATCH /api/accounts/[id]/approve - Approve an account (set status to Active)
-export const PATCH = withAuth(async (request: NextRequest, context: any) => {
+export const PATCH = withAuth(async (request: NextRequest, context: any, payload: JWTPayload) => {
   try {
     const now = new Date();
 
@@ -27,7 +28,9 @@ export const PATCH = withAuth(async (request: NextRequest, context: any) => {
       return NextResponse.json({ error: "Account not found" }, { status: 404 });
     }
 
-    return NextResponse.json(updatedAccount[0]);
+    // Remove sensitive data before returning
+    const safeAccount = removeSensitiveData(updatedAccount[0]);
+    return NextResponse.json(safeAccount);
   } catch (error) {
     console.error("Error approving account:", error);
     return NextResponse.json(

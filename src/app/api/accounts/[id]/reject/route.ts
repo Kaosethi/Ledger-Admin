@@ -4,6 +4,7 @@ import { accounts } from "@/lib/db/schema";
 import { eq, isNull, and } from "drizzle-orm";
 import { withAuth } from "@/lib/auth/middleware";
 import { JWTPayload } from "@/lib/auth/jwt";
+import { removeSensitiveData } from "@/lib/utils";
 
 // PATCH /api/accounts/[id]/reject - Reject an account (set status to Inactive and soft delete)
 export const PATCH = withAuth(
@@ -32,7 +33,9 @@ export const PATCH = withAuth(
         );
       }
 
-      return NextResponse.json(updatedAccount[0]);
+      // Remove sensitive data before returning
+      const safeAccount = removeSensitiveData(updatedAccount[0]);
+      return NextResponse.json(safeAccount);
     } catch (error) {
       console.error("Error rejecting account:", error);
       return NextResponse.json(

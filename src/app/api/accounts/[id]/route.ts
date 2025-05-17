@@ -5,6 +5,7 @@ import { eq, ne, isNull, and } from "drizzle-orm";
 import { withAuth } from "@/lib/auth/middleware";
 import { JWTPayload } from "@/lib/auth/jwt";
 import { z } from "zod";
+import { removeSensitiveData } from "@/lib/utils";
 
 // Schema for updating insensitive data only
 const updateSchema = z.object({
@@ -35,7 +36,9 @@ export const GET = withAuth(
         );
       }
 
-      return NextResponse.json(account[0]);
+      // Remove sensitive data before returning
+      const safeAccount = removeSensitiveData(account[0]);
+      return NextResponse.json(safeAccount);
     } catch (error) {
       console.error("Error fetching account:", error);
       return NextResponse.json(
@@ -78,7 +81,9 @@ export const PATCH = withAuth(
         );
       }
 
-      return NextResponse.json(updatedAccount[0]);
+      // Remove sensitive data before returning
+      const safeAccount = removeSensitiveData(updatedAccount[0]);
+      return NextResponse.json(safeAccount);
     } catch (error) {
       console.error("Error updating account:", error);
 
@@ -117,7 +122,9 @@ export const DELETE = withAuth(
         );
       }
 
-      return NextResponse.json(deletedAccount[0]);
+      // Remove sensitive data before returning
+      const safeAccount = removeSensitiveData(deletedAccount[0]);
+      return NextResponse.json(safeAccount);
     } catch (error) {
       console.error("Error deleting account:", error);
       return NextResponse.json(
