@@ -1,7 +1,9 @@
 // src/components/tabs/TransactionsTab.tsx
 "use client";
 import React, { useState, useMemo } from "react";
-import type { Transaction, Merchant, Account } from "@/lib/mockData"; // EXPECTING RICH TYPE
+// This import MUST resolve to the "rich" Transaction type from lib/mockData.ts
+// that includes paymentId, createdAt, updatedAt, timestamp:Date, amount:string etc.
+import type { Transaction, Merchant, Account } from "@/lib/mockData";
 
 import {
   Table,
@@ -37,13 +39,14 @@ import {
 } from "@/lib/utils";
 import TransactionDetailModal from "../modals/TransactionDetailModal";
 import {
-  DownloadIcon,
+  DownloadIcon, // For Export button
   ChevronLeftIcon, 
   ChevronRightIcon,
   XIcon,
   CalendarIcon,
 } from "lucide-react";
 import { format as formatDateFns } from "date-fns";
+import { unparse } from "papaparse"; // For CSV export
 
 const ITEMS_PER_PAGE = 10;
 
@@ -61,6 +64,7 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
   merchants = [],
   accounts = [],
   transactionsLoading = false,
+  // accountsLoading and merchantsLoading are accepted but not yet used for specific UI changes
 }) => {
   const [fromDate, setFromDate] = useState<Date | undefined>(undefined);
   const [toDate, setToDate] = useState<Date | undefined>(undefined);
@@ -84,8 +88,9 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
   };
 
   const filteredTransactions = useMemo(() => {
+    // This assumes 'transactions' prop contains the "rich" Transaction objects
     return transactions.filter((tx) => {
-      const txDate = tx.timestamp;
+      const txDate = tx.timestamp; // Should be a Date object
 
       if (fromDate) {
         const startOfDayFromDate = new Date(fromDate);
@@ -113,6 +118,7 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
       if (filterStatus !== "all" && tx.status !== filterStatus) {
         return false;
       }
+      // tx.paymentId should exist on the rich Transaction type
       if (filterPaymentId.trim() !== "" && !tx.paymentId.toLowerCase().includes(filterPaymentId.trim().toLowerCase())) {
         return false;
       }
@@ -149,9 +155,72 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
   
   const transactionStatuses: Transaction['status'][] = ["Pending", "Completed", "Failed", "Declined"];
 
+  // --- CSV EXPORT FUNCTION ---
+  const handleExportCSV = () => {
+    if (filteredTransactions.length === 0) {
+      alert("No transactions to export with current filters.");
+      return;
+    }
+
+    const csvData = filteredTransactions.map((tx) => {
+      // Ensure all fields from the "rich" Transaction type are accessed correctly
+      const { date: txDisplayDate, time: txDisplayTime } = formatDateTime(tx.timestamp); // tx.timestamp is Date
+      const { date: createdDate, time: createdTime } = formatDateTime(tx.createdAt); // tx.createdAt is Date
+      const { date: updatedDate, time: updatedTime } = formatDateTime(tx.updatedAt); // tx.updatedAt is Date
+      const merchant = merchants.find((m) => m.id === tx.merchantId);
+      const account = accounts.find((acc) => acc.id === tx.accountId);
+      
+      let signedAmount = parseFloat(tx.amount); // tx.amount is string
+      if (tx.type === "Debit" || (tx.type === "Adjustment" && signedAmount < 0)) {
+        signedAmount = -Math.abs(signedAmount); 
+      } else {
+        signedAmount = Math.abs(signedAmount);
+      }
+
+      return {
+        "Payment ID (User Facing)": tx.paymentId,
+        "Transaction DB ID": tx.id,
+        "Date": txDisplayDate,
+        "Time": txDisplayTime,
+        "Timestamp (ISO)": tx.timestamp.toISOString(),
+        "Account Display ID": account?.displayId || "N/A",
+        "Account Child Name": account?.childName || "N/A",
+        "Account DB ID": tx.accountId || "",
+        "Merchant Name": merchant?.businessName || (tx.merchantId ? "Unknown/Inactive" : "N/A"),
+        "Merchant DB ID": tx.merchantId || "N/A",
+        "Type": tx.type,
+        "Amount": signedAmount.toFixed(2),
+        "Currency": "THB", // Assuming THB
+        "Status": tx.status,
+        "Decline Reason": tx.declineReason || "",
+        "PIN Verified": tx.pinVerified === null ? "N/A" : tx.pinVerified ? "Yes" : "No",
+        "Description": tx.description || "",
+        "Client Reference": tx.reference || "",
+        "Metadata (JSON)": tx.metadata ? JSON.stringify(JSON.parse(tx.metadata)) : "",
+        "System Created At (ISO)": tx.createdAt.toISOString(),
+        "System Updated At (ISO)": tx.updatedAt.toISOString(),
+      };
+    });
+
+    try {
+      const csv = unparse(csvData);
+      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `transactions_export_${new Date().toISOString().split("T")[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error exporting CSV:", error);
+      alert("Failed to export CSV. Please check console for details.");
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* TASK 1: Added Transaction History Title */}
       <h1 className="text-2xl font-semibold text-gray-800">Transaction History</h1>
 
       {/* Filter Section */}
@@ -205,15 +274,20 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
             <Label htmlFor="filterPaymentId" className="mb-1 block text-sm font-medium">Payment ID:</Label>
             <Input id="filterPaymentId" type="text" placeholder="Filter by Payment ID" value={filterPaymentId} onChange={(e) => setFilterPaymentId(e.target.value)} className="w-full"/>
           </div>
-          <div className="flex space-x-2 items-end pt-2 sm:pt-0 md:col-start-3 lg:col-start-4 lg:col-span-1 justify-end">
+          {/* Action Buttons Container */}
+          <div className="flex space-x-2 items-end pt-2 sm:pt-0 md:col-start-3 lg:col-start-3 lg:col-span-2 justify-end"> {/* Adjusted grid positioning for buttons */}
             <Button onClick={clearFilters} variant="outline" className="w-full sm:w-auto">
               <XIcon className="mr-2 h-4 w-4" /> Clear
+            </Button>
+            {/* EXPORT BUTTON RE-ADDED */}
+            <Button onClick={handleExportCSV} className="w-full sm:w-auto">
+              <DownloadIcon className="mr-2 h-4 w-4" /> Export CSV
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Table Section */}
+      {/* Table Section - This part should be working if lib/mockData.ts and AdminDashboard.tsx are correct */}
       <div className="bg-white p-4 rounded-lg shadow overflow-x-auto">
         <Table>
           <TableHeader>
@@ -248,6 +322,7 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
               ))
             ) : transactionsToDisplay.length > 0 ? (
               transactionsToDisplay.map((tx) => {
+                // Assuming tx.timestamp is Date and tx.amount is string from rich Transaction type
                 const { date, time } = formatDateTime(tx.timestamp);
                 const account = accounts.find(acc => acc.id === tx.accountId);
                 const merchant = merchants.find(m => m.id === tx.merchantId);
@@ -261,10 +336,7 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
                     <TableCell>{account?.childName || "N/A"}</TableCell>
                     <TableCell title={merchant?.id || ""}>{tx.merchantId ? tuncateUUID(tx.merchantId) : "N/A"}</TableCell>
                     <TableCell>{merchant?.businessName || (tx.merchantId ? "Unknown" : "N/A")}</TableCell>
-                    {/* TASK 2: Amount column updated */}
-                    <TableCell className="text-right font-medium">
-                      {formatCurrency(Math.abs(amountValue))}
-                    </TableCell>
+                    <TableCell className="text-right font-medium">{formatCurrency(Math.abs(amountValue))}</TableCell>
                     <TableCell className="text-center">{renderStatusBadge(tx.status, "transaction")}</TableCell>
                     <TableCell className="font-mono text-xs" title={tx.paymentId}>{tuncateUUID(tx.paymentId)}</TableCell>
                     <TableCell className="text-center">
@@ -282,14 +354,15 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
         </Table>
       </div>
       
+      {/* Pagination Section */}
       {totalPages > 1 && !transactionsLoading && (
         <div className="flex items-center justify-between pt-4">
           <div className="text-sm text-gray-700">
             Showing page <strong>{currentPage}</strong> of <strong>{totalPages}</strong>
           </div>
           <div className="space-x-2">
-            <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Previous</Button>
-            <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Next</Button>
+            <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}><ChevronLeftIcon className="h-4 w-4 mr-1" />Previous</Button>
+            <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>Next<ChevronRightIcon className="h-4 w-4 ml-1" /></Button>
           </div>
         </div>
       )}
