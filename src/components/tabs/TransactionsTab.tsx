@@ -33,11 +33,11 @@ import {
     formatDateTime,
     renderStatusBadge,
     tuncateUUID,
-    cn // Assuming cn is in your utils
+    cn 
 } from "@/lib/utils";
 import TransactionDetailModal from "../modals/TransactionDetailModal";
 import {
-  DownloadIcon, // We'll add CSV export later
+  DownloadIcon,
   ChevronLeftIcon, 
   ChevronRightIcon,
   XIcon,
@@ -45,7 +45,7 @@ import {
 } from "lucide-react";
 import { format as formatDateFns } from "date-fns";
 
-const ITEMS_PER_PAGE = 10; // For pagination later
+const ITEMS_PER_PAGE = 10;
 
 interface TransactionsTabProps {
   transactions: Transaction[];
@@ -61,17 +61,15 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
   merchants = [],
   accounts = [],
   transactionsLoading = false,
-  // accountsLoading and merchantsLoading are accepted but not used for specific skeletons yet
 }) => {
-  // --- Filter State ---
   const [fromDate, setFromDate] = useState<Date | undefined>(undefined);
   const [toDate, setToDate] = useState<Date | undefined>(undefined);
   const [filterAccountId, setFilterAccountId] = useState<string>("");
-  const [filterMerchantName, setFilterMerchantName] = useState<string>(""); // Filter by name
-  const [filterStatus, setFilterStatus] = useState<string>("all"); // "all" or specific status
+  const [filterMerchantName, setFilterMerchantName] = useState<string>("");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterPaymentId, setFilterPaymentId] = useState<string>("");
 
-  const [currentPage, setCurrentPage] = useState(1); // For pagination later
+  const [currentPage, setCurrentPage] = useState(1);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedTransactionForDetail, setSelectedTransactionForDetail] = useState<Transaction | null>(null);
 
@@ -87,7 +85,7 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter((tx) => {
-      const txDate = tx.timestamp; // Already a Date object from rich Transaction type
+      const txDate = tx.timestamp;
 
       if (fromDate) {
         const startOfDayFromDate = new Date(fromDate);
@@ -99,7 +97,6 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
         endOfDayToDate.setHours(23, 59, 59, 999);
         if (txDate > endOfDayToDate) return false;
       }
-
       if (filterAccountId.trim() !== "") {
         const account = accounts.find(acc => acc.id === tx.accountId);
         if (!account?.displayId.toLowerCase().includes(filterAccountId.trim().toLowerCase()) &&
@@ -107,22 +104,18 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
           return false;
         }
       }
-
       if (filterMerchantName.trim() !== "") {
         const merchant = merchants.find(m => m.id === tx.merchantId);
         if (!merchant?.businessName.toLowerCase().includes(filterMerchantName.trim().toLowerCase())) {
           return false;
         }
       }
-      
       if (filterStatus !== "all" && tx.status !== filterStatus) {
         return false;
       }
-
       if (filterPaymentId.trim() !== "" && !tx.paymentId.toLowerCase().includes(filterPaymentId.trim().toLowerCase())) {
         return false;
       }
-      
       return true;
     });
   }, [
@@ -137,14 +130,12 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
     merchants
   ]);
 
-  // --- Pagination Logic (will be expanded) ---
   const totalPages = Math.ceil(filteredTransactions.length / ITEMS_PER_PAGE);
   const transactionsToDisplay = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const endIndex = startIndex + ITEMS_PER_PAGE;
     return filteredTransactions.slice(startIndex, endIndex);
   }, [filteredTransactions, currentPage]);
-
 
   const handleViewDetailsClick = (transaction: Transaction) => {
     setSelectedTransactionForDetail(transaction);
@@ -158,13 +149,14 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
   
   const transactionStatuses: Transaction['status'][] = ["Pending", "Completed", "Failed", "Declined"];
 
-
   return (
     <div className="space-y-6">
+      {/* TASK 1: Added Transaction History Title */}
+      <h1 className="text-2xl font-semibold text-gray-800">Transaction History</h1>
+
       {/* Filter Section */}
       <div className="bg-white p-4 rounded-lg shadow">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-3 items-end">
-          {/* From Date */}
           <div>
             <Label htmlFor="fromDate" className="mb-1 block text-sm font-medium">From Date:</Label>
             <Popover>
@@ -177,7 +169,6 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
               <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={fromDate} onSelect={setFromDate} initialFocus /></PopoverContent>
             </Popover>
           </div>
-          {/* To Date */}
           <div>
             <Label htmlFor="toDate" className="mb-1 block text-sm font-medium">To Date:</Label>
             <Popover>
@@ -190,17 +181,14 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
               <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={toDate} onSelect={setToDate} disabled={(date) => fromDate ? date < fromDate : false} initialFocus /></PopoverContent>
             </Popover>
           </div>
-          {/* Account ID Filter */}
           <div>
             <Label htmlFor="filterAccountId" className="mb-1 block text-sm font-medium">Account ID:</Label>
             <Input id="filterAccountId" type="text" placeholder="Filter by Account ID" value={filterAccountId} onChange={(e) => setFilterAccountId(e.target.value)} className="w-full"/>
           </div>
-          {/* Merchant Name Filter */}
           <div>
             <Label htmlFor="filterMerchantName" className="mb-1 block text-sm font-medium">Merchant Name:</Label>
             <Input id="filterMerchantName" type="text" placeholder="Filter by Merchant Name" value={filterMerchantName} onChange={(e) => setFilterMerchantName(e.target.value)} className="w-full"/>
           </div>
-          {/* Status Filter */}
           <div>
             <Label htmlFor="filterStatus" className="mb-1 block text-sm font-medium">Status:</Label>
             <Select value={filterStatus} onValueChange={setFilterStatus}>
@@ -213,22 +201,19 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
               </SelectContent>
             </Select>
           </div>
-          {/* Payment ID Filter */}
           <div>
             <Label htmlFor="filterPaymentId" className="mb-1 block text-sm font-medium">Payment ID:</Label>
             <Input id="filterPaymentId" type="text" placeholder="Filter by Payment ID" value={filterPaymentId} onChange={(e) => setFilterPaymentId(e.target.value)} className="w-full"/>
           </div>
-          {/* Action Buttons - spanning across to align better */}
           <div className="flex space-x-2 items-end pt-2 sm:pt-0 md:col-start-3 lg:col-start-4 lg:col-span-1 justify-end">
             <Button onClick={clearFilters} variant="outline" className="w-full sm:w-auto">
               <XIcon className="mr-2 h-4 w-4" /> Clear
             </Button>
-             {/* CSV Export button will be added back here later */}
           </div>
         </div>
       </div>
 
-      {/* Table Section - unchanged from previous working version */}
+      {/* Table Section */}
       <div className="bg-white p-4 rounded-lg shadow overflow-x-auto">
         <Table>
           <TableHeader>
@@ -276,8 +261,8 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
                     <TableCell>{account?.childName || "N/A"}</TableCell>
                     <TableCell title={merchant?.id || ""}>{tx.merchantId ? tuncateUUID(tx.merchantId) : "N/A"}</TableCell>
                     <TableCell>{merchant?.businessName || (tx.merchantId ? "Unknown" : "N/A")}</TableCell>
-                    <TableCell className={`text-right font-medium ${tx.type === "Credit" || (tx.type === "Adjustment" && amountValue > 0) ? "text-green-600" : "text-red-600"}`}>
-                      {tx.type === "Credit" || (tx.type === "Adjustment" && amountValue > 0) ? "+" : "-"}
+                    {/* TASK 2: Amount column updated */}
+                    <TableCell className="text-right font-medium">
                       {formatCurrency(Math.abs(amountValue))}
                     </TableCell>
                     <TableCell className="text-center">{renderStatusBadge(tx.status, "transaction")}</TableCell>
@@ -297,7 +282,6 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
         </Table>
       </div>
       
-      {/* Pagination Section - Basic for now */}
       {totalPages > 1 && !transactionsLoading && (
         <div className="flex items-center justify-between pt-4">
           <div className="text-sm text-gray-700">
