@@ -21,6 +21,7 @@
     "@radix-ui/react-slot": "^1.2.2",
     "@radix-ui/react-toast": "^1.2.11",
     "@tanstack/react-query": "^5.76.0",
+    "@tanstack/react-table": "^8.21.3",
     "bcrypt": "^6.0.0",
     "better-auth": "^1.2.7",
     "bun": "^1.2.12",
