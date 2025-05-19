@@ -23,11 +23,11 @@ import { DateTime } from "luxon";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // --- ADD THESE IMPORTS AND TYPE DEFINITIONS ---
-import { selectTransactionSchema, selectAccountSchema } from "@/lib/db/schema"; 
-import { z } from "zod"; 
+import { selectTransactionSchema, selectAccountSchema } from "@/lib/db/schema";
+import { z } from "zod";
 
 type DrizzleTransaction = z.infer<typeof selectTransactionSchema>;
-type DrizzleAccount = z.infer<typeof selectAccountSchema>; 
+type DrizzleAccount = z.infer<typeof selectAccountSchema>;
 
 interface AccountsTabProps {
   accounts: Account[];

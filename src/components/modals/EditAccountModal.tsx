@@ -11,10 +11,11 @@ import {
   tuncateUUID, // Using the typo'd name as per your decision
 } from "@/lib/utils";
 import { QRCodeSVG } from "qrcode.react";
-import { useReactToPrint, UseReactToPrintOptions } from "react-to-print";
+import { useReactToPrint } from "react-to-print";
 import ConfirmActionModal from "./ConfirmActionModal";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
+import QrCodePrintable from "@/components/print/QrCodePrintable"; // Import the printable component
 
 // Infer the select type from Drizzle Zod schema. This will have paymentId and other DB fields.
 type DrizzleTransaction = z.infer<typeof selectTransactionSchema>;
@@ -127,7 +128,6 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
     actionType: AccountActionType | null;
     account: Account | null;
   }>({ actionType: null, account: null });
-
   const qrCodePrintRef = useRef<HTMLDivElement>(null);
 
   const suspendMutation = useMutation({
@@ -198,10 +198,149 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
   }, [allTransactions, account, merchants]);
 
   const handlePrintQr = useReactToPrint({
-    content: () => qrCodePrintRef.current,
+    contentRef: qrCodePrintRef,
     documentTitle: `QR-Code-${account?.displayId || "Account"}`,
-    removeAfterPrint: true,
-  } as UseReactToPrintOptions);
+  });
+
+  const triggerQrPrintView = () => {
+    if (!account || !currentQrToken) {
+      toast.error("No QR code available to print.");
+      return;
+    }
+
+    // Build HTML for printing
+    // Create a more focused, single QR code print view
+    const qrValue = currentQrToken;
+    const html = `
+      <html>
+        <head>
+          <title>QR Code - ${account.displayId || account.id}</title>
+          <style>
+            body { 
+              margin: 0; 
+              padding: 0; 
+              font-family: Arial, sans-serif;
+              background-color: white;
+            }
+            
+            .print-container {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              padding: 15mm;
+              box-sizing: border-box;
+            }
+            
+            .qr-card {
+              border: 1px solid #ddd;
+              border-radius: 4px;
+              padding: 8mm;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              background-color: white;
+              box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+              max-width: 100mm;
+              margin: 0 auto;
+            }
+            
+            .account-id {
+              font-size: 14px;
+              font-weight: bold;
+              margin-bottom: 2mm;
+              text-align: center;
+            }
+            
+            .account-name {
+              font-size: 12px;
+              margin-bottom: 5mm;
+              text-align: center;
+            }
+            
+            .qr-container {
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              padding: 2mm;
+              background-color: #f9f9f9;
+              border-radius: 4px;
+              margin-bottom: 3mm;
+            }
+            
+            .footer {
+              font-size: 9px;
+              color: #999;
+              text-align: center;
+              margin-top: 5mm;
+            }
+            
+            @media print {
+              @page { size: auto; margin: 0; }
+              body { margin: 10mm; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="print-container">
+            <div class="qr-card">
+              <div class="account-id">
+                ${account.displayId || account.id}
+              </div>
+              <div class="account-name">
+                ${account.childName || "N/A"} / ${account.guardianName || "N/A"}
+              </div>
+              <div class="qr-container">
+                <img 
+                  src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
+                    qrValue
+                  )}" 
+                  width="200" 
+                  height="200" 
+                  alt="QR Code" 
+                />
+              </div>
+              <div class="footer">
+                Generated on ${new Date().toLocaleDateString()} • Ledger Admin
+              </div>
+            </div>
+          </div>
+          <script>
+            // Auto print when loaded
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+                setTimeout(function() {
+                  window.close();
+                }, 500);
+              }, 300);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    // Open a new window and print
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(html);
+      printWindow.document.close();
+    } else {
+      toast.error(
+        "Failed to open print window. Please check your popup settings."
+      );
+    }
+
+    // Log the activity
+    logAdminActivity?.(
+      "Print QR Code",
+      "Account",
+      account.id,
+      `Printed QR code for account ${account.displayId || account.id} (${
+        account.childName || "N/A"
+      }).`
+    );
+  };
 
   const handleSaveChanges = async () => {
     if (!account) return;
@@ -650,7 +789,7 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => handlePrintQr()}
+                  onClick={triggerQrPrintView}
                   disabled={!currentQrToken || isGeneratingQr}
                   className="py-1 px-3 border border-gray-300 rounded-md shadow-sm text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
                 >
