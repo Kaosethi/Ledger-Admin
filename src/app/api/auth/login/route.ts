@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { SignJWT } from "jose";
 import { db } from "@/lib/db";
 import { administrators } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import mockDataInstance, { AdminUser } from "@/lib/mockData";
 import { env } from "@/lib/config";
+import { verifyPassword } from "@/lib/auth/password";
+import { createJWT } from "@/lib/auth/jwt";
 
 // Authentication schema for login
 const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
+  email: z.string().email("Valid email is required"),
+  password: z.string().min(1, "Password is required"),
 });
 
 // TEST credentials - only use in development environment
@@ -21,37 +22,30 @@ const TEST_PASSWORD = "password";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password } = body;
 
-    console.log("Login request received:", { email, password });
-
-    if (!email || !password) {
-      const response = NextResponse.json(
-        { error: "Email and password are required" },
+    // Validate input using zod
+    const validation = loginSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: "Validation error", details: validation.error.format() },
         { status: 400 }
       );
-      response.cookies.set({
-        name: "auth-token",
-        value: "",
-        httpOnly: true,
-        path: "/",
-        maxAge: 0,
-      });
-      return response;
     }
 
-    // Bypass authentication for test credentials
-    if (email === TEST_EMAIL && password === TEST_PASSWORD) {
+    const { email, password } = validation.data;
+
+    console.log("[API /auth/login] Attempting login for email:", email);
+
+    // Bypass authentication for test credentials in development
+    const isTestEnv = env.NODE_ENV !== "production";
+    if (isTestEnv && email === TEST_EMAIL && password === TEST_PASSWORD) {
       // Create a JWT token for test user
-      const token = await new SignJWT({
+      const token = await createJWT({
         sub: "test-admin-id",
         email: TEST_EMAIL,
-        role: "Admin",
-      })
-        .setProtectedHeader({ alg: "HS256" })
-        .setIssuedAt()
-        .setExpirationTime("8h")
-        .sign(new TextEncoder().encode(env.JWT_SECRET));
+        role: "admin",
+        isAdmin: true,
+      });
 
       const response = NextResponse.json({
         message: "Logged in successfully (test user)",
@@ -59,7 +53,7 @@ export async function POST(request: NextRequest) {
           id: "test-admin-id",
           email: TEST_EMAIL,
           name: "Test Administrator",
-          role: "Admin",
+          role: "admin",
         },
       });
 
@@ -69,94 +63,121 @@ export async function POST(request: NextRequest) {
         httpOnly: true,
         path: "/",
         secure: env.NODE_ENV === "production",
-        maxAge: 60 * 60 * 8, // 8 hours
+        maxAge: 60 * 60 * 12, // 12 hours
       });
 
       return response;
     }
 
-    // First try to authenticate against the database
-    let admin;
-    try {
-      admin = await db
-        .select()
-        .from(administrators)
-        .where(eq(administrators.email, email))
-        .limit(1);
+    // Try to authenticate against the database
+    const adminUsers = await db
+      .select()
+      .from(administrators)
+      .where(eq(administrators.email, email.toLowerCase()))
+      .limit(1);
 
-      if (admin && admin.length > 0) {
-        const adminUser = admin[0];
-        // In a real app, you would use a proper password comparison
-        // e.g., const isPasswordValid = await bcrypt.compare(password, adminUser.passwordHash);
-        const isPasswordValid = adminUser.passwordHash === password; // Simplified for demo
+    // If no admin found in DB, check mock data
+    let admin: AdminUser | typeof administrators.$inferSelect | null = null;
 
-        if (!isPasswordValid) {
-          const response = NextResponse.json(
+    if (adminUsers.length === 0) {
+      console.warn(
+        "[API /auth/login] Admin not found in database, checking mock data for:",
+        email
+      );
+      const mockAdmin = mockDataInstance.admins.find((a) => a.email === email);
+
+      if (mockAdmin) {
+        admin = mockAdmin;
+
+        // For mock data, use simplified password check
+        if (admin.passwordHash !== password) {
+          console.warn(
+            "[API /auth/login] Invalid password for mock admin:",
+            email
+          );
+          return NextResponse.json(
             { error: "Invalid credentials" },
             { status: 401 }
           );
-          response.cookies.set({
-            name: "auth-token",
-            value: "",
-            httpOnly: true,
-            path: "/",
-            maxAge: 0,
-          });
-          return response;
         }
-      }
-    } catch (dbError) {
-      console.warn(
-        "Database error, falling back to mock authentication:",
-        dbError
-      );
-      admin = null;
-    }
-
-    // If no admin found in DB or DB error occurred, check mock data
-    if (!admin || admin.length === 0) {
-      const mockAdmin = mockDataInstance.admins.find(
-        (a) => a.email === email && a.passwordHash === password
-      );
-
-      if (!mockAdmin) {
-        const response = NextResponse.json(
+      } else {
+        console.warn("[API /auth/login] Admin not found in mock data:", email);
+        return NextResponse.json(
           { error: "Invalid credentials" },
           { status: 401 }
         );
-        response.cookies.set({
-          name: "auth-token",
-          value: "",
-          httpOnly: true,
-          path: "/",
-          maxAge: 0,
-        });
-        return response;
+      }
+    } else {
+      admin = adminUsers[0];
+
+      // Check if deleted
+      if (admin.deletedAt) {
+        console.warn(
+          "[API /auth/login] Attempt to login with deleted admin account:",
+          email
+        );
+        return NextResponse.json(
+          { error: "Account not found" },
+          { status: 404 }
+        );
       }
 
-      admin = [mockAdmin];
+      // Verify password using the proper password verification
+      const isPasswordValid = await verifyPassword(
+        password,
+        admin.passwordHash
+      );
+
+      if (!isPasswordValid) {
+        console.warn("[API /auth/login] Invalid password for email:", email);
+        return NextResponse.json(
+          { error: "Invalid credentials" },
+          { status: 401 }
+        );
+      }
     }
 
-    // Create a JWT token
-    const jwtSecret = env.JWT_SECRET;
-    const token = await new SignJWT({
-      sub: String(admin[0].id),
-      email: admin[0].email,
-      role: (admin[0] as AdminUser).role || "Admin", // Cast to AdminUser type for mock data
-    })
-      .setProtectedHeader({ alg: "HS256" })
-      .setIssuedAt()
-      .setExpirationTime("8h")
-      .sign(new TextEncoder().encode(jwtSecret));
+    // At this point, authentication is successful
+    // Update last login time for database admins
+    if ("id" in admin && !("isActive" in admin)) {
+      try {
+        await db
+          .update(administrators)
+          .set({ lastLoginAt: new Date() })
+          .where(eq(administrators.id, admin.id));
+      } catch (updateError) {
+        console.error(
+          "[API /auth/login] Error updating last login time:",
+          updateError
+        );
+        // Continue with login process even if update fails
+      }
+    }
+
+    // Create JWT using the common createJWT function
+    const token = await createJWT({
+      sub: String(admin.id),
+      email: admin.email,
+      role: "isActive" in admin ? "admin" : admin.role,
+      isAdmin: true,
+    });
+
+    console.log("[API /auth/login] Login successful for email:", email);
+
+    // Remove sensitive data before returning
+    const { passwordHash, ...adminDetails } = admin;
 
     // Create the response with JSON data
     const response = NextResponse.json({
       message: "Logged in successfully",
       user: {
-        id: admin[0].id,
-        email: admin[0].email,
-        name: (admin[0] as AdminUser).name || "Administrator",
-        role: (admin[0] as AdminUser).role || "Admin",
+        ...adminDetails,
+        name:
+          "isActive" in admin
+            ? admin.name
+            : admin.firstName && admin.lastName
+            ? `${admin.firstName} ${admin.lastName}`
+            : admin.firstName || "Administrator",
       },
     });
 
@@ -167,23 +188,15 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       path: "/",
       secure: env.NODE_ENV === "production",
-      maxAge: 60 * 60 * 8, // 8 hours
+      maxAge: 60 * 60 * 12, // 12 hours
     });
 
     return response;
   } catch (error) {
-    console.error("Login error:", error);
-    const response = NextResponse.json(
-      { error: "An error occurred during login" },
+    console.error("[API /auth/login] Error processing login request:", error);
+    return NextResponse.json(
+      { error: "Internal Server Error during login" },
       { status: 500 }
     );
-    response.cookies.set({
-      name: "auth-token",
-      value: "",
-      httpOnly: true,
-      path: "/",
-      maxAge: 0,
-    });
-    return response;
   }
 }

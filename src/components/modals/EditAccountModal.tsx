@@ -24,7 +24,7 @@ interface DisplayTransaction extends DrizzleTransaction {
   merchantNameDisplay: string;
 }
 
-type AccountActionType = "suspend" | "reactivate";
+type AccountActionType = "suspend" | "reactivate" | "regenerateQr";
 
 // --- API Call Helper Functions ---
 const suspendAccountAPI = async (accountId: string): Promise<Account> => {
@@ -82,9 +82,9 @@ const updateAccountDetailsAPI = async (
 
 const regenerateQrAPI = async (
   accountId: string
-): Promise<{ qrToken: string }> => {
+): Promise<{ qrPayload: string }> => {
   const response = await fetch(`/api/accounts/${accountId}/regenerate-qr`, {
-    method: "POST",
+    method: "GET",
   });
   if (!response.ok) {
     const errorData = await response.json();
@@ -278,10 +278,40 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
     const { actionType: currentActionType, account: accountToUpdate } =
       confirmActionDetails;
     if (!currentActionType || !accountToUpdate) return;
+
     if (currentActionType === "suspend")
       suspendMutation.mutate(accountToUpdate.id);
     else if (currentActionType === "reactivate")
       reactivateMutation.mutate(accountToUpdate.id);
+    else if (currentActionType === "regenerateQr")
+      performQrRegeneration(accountToUpdate);
+  };
+
+  const performQrRegeneration = async (accountToUpdate: Account) => {
+    if (!accountToUpdate || isGeneratingQr) return;
+    setIsGeneratingQr(true);
+    try {
+      const response = await regenerateQrAPI(accountToUpdate.id);
+      // Set the new base64 QR payload as the currentQrToken
+      setCurrentQrToken(response.qrPayload);
+
+      toast.success("QR Code regenerated successfully!");
+      logAdminActivity?.(
+        "Regenerate QR Code",
+        "Account",
+        accountToUpdate.id,
+        `Generated new QR token.`
+      );
+    } catch (error) {
+      toast.error(
+        `Failed to generate QR code: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    } finally {
+      setIsGeneratingQr(false);
+      handleCloseConfirmModal();
+    }
   };
 
   const handleToggleStatus = () => {
@@ -302,6 +332,13 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
     }
   };
 
+  const handleGenerateQrCode = () => {
+    if (!account) return;
+    setConfirmActionDetails({ actionType: "regenerateQr", account });
+    setIsConfirmModalOpen(true);
+  };
+
+  // Get confirmation modal props based on action type
   const getConfirmModalProps = () => {
     const { actionType, account: accountToUpdate } = confirmActionDetails;
     if (!actionType || !accountToUpdate) return null;
@@ -309,11 +346,14 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
     const guardianName = accountToUpdate.guardianName || "N/A";
     const isLoading =
       (actionType === "suspend" && suspendMutation.isPending) ||
-      (actionType === "reactivate" && reactivateMutation.isPending);
+      (actionType === "reactivate" && reactivateMutation.isPending) ||
+      (actionType === "regenerateQr" && isGeneratingQr);
     const errorObject =
       actionType === "suspend"
         ? suspendMutation.error
-        : reactivateMutation.error;
+        : actionType === "reactivate"
+        ? reactivateMutation.error
+        : null;
     const errorMessage =
       errorObject instanceof Error ? errorObject.message : null;
 
@@ -358,40 +398,33 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
           confirmButtonVariant: "success" as const,
           isLoading,
         };
+      case "regenerateQr":
+        return {
+          title: "Confirm QR Code Regeneration",
+          message: (
+            <>
+              <p>
+                Regenerate QR code for account {accountToUpdate.displayId} (
+                {tuncateUUID(accountToUpdate.id)}) ({guardianName} /{" "}
+                {confirmBeneficiaryName})?
+              </p>
+              <p className="mt-2 text-sm text-amber-600">
+                Warning: This will invalidate the previous QR code. Any printed
+                or saved QR codes will no longer work.
+              </p>
+              {errorMessage && (
+                <p className="mt-2 text-sm text-red-600">{errorMessage}</p>
+              )}
+            </>
+          ),
+          confirmButtonText: isLoading
+            ? "Regenerating..."
+            : "Regenerate QR Code",
+          confirmButtonVariant: "primary" as const,
+          isLoading,
+        };
       default:
         return null;
-    }
-  };
-
-  const handleGenerateQrCode = async () => {
-    if (!account || isGeneratingQr) return;
-    setIsGeneratingQr(true);
-    try {
-      const { qrToken: newToken } = await regenerateQrAPI(account.id);
-      setCurrentQrToken(newToken);
-      // Construct an object that fully matches the 'Account' type for onSave
-      const updatedAccountForSave: Account = {
-        ...account,
-        currentQrToken: newToken,
-        updatedAt: new Date().toISOString(), // Convert Date to string for Account type
-        lastActivity: new Date().toISOString(), // Convert Date to string for Account type
-      };
-      onSave(updatedAccountForSave);
-      toast.success("QR Code regenerated successfully!");
-      logAdminActivity?.(
-        "Regenerate QR Code",
-        "Account",
-        account.id,
-        `Generated new QR token.`
-      );
-    } catch (error) {
-      toast.error(
-        `Failed to generate QR code: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
-    } finally {
-      setIsGeneratingQr(false);
     }
   };
 
@@ -579,8 +612,10 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
               <h4 className="text-md font-semibold text-gray-700 mb-3">
                 Account QR Code
               </h4>
-              <div ref={qrCodePrintRef} className="bg-white p-2 inline-block">
-                {" "}
+              <div
+                ref={qrCodePrintRef}
+                className="flex justify-center w-full bg-white p-2"
+              >
                 <div className="flex justify-center items-center bg-gray-100 p-4 rounded mb-3 min-h-[180px] min-w-[180px]">
                   {isGeneratingQr ? (
                     <span className="text-gray-500 text-sm">Generating...</span>
