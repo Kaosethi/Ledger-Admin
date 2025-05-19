@@ -5,7 +5,7 @@ import React, { useState, useMemo } from "react";
 
 import type {
   Merchant,
-  Transaction, // Assuming this is the "rich" type with Date objects for timestamps
+  Transaction,
   Account,
   BackendMerchantStatus,
 } from "@/lib/mockData";
@@ -14,8 +14,8 @@ import {
     formatDate, 
     renderStatusBadge, 
     tuncateUUID,
-    formatCurrency, // For Gross Sales Volume
-    cn // For Shadcn UI utilities
+    formatCurrency,
+    cn 
 } from "@/lib/utils";
 import MerchantDetailModal, {
   AllowedMerchantActionForModal,
@@ -24,14 +24,14 @@ import ConfirmActionModal from "../modals/ConfirmActionModal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input"; // Added Input for the new filter
+import { Input } from "@/components/ui/input";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { XIcon, CalendarIcon } from "lucide-react"; // XIcon is already imported
+import { XIcon, CalendarIcon } from "lucide-react";
 import { format as formatDateFns } from "date-fns";
 
 interface MerchantsTabProps {
@@ -49,7 +49,11 @@ interface MerchantsTabProps {
   approveMerchant?: (id: string, closeModalCallback?: () => void) => void;
   rejectMerchant?: (id: string, reason?: string, closeModalCallback?: () => void) => void;
   suspendMerchant?: (id: string, reason?: string, closeModalCallback?: () => void) => void;
-  reactivateMerchant?: (id: string, closeModalCallback?: () => void) => void;
+  // MODIFIED: reactivateMerchant prop signature
+  reactivateMerchant?: (
+    args: { merchantId: string; status: BackendMerchantStatus }, 
+    closeModalCallback?: () => void
+  ) => void;
   approvalLoading?: boolean;
   rejectionLoading?: boolean;
   suspensionLoading?: boolean;
@@ -70,7 +74,7 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
   approveMerchant,
   rejectMerchant,
   suspendMerchant,
-  reactivateMerchant,
+  reactivateMerchant, // This prop will now match the new signature
   approvalLoading,
   rejectionLoading,
   suspensionLoading,
@@ -85,15 +89,14 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
     reason?: string; 
   }>({ actionType: null, merchant: null, reason: undefined });
 
-  // --- Filters for the Managed Merchants Table Aggregates & Display ---
   const [filterFromDate, setFilterFromDate] = useState<Date | undefined>(undefined);
   const [filterToDate, setFilterToDate] = useState<Date | undefined>(undefined);
-  const [filterMerchantIdOrName, setFilterMerchantIdOrName] = useState<string>(""); // New state for ID/Name/Email filter
+  const [filterMerchantIdOrName, setFilterMerchantIdOrName] = useState<string>("");
 
   const clearManagedMerchantFilters = () => {
     setFilterFromDate(undefined);
     setFilterToDate(undefined);
-    setFilterMerchantIdOrName(""); // Clear the new filter
+    setFilterMerchantIdOrName("");
   };
 
   const pendingMerchants = useMemo(
@@ -106,7 +109,7 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
       ["active", "suspended", "rejected"].includes(m.status as BackendMerchantStatus)
     );
 
-    if (filterMerchantIdOrName.trim() !== "") { // Apply Merchant ID/Name/Email filter
+    if (filterMerchantIdOrName.trim() !== "") {
       const searchTerm = filterMerchantIdOrName.toLowerCase().trim();
       filtered = filtered.filter(
         (merchant) =>
@@ -116,7 +119,7 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
       );
     }
     return filtered;
-  }, [merchants, filterMerchantIdOrName]); // Added filterMerchantIdOrName to dependencies
+  }, [merchants, filterMerchantIdOrName]);
 
   const handleViewDetails = (merchantId: string) => {
     const merchantToView = merchants.find((m) => m.id === merchantId);
@@ -133,13 +136,45 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
   const handleConfirmAction = async () => { 
     const { actionType, merchant, reason } = confirmActionDetails; 
     if (!actionType || !merchant || !logAdminActivity) { handleCloseConfirmModal(); return; }
-    let logActionText = ""; let logDetails = `Status changed for merchant ${merchant.businessName} (${tuncateUUID(merchant.id)}) to ${actionType}`;
+    let logActionText = ""; 
+    let logDetails = `Status changed for merchant ${merchant.businessName} (${tuncateUUID(merchant.id)})`; // Base detail
+
     switch (actionType) {
-      case "approve": if (approveMerchant) approveMerchant(merchant.id, handleCloseConfirmModal); else { updateMerchantStatus(merchant, "active"); handleCloseConfirmModal(); } logActionText = "Approve Merchant"; logDetails = `Approved merchant: ${merchant.businessName} (${tuncateUUID(merchant.id)})`; break;
-      case "reject": if (rejectMerchant) rejectMerchant(merchant.id, reason, handleCloseConfirmModal); else { updateMerchantStatus(merchant, "rejected", reason); handleCloseConfirmModal(); } logActionText = "Reject Merchant"; logDetails = `Rejected merchant: ${merchant.businessName} (${tuncateUUID(merchant.id)})${reason ? `. Reason: ${reason}` : ''}`; break;
-      case "suspend": if (suspendMerchant) suspendMerchant(merchant.id, reason, handleCloseConfirmModal); else { updateMerchantStatus(merchant, "suspended", reason); handleCloseConfirmModal(); } logActionText = "Suspend Merchant"; logDetails = `Suspended merchant: ${merchant.businessName} (${tuncateUUID(merchant.id)})${reason ? `. Reason: ${reason}` : ''}`; break;
-      case "reactivate": const ts = merchant.status === 'rejected' ? 'pending_approval' : 'active'; if (reactivateMerchant) reactivateMerchant(merchant.id, handleCloseConfirmModal); else { updateMerchantStatus(merchant, ts); handleCloseConfirmModal(); } logActionText = "Reactivate Merchant"; logDetails = `Reactivated merchant: ${merchant.businessName} (${tuncateUUID(merchant.id)}) to ${ts}`; break;
-      default: const ec: never = actionType; console.error("Unhandled action type in MerchantsTab:", ec); handleCloseConfirmModal(); return;
+      case "approve": 
+        if (approveMerchant) approveMerchant(merchant.id, handleCloseConfirmModal); 
+        else { updateMerchantStatus(merchant, "active"); handleCloseConfirmModal(); } 
+        logActionText = "Approve Merchant"; 
+        logDetails = `Approved merchant: ${merchant.businessName} (${tuncateUUID(merchant.id)})`; 
+        break;
+      case "reject": 
+        if (rejectMerchant) rejectMerchant(merchant.id, reason, handleCloseConfirmModal); 
+        else { updateMerchantStatus(merchant, "rejected", reason); handleCloseConfirmModal(); } 
+        logActionText = "Reject Merchant"; 
+        logDetails = `Rejected merchant: ${merchant.businessName} (${tuncateUUID(merchant.id)})${reason ? `. Reason: ${reason}` : ''}`; 
+        break;
+      case "suspend": 
+        if (suspendMerchant) suspendMerchant(merchant.id, reason, handleCloseConfirmModal); 
+        else { updateMerchantStatus(merchant, "suspended", reason); handleCloseConfirmModal(); } 
+        logActionText = "Suspend Merchant"; 
+        logDetails = `Suspended merchant: ${merchant.businessName} (${tuncateUUID(merchant.id)})${reason ? `. Reason: ${reason}` : ''}`; 
+        break;
+      case "reactivate": 
+        const targetStatusForReactivation = merchant.status === 'rejected' ? 'pending_approval' : 'active';
+        if (reactivateMerchant) {
+          // MODIFIED: Call reactivateMerchant with the object structure
+          reactivateMerchant({ merchantId: merchant.id, status: targetStatusForReactivation }, handleCloseConfirmModal);
+        } else { 
+          updateMerchantStatus(merchant, targetStatusForReactivation); 
+          handleCloseConfirmModal(); 
+        } 
+        logActionText = "Reactivate Merchant"; 
+        logDetails = `Reactivated merchant: ${merchant.businessName} (${tuncateUUID(merchant.id)}) to ${targetStatusForReactivation}`; 
+        break;
+      default: 
+        const ec: never = actionType; 
+        console.error("Unhandled action type in MerchantsTab:", ec); 
+        handleCloseConfirmModal(); 
+        return;
     }
     if (logActionText) logAdminActivity(logActionText, "Merchant", merchant.id, logDetails);
   };
@@ -152,83 +187,37 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
   };
 
   const getConfirmModalProps = () => {
-  const { actionType, merchant, reason } = confirmActionDetails;
-  if (!actionType || !merchant) return null;
+    const { actionType, merchant, reason } = confirmActionDetails;
+    if (!actionType || !merchant) return null;
 
-  const merchantName = merchant.businessName;
-  let message: React.ReactNode;
+    const merchantName = merchant.businessName;
+    let message: React.ReactNode;
 
-  switch (actionType) {
-    case "approve":
-      message = <>Approve application for <strong>{merchantName}</strong>?</>;
-      return {
-        title: "Confirm Approval",
-        message,
-        confirmButtonText: approvalLoading ? "Approving..." : "Approve",
-        confirmButtonVariant: "success" as const,
-        isLoading: approvalLoading,
-      };
-
-    case "reject":
-      message = (
-        <>
-          <p>
-            Reject application for <strong>{merchantName}</strong>
-            {reason ? " with reason:" : "?"}
-          </p>
-          {reason ? (
-            <p className="mt-1 text-sm italic text-gray-600">&quot;{reason}&quot;</p>
-          ) : (
-            <p className="mt-1 text-sm text-yellow-600">
-              Note: No specific reason was provided.
-            </p>
-          )}
-          <p className="mt-2 font-semibold text-red-700">
-            This action may have significant consequences.
-          </p>
-        </>
-      );
-      return {
-        title: "Confirm Rejection",
-        message,
-        confirmButtonText: rejectionLoading ? "Rejecting..." : "Confirm Rejection",
-        confirmButtonVariant: "danger" as const,
-        isLoading: rejectionLoading,
-      };
-
-    case "suspend":
-      message = reason ? (
-        <>
-          <p>Suspend merchant <strong>{merchantName}</strong> with reason:</p>
-          <p className="mt-1 text-sm italic text-gray-600">&quot;{reason}&quot;</p>
-        </>
-      ) : (
-        <>Suspend merchant <strong>{merchantName}</strong>?</>
-      );
-      return {
-        title: "Confirm Suspension",
-        message,
-        confirmButtonText: suspensionLoading ? "Suspending..." : "Suspend",
-        confirmButtonVariant: "danger" as const,
-        isLoading: suspensionLoading,
-      };
-
-    case "reactivate":
-      message = <>Reactivate merchant <strong>{merchantName}</strong>?</>;
-      return {
-        title: "Confirm Reactivation",
-        message,
-        confirmButtonText: reactivationLoading ? "Reactivating..." : "Reactivate",
-        confirmButtonVariant: "success" as const,
-        isLoading: reactivationLoading,
-      };
-
-    default:
-      const _exhaustiveCheck: never = actionType;
-      console.warn("Unhandled type in getConfirmModalProps:", _exhaustiveCheck);
-      return null;
-  }
-};
+    switch (actionType) {
+      case "approve":
+        message = <>Approve application for <strong>{merchantName}</strong>?</>;
+        return { title: "Confirm Approval", message, confirmButtonText: approvalLoading ? "Approving..." : "Approve", confirmButtonVariant: "success" as const, isLoading: approvalLoading };
+      case "reject":
+        message = (
+          <>
+            <p>Reject application for <strong>{merchantName}</strong>{reason ? " with reason:" : "?"}</p>
+            {reason ? (<p className="mt-1 text-sm italic text-gray-600">"{reason}"</p>) : (<p className="mt-1 text-sm text-yellow-600">Note: No specific reason was provided.</p>)}
+            <p className="mt-2 font-semibold text-red-700">This action may have significant consequences.</p>
+          </>
+        );
+        return { title: "Confirm Rejection", message, confirmButtonText: rejectionLoading ? "Rejecting..." : "Confirm Rejection", confirmButtonVariant: "danger" as const, isLoading: rejectionLoading };
+      case "suspend":
+        message = reason ? (<><p>Suspend merchant <strong>{merchantName}</strong> with reason:</p><p className="mt-1 text-sm italic text-gray-600">"{reason}"</p></>) : (<>Suspend merchant <strong>{merchantName}</strong>?</>);
+        return { title: "Confirm Suspension", message, confirmButtonText: suspensionLoading ? "Suspending..." : "Suspend", confirmButtonVariant: "danger" as const, isLoading: suspensionLoading };
+      case "reactivate":
+        message = <>Reactivate merchant <strong>{merchantName}</strong>?</>;
+        return { title: "Confirm Reactivation", message, confirmButtonText: reactivationLoading ? "Reactivating..." : "Reactivate", confirmButtonVariant: "success" as const, isLoading: reactivationLoading };
+      default:
+        const _exhaustiveCheck: never = actionType;
+        console.warn("Unhandled type in getConfirmModalProps:", _exhaustiveCheck);
+        return null;
+    }
+  };
 
   const confirmModalProps = getConfirmModalProps();
   const renderSkeletonCells = (count: number) => Array.from({ length: count }).map((_, i) => <td key={i} className={tableCellClasses}><Skeleton className="h-5 w-full" /></td>);
@@ -257,7 +246,7 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
 
   return (
     <div className="space-y-8">
-      {/* Pending Merchants Section (Unchanged) */}
+      {/* Pending Merchants Section */}
       <div className="bg-white p-6 rounded-lg shadow-md">
         <h3 className="text-lg font-semibold mb-4 text-gray-800">
           Pending Merchant Applications ({merchantsLoading && !pendingMerchants.length ? "..." : pendingMerchants.length})
@@ -301,11 +290,8 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
         <h3 className="text-lg font-semibold text-gray-800 mb-4">
           Managed Merchants
         </h3>
-
-        {/* --- FILTERS FOR MANAGED MERCHANTS --- */}
         <div className="mb-6 p-4 border rounded-md bg-gray-50">
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
-                {/* New Merchant ID/Name/Email Filter */}
                 <div>
                     <Label htmlFor="filterMerchantIdOrNameManaged" className="mb-1 block text-sm font-medium">Merchant ID/Name/Email:</Label>
                     <Input
@@ -314,10 +300,9 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
                         placeholder="Filter by ID, Name, or Email..."
                         value={filterMerchantIdOrName}
                         onChange={(e) => setFilterMerchantIdOrName(e.target.value)}
-                        className="w-full" // Standard input styling
+                        className="w-full"
                     />
                 </div>
-                {/* Existing Date Filters */}
                 <div>
                     <Label htmlFor="filterFromDateManaged" className="mb-1 block text-sm font-medium">Sales From:</Label>
                     <Popover>
@@ -339,11 +324,10 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
                                 {filterToDate ? formatDateFns(filterToDate, "dd/MM/yyyy") : <span>Pick a date</span>}
                             </Button>
                         </PopoverTrigger>
-                                                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={filterToDate} onSelect={setFilterToDate} disabled={(date) => filterFromDate ? date < new Date(new Date(filterFromDate).setHours(0,0,0,0)) : false} initialFocus /></PopoverContent>
+                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={filterToDate} onSelect={setFilterToDate} disabled={(date) => filterFromDate ? date < new Date(new Date(filterFromDate).setHours(0,0,0,0)) : false} initialFocus /></PopoverContent>
                     </Popover>
                 </div>
             </div>
-            {/* Clear button: shows if any filter is active */}
             {(filterMerchantIdOrName || filterFromDate || filterToDate) && (
                 <div className="mt-4 flex justify-end">
                     <Button onClick={clearManagedMerchantFilters} variant="outline">
@@ -352,7 +336,6 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
                 </div>
             )}
         </div>
-        {/* --- END FILTERS --- */}
 
         <div className="overflow-x-auto border border-gray-200 rounded-md">
           <table id="merchants-table" className="min-w-full divide-y divide-gray-200">

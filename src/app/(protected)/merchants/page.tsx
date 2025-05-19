@@ -9,9 +9,7 @@ import {
   QueryClientProvider,
 } from "@tanstack/react-query";
 import MerchantsTab from "@/components/tabs/MerchantsTab";
-// Import Account type from lib/mockData.ts
-// Transaction type from lib/mockData.ts should define timestamp, createdAt, updatedAt as Date
-import { Merchant, Transaction, Account } from "@/lib/mockData"; 
+import { Merchant, Transaction, Account, BackendMerchantStatus } from "@/lib/mockData"; // Added BackendMerchantStatus
 
 const queryClientInstance = new QueryClient();
 
@@ -33,7 +31,6 @@ const fetchMerchants = async (): Promise<Merchant[]> => {
   return response.json();
 };
 
-// VVVV MODIFIED THIS FUNCTION VVVV
 const fetchTransactions = async (): Promise<Transaction[]> => {
   const response = await fetch("/api/transactions");
   if (!response.ok) {
@@ -42,18 +39,14 @@ const fetchTransactions = async (): Promise<Transaction[]> => {
     );
   }
   const data = await response.json();
-  // Transform date strings from API to Date objects to match Transaction type from lib/mockData.ts
   return data.map((tx: any) => ({ 
     ...tx,
-    timestamp: new Date(tx.timestamp), // Convert string to Date
-    createdAt: new Date(tx.createdAt), // Convert string to Date
-    updatedAt: new Date(tx.updatedAt), // Convert string to Date
-    amount: String(tx.amount), // Ensure amount is string as per rich Transaction type
-    // Other fields like paymentId, pinVerified, metadata, reference should be present
-    // if your API returns them and lib/mockData.ts Transaction type includes them.
+    timestamp: new Date(tx.timestamp),
+    createdAt: new Date(tx.createdAt),
+    updatedAt: new Date(tx.updatedAt),
+    amount: String(tx.amount),
   }));
 };
-// VVVV END MODIFICATION VVVV
 
 const fetchAccounts = async (): Promise<Account[]> => {
   const response = await fetch("/api/accounts");
@@ -94,12 +87,18 @@ const suspendMerchant = async ({ id, reason }: { id: string; reason?: string; })
   return response.json();
 };
 
-const reactivateMerchant = async (id: string): Promise<Merchant> => {
-  const response = await fetch(`/api/merchants/${id}/reactivate`, {
+// MODIFIED: reactivateMerchant async function to accept { id, status } and send status in body
+const reactivateMerchant = async (
+  { id, status }: { id: string; status: BackendMerchantStatus }
+): Promise<Merchant> => {
+  const response = await fetch(`/api/merchants/${id}/reactive`, { // Correct endpoint
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }), // Send the target status in the body
   });
-  if (!response.ok) { throw new Error(`Failed to reactivate merchant: ${response.status} ${response.statusText}`); }
+  if (!response.ok) { 
+    throw new Error(`Failed to set merchant to reactive status: ${response.status} ${response.statusText}`); 
+  }
   return response.json();
 };
 
@@ -117,14 +116,13 @@ function MerchantsPage() {
     queryFn: fetchMerchants,
   });
 
-  // useQuery now expects fetchTransactions to return Transaction[] with Date objects
   const { 
     data: transactions = [], 
     isLoading: transactionsLoading,
     error: transactionsError,
   } = useQuery<Transaction[], Error>({ 
     queryKey: ["transactions"],
-    queryFn: fetchTransactions, // This function now transforms dates
+    queryFn: fetchTransactions,
   });
 
   const { 
@@ -136,10 +134,31 @@ function MerchantsPage() {
     queryFn: fetchAccounts,
   });
 
-  const approveMutation = useMutation({ mutationFn: approveMerchant, onSuccess: () => { queryClientHook.invalidateQueries({ queryKey: ["merchants"] }); if (closeModalCallback) { closeModalCallback(); setCloseModalCallback(null); }}, onError: () => { if (closeModalCallback) { closeModalCallback(); setCloseModalCallback(null); } }});
-  const rejectMutation = useMutation({ mutationFn: rejectMerchant, onSuccess: () => { queryClientHook.invalidateQueries({ queryKey: ["merchants"] }); if (closeModalCallback) { closeModalCallback(); setCloseModalCallback(null); }}, onError: () => { if (closeModalCallback) { closeModalCallback(); setCloseModalCallback(null); } }});
-  const suspendMutation = useMutation({ mutationFn: suspendMerchant, onSuccess: () => { queryClientHook.invalidateQueries({ queryKey: ["merchants"] }); if (closeModalCallback) { closeModalCallback(); setCloseModalCallback(null); }}, onError: () => { if (closeModalCallback) { closeModalCallback(); setCloseModalCallback(null); } }});
-  const reactivateMutation = useMutation({ mutationFn: reactivateMerchant, onSuccess: () => { queryClientHook.invalidateQueries({ queryKey: ["merchants"] }); if (closeModalCallback) { closeModalCallback(); setCloseModalCallback(null); }}, onError: () => { if (closeModalCallback) { closeModalCallback(); setCloseModalCallback(null); } }});
+  const commonMutationOptions = {
+    onSuccess: () => { 
+      queryClientHook.invalidateQueries({ queryKey: ["merchants"] }); 
+      if (closeModalCallback) { 
+        closeModalCallback(); 
+        setCloseModalCallback(null); 
+      }
+    },
+    onError: () => { 
+      // Consider logging the error or showing a toast notification
+      if (closeModalCallback) { 
+        closeModalCallback(); 
+        setCloseModalCallback(null); 
+      } 
+    }
+  };
+
+  const approveMutation = useMutation({ mutationFn: approveMerchant, ...commonMutationOptions});
+  const rejectMutation = useMutation({ mutationFn: rejectMerchant, ...commonMutationOptions});
+  const suspendMutation = useMutation({ mutationFn: suspendMerchant, ...commonMutationOptions});
+  // MODIFIED: reactivateMutation now uses the updated reactivateMerchant function
+  const reactivateMutation = useMutation({ 
+    mutationFn: reactivateMerchant, // This function now expects { id, status }
+    ...commonMutationOptions
+  });
 
   const handleMerchantsUpdate = (updatedMerchants: Merchant[]) => {
     queryClientHook.setQueryData(["merchants"], updatedMerchants);
@@ -149,10 +168,27 @@ function MerchantsPage() {
     console.log(`Admin activity logged (client-side): ${action}`, { targetType, targetId, details });
   };
 
-  const handleApproveMerchant = (id: string, closeModal?: () => void) => { if (closeModal) setCloseModalCallback(() => closeModal); approveMutation.mutate(id); };
-  const handleRejectMerchant = (id: string, reason?: string, closeModal?: () => void) => { if (closeModal) setCloseModalCallback(() => closeModal); rejectMutation.mutate({ id, declineReason: reason }); };
-  const handleSuspendMerchant = (id: string, reason?: string, closeModal?: () => void) => { if (closeModal) setCloseModalCallback(() => closeModal); suspendMutation.mutate({ id, reason }); };
-  const handleReactivateMerchant = (id: string, closeModal?: () => void) => { if (closeModal) setCloseModalCallback(() => closeModal); reactivateMutation.mutate(id); };
+  const handleApproveMerchant = (id: string, closeModal?: () => void) => { 
+    if (closeModal) setCloseModalCallback(() => closeModal); 
+    approveMutation.mutate(id); 
+  };
+  const handleRejectMerchant = (id: string, reason?: string, closeModal?: () => void) => { 
+    if (closeModal) setCloseModalCallback(() => closeModal); 
+    rejectMutation.mutate({ id, declineReason: reason }); 
+  };
+  const handleSuspendMerchant = (id: string, reason?: string, closeModal?: () => void) => { 
+    if (closeModal) setCloseModalCallback(() => closeModal); 
+    suspendMutation.mutate({ id, reason }); 
+  };
+  // MODIFIED: handleReactivateMerchant to pass the object { id, status }
+  const handleReactivateMerchant = (
+    args: { merchantId: string; status: BackendMerchantStatus }, 
+    closeModal?: () => void
+  ) => { 
+    if (closeModal) setCloseModalCallback(() => closeModal); 
+    // Pass the object with id (as merchantId) and status
+    reactivateMutation.mutate({ id: args.merchantId, status: args.status }); 
+  };
 
   const queryError = merchantsError || transactionsError || accountsError; 
   if (queryError || error) { 
@@ -171,7 +207,7 @@ function MerchantsPage() {
     <div className="container mx-auto p-4">
       <MerchantsTab
         merchants={merchants}
-        transactions={transactions} // These transactions now have Date objects for timestamps
+        transactions={transactions}
         accounts={accounts} 
         onMerchantsUpdate={handleMerchantsUpdate}
         logAdminActivity={logAdminActivity}
@@ -180,7 +216,7 @@ function MerchantsPage() {
         approveMerchant={handleApproveMerchant}
         rejectMerchant={handleRejectMerchant}
         suspendMerchant={handleSuspendMerchant}
-        reactivateMerchant={handleReactivateMerchant}
+        reactivateMerchant={handleReactivateMerchant} // This prop now expects args: { merchantId, status }
         
         approvalLoading={approveMutation.isPending}
         rejectionLoading={rejectMutation.isPending}
