@@ -87,22 +87,25 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
   };
 
   const filteredTransactions = useMemo(() => {
+    // DEBUG: Log when this memo recalculates and the current filter date states
     console.log("[TransactionsTab] Recalculating filteredTransactions. From:", fromDate, "To:", toDate);
 
     return transactions.filter((tx, index) => { 
+      // DEBUG: Log the transaction being processed and its timestamp type and value
       if (index < 5 || (fromDate || toDate)) { 
         console.log(`[TransactionsTab] Filtering tx ID: ${tx.id}, Timestamp:`, tx.timestamp, "(Type:", typeof tx.timestamp, tx.timestamp instanceof Date ? "is Date" : "is NOT Date", ")");
       }
 
       const txDate = tx.timestamp; 
 
+      // Validate txDate before proceeding
       if (!(txDate instanceof Date) || isNaN(txDate.getTime())) {
         if (index < 5 || (fromDate || toDate)) {
             console.warn(`[TransactionsTab] Invalid or missing txDate for tx ID: ${tx.id}. Skipping date filter for this tx.`);
         }
       }
 
-      let shouldKeep = true;
+      let shouldKeep = true; // Start by assuming we keep the transaction
 
       if (fromDate && txDate instanceof Date && !isNaN(txDate.getTime())) {
         const startOfDayFromDate = new Date(fromDate);
@@ -122,8 +125,9 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
         }
       }
 
-      if (!shouldKeep) return false;
+      if (!shouldKeep) return false; // If rejected by date filters, stop here
 
+      // Other filters (applied only if not rejected by date)
       if (filterAccountId.trim() !== "") {
         const account = accounts.find(acc => acc.id === tx.accountId);
         if (!account?.displayId?.toLowerCase().includes(filterAccountId.trim().toLowerCase()) &&
@@ -144,7 +148,7 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
         return false;
       }
       
-      return true;
+      return true; // Keep if all filters pass
     });
   }, [
     transactions, 
@@ -177,29 +181,34 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
   
   const transactionStatuses: Transaction['status'][] = useMemo(() => ["Pending", "Completed", "Failed", "Declined"], []);
 
+
   const handleExportCSV = () => {
     if (filteredTransactions.length === 0) {
       alert("No transactions to export with current filters.");
       return;
     }
+    // Reverted to simpler formatDateTime usage for CSV, assuming it works if tx.timestamp is Date
     const csvData = filteredTransactions.map((tx) => {
-      const { date: txDisplayDate, time: txDisplayTime } = tx.timestamp instanceof Date ? formatDateTime(tx.timestamp) : { date: 'Invalid Date', time: ''};
-      const { date: createdDate, time: createdTime } = tx.createdAt instanceof Date ? formatDateTime(tx.createdAt) : { date: 'Invalid Date', time: ''};
-      const { date: updatedDate, time: updatedTime } = tx.updatedAt instanceof Date ? formatDateTime(tx.updatedAt) : { date: 'Invalid Date', time: ''};
+      const { date: txDisplayDate, time: txDisplayTime } = (tx.timestamp instanceof Date && !isNaN(tx.timestamp.getTime())) ? formatDateTime(tx.timestamp) : { date: 'N/A', time: '' };
+      const { date: createdDate, time: createdTime } = (tx.createdAt instanceof Date && !isNaN(tx.createdAt.getTime())) ? formatDateTime(tx.createdAt) : { date: 'N/A', time: '' };
+      const { date: updatedDate, time: updatedTime } = (tx.updatedAt instanceof Date && !isNaN(tx.updatedAt.getTime())) ? formatDateTime(tx.updatedAt) : { date: 'N/A', time: '' };
+      
       const merchant = merchants.find((m) => m.id === tx.merchantId);
       const account = accounts.find((acc) => acc.id === tx.accountId);
+      
       let signedAmount = parseFloat(tx.amount); 
       if (tx.type === "Debit" || (tx.type === "Adjustment" && signedAmount < 0)) {
         signedAmount = -Math.abs(signedAmount); 
       } else {
         signedAmount = Math.abs(signedAmount);
       }
+
       return {
         "Payment ID (User Facing)": tx.paymentId || "N/A",
         "Transaction DB ID": tx.id,
         "Date": txDisplayDate,
         "Time": txDisplayTime,
-        "Timestamp (ISO)": tx.timestamp instanceof Date ? tx.timestamp.toISOString() : "Invalid Date",
+        "Timestamp (ISO)": (tx.timestamp instanceof Date && !isNaN(tx.timestamp.getTime())) ? tx.timestamp.toISOString() : "Invalid Date",
         "Account Display ID": account?.displayId || "N/A",
         "Account Child Name": account?.childName || "N/A",
         "Account DB ID": tx.accountId || "",
@@ -213,11 +222,12 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
         "PIN Verified": tx.pinVerified === null ? "N/A" : tx.pinVerified ? "Yes" : "No",
         "Description": tx.description || "",
         "Client Reference": tx.reference || "",
-        "Metadata (JSON)": tx.metadata ? JSON.stringify(JSON.parse(tx.metadata)) : "",
-        "System Created At (ISO)": tx.createdAt instanceof Date ? tx.createdAt.toISOString() : "Invalid Date",
-        "System Updated At (ISO)": tx.updatedAt instanceof Date ? tx.updatedAt.toISOString() : "Invalid Date",
+        "Metadata (JSON)": tx.metadata && typeof tx.metadata === 'string' ? JSON.stringify(JSON.parse(tx.metadata)) : "", // Added check for string metadata
+        "System Created At (ISO)": (tx.createdAt instanceof Date && !isNaN(tx.createdAt.getTime())) ? tx.createdAt.toISOString() : "Invalid Date",
+        "System Updated At (ISO)": (tx.updatedAt instanceof Date && !isNaN(tx.updatedAt.getTime())) ? tx.updatedAt.toISOString() : "Invalid Date",
       };
     });
+
     try {
       const csv = unparse(csvData);
       const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
@@ -353,39 +363,12 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
               ))
             ) : transactionsToDisplay.length > 0 ? (
               transactionsToDisplay.map((tx) => {
-                               // CORRECTED AGAIN: More robust handling of formatDateTime output for table display
-                let displayDate = "N/A";
-                let displayTime = "";
-
-                if (tx.timestamp instanceof Date && !isNaN(tx.timestamp.getTime())) {
-                    const formattedResultAsUnknown: unknown = formatDateTime(tx.timestamp);
-
-                    if (
-                        typeof formattedResultAsUnknown === 'object' &&
-                        formattedResultAsUnknown !== null &&
-                        'date' in formattedResultAsUnknown &&
-                        typeof (formattedResultAsUnknown as any).date === 'string' && // Further checks
-                        'time' in formattedResultAsUnknown &&
-                        typeof (formattedResultAsUnknown as any).time === 'string'
-                    ) {
-                        displayDate = (formattedResultAsUnknown as { date: string; time: string }).date;
-                        displayTime = (formattedResultAsUnknown as { date: string; time: string }).time;
-                    } else if (typeof formattedResultAsUnknown === 'string') {
-                        // Now TypeScript should correctly infer formattedResultAsUnknown as string here
-                        const parts = formattedResultAsUnknown.split(" "); 
-                        displayDate = parts[0] || formattedResultAsUnknown;
-                        if (parts.length > 1) {
-                            displayTime = parts.slice(1).join(" ");
-                        }
-                    } else {
-                        // Handles cases where formatDateTime returns null, undefined, or an unexpected object type
-                        console.warn(
-                            "[TransactionsTab] formatDateTime returned an unexpected value or type for tx:",
-                            tx.id,
-                            "Value:", formattedResultAsUnknown
-                        );
-                    }
-                }
+                // REVERTED to simpler date/time display logic
+                // This assumes tx.timestamp IS a Date object and formatDateTime returns { date: string, time: string }
+                // If tx.timestamp is not a valid date, formatDateTime should handle it gracefully (e.g., return "N/A")
+                const { date, time } = (tx.timestamp instanceof Date && !isNaN(tx.timestamp.getTime())) 
+                                        ? formatDateTime(tx.timestamp) 
+                                        : { date: "N/A", time: "" };
 
                 const account = accounts.find(acc => acc.id === tx.accountId);
                 const merchant = merchants.find(m => m.id === tx.merchantId);
@@ -393,8 +376,8 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
 
                 return (
                   <TableRow key={tx.id}>
-                    <TableCell>{displayDate}</TableCell>
-                    <TableCell>{displayTime}</TableCell>
+                    <TableCell>{date}</TableCell>
+                    <TableCell>{time}</TableCell>
                     <TableCell title={account?.id || ""}>{account?.displayId || (tx.accountId ? tuncateUUID(tx.accountId) : "N/A")}</TableCell>
                     <TableCell>{account?.childName || "N/A"}</TableCell>
                     <TableCell title={merchant?.id || ""}>{tx.merchantId ? tuncateUUID(tx.merchantId) : "N/A"}</TableCell>
