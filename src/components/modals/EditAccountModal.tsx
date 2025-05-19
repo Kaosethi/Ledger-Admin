@@ -15,6 +15,7 @@ import { useReactToPrint, UseReactToPrintOptions } from "react-to-print";
 import ConfirmActionModal from "./ConfirmActionModal";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
+import QrCodePrintable from "@/components/print/QrCodePrintable"; // Import the printable component
 
 // Infer the select type from Drizzle Zod schema. This will have paymentId and other DB fields.
 type DrizzleTransaction = z.infer<typeof selectTransactionSchema>;
@@ -127,6 +128,9 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
     actionType: AccountActionType | null;
     account: Account | null;
   }>({ actionType: null, account: null });
+  const [printableQrContent, setPrintableQrContent] =
+    useState<React.ReactElement | null>(null);
+  const printComponentRef = useRef<HTMLDivElement>(null); // Ref for the printable component container
 
   const qrCodePrintRef = useRef<HTMLDivElement>(null);
 
@@ -198,10 +202,30 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
   }, [allTransactions, account, merchants]);
 
   const handlePrintQr = useReactToPrint({
-    content: () => qrCodePrintRef.current,
+    contentRef: printComponentRef, // Using contentRef as per AccountsTab.tsx
     documentTitle: `QR-Code-${account?.displayId || "Account"}`,
     removeAfterPrint: true,
-  } as UseReactToPrintOptions);
+    onAfterPrint: () => setPrintableQrContent(null), // Clear printable content after printing
+  } as UseReactToPrintOptions); // Ensuring the cast is present
+
+  const triggerQrPrintView = () => {
+    if (account && currentQrToken) {
+      // Prepare the printable content with 1 copy
+      setPrintableQrContent(
+        <QrCodePrintable
+          qrCodeString={currentQrToken}
+          account={account}
+          copies={1} // We want to print a single QR code, or maybe a few like 2 for a smaller slip. User can adjust if needed.
+        />
+      );
+      // useReactToPrint needs a slight delay for the content to be in the DOM
+      setTimeout(() => {
+        handlePrintQr();
+      }, 100);
+    } else {
+      toast.error("No QR code available to print.");
+    }
+  };
 
   const handleSaveChanges = async () => {
     if (!account) return;
@@ -650,7 +674,7 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => handlePrintQr()}
+                  onClick={triggerQrPrintView}
                   disabled={!currentQrToken || isGeneratingQr}
                   className="py-1 px-3 border border-gray-300 rounded-md shadow-sm text-xs font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
                 >
@@ -820,6 +844,14 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
           confirmButtonVariant={confirmModalProps.confirmButtonVariant}
           isLoading={confirmModalProps.isLoading || false}
         />
+      )}
+
+      {printableQrContent && (
+        <div style={{ display: "none" }}>
+          {" "}
+          {/* Hidden container for printing */}
+          <div ref={printComponentRef}>{printableQrContent}</div>
+        </div>
       )}
     </div>
   );

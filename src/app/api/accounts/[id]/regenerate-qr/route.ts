@@ -63,7 +63,7 @@ export const GET = withAuth(
       const updatedAccount = await db
         .update(accounts)
         .set({
-          currentQrToken: sig, // Store the signature in currentQrToken
+          currentQrToken: base64Payload, // Store the signature in currentQrToken
           updatedAt: new Date(),
           lastActivity: new Date(),
         })
