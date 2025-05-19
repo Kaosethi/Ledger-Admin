@@ -177,7 +177,7 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
             {reason ? " with reason:" : "?"}
           </p>
           {reason ? (
-            <p className="mt-1 text-sm italic text-gray-600">"{reason}"</p>
+            <p className="mt-1 text-sm italic text-gray-600">&quot;{reason}&quot;</p>
           ) : (
             <p className="mt-1 text-sm text-yellow-600">
               Note: No specific reason was provided.
@@ -200,7 +200,7 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
       message = reason ? (
         <>
           <p>Suspend merchant <strong>{merchantName}</strong> with reason:</p>
-          <p className="mt-1 text-sm italic text-gray-600">"{reason}"</p>
+          <p className="mt-1 text-sm italic text-gray-600">&quot;{reason}&quot;</p>
         </>
       ) : (
         <>Suspend merchant <strong>{merchantName}</strong>?</>
