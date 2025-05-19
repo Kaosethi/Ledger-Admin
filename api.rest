@@ -3,8 +3,7 @@
 ###
 
 # --- Configuration ---
-@baseUrl = http://stc.pinroj.com/api
-
+@baseUrl = http://stc.pinroj.com/
 @contentType = application/json
 
 # Admin Token - Get this by running the "Admin Login" request below and copying the token
