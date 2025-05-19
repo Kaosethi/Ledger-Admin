@@ -4,7 +4,7 @@ import type {
   Merchant, 
   Transaction,
   Account,
-} from '@/lib/mockData';
+} from '@/lib/mockData'; 
 import { 
     formatDate, 
     formatCurrency, 
@@ -23,11 +23,10 @@ interface MerchantDetailModalProps {
   onClose: () => void;
   onRequestConfirm: (actionType: AllowedMerchantActionForModal, merchant: Merchant, reason?: string) => void;
   merchant: Merchant | null;
-  transactions: Transaction[]; // All transactions (rich type with Date objects)
+  transactions: Transaction[]; 
   accounts: Account[];
 }
 
-// Helper for rendering detail items consistently
 const DetailItem: React.FC<{ label: string; value?: string | React.ReactNode; valueClassName?: string; fullWidth?: boolean }> = ({
   label,
   value,
@@ -42,11 +41,9 @@ const DetailItem: React.FC<{ label: string; value?: string | React.ReactNode; va
   </div>
 );
 
-// Define a new type for the transactions displayed in the modal's table
 type DisplayableMerchantTransaction = Transaction & {
   displayAccountId: string;
   accountChildName: string;
-  // The 'description' here will be tailored for the merchant's view.
 };
 
 
@@ -59,17 +56,16 @@ const MerchantDetailModal: React.FC<MerchantDetailModalProps> = ({
   accounts,
 }) => {
   const [isIndividualTxModalOpen, setIsIndividualTxModalOpen] = useState(false);
-  const [selectedTxForDetail, setSelectedTxForDetail] = useState<Transaction | null>(null); // Original Transaction for sub-modal
+  const [selectedTxForDetail, setSelectedTxForDetail] = useState<Transaction | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [suspensionReason, setSuspensionReason] = useState("");
 
   const merchantTransactionsToDisplay = useMemo((): DisplayableMerchantTransaction[] => {
     if (!merchant) return [];
-
     const allMerchantRelatedLegs = transactions.filter(tx => tx.merchantId === merchant.id);
-
     const transactionsByPaymentId = allMerchantRelatedLegs.reduce((acc, tx) => {
-      const paymentId = tx.paymentId;
+      const paymentId = tx.paymentId; 
+      if (!paymentId) return acc; 
       if (!acc[paymentId]) {
         acc[paymentId] = [];
       }
@@ -78,52 +74,33 @@ const MerchantDetailModal: React.FC<MerchantDetailModalProps> = ({
     }, {} as Record<string, Transaction[]>);
 
     const processedTransactions: DisplayableMerchantTransaction[] = [];
-
     for (const paymentId in transactionsByPaymentId) {
       const legs = transactionsByPaymentId[paymentId];
       if (!legs || legs.length === 0) continue;
-
-      // Find the credit leg to the merchant (this is what the merchant received)
-      // Or a debit leg if it's a refund *from* the merchant.
-      // For simplicity, let's prioritize the CREDIT leg TO an account that is NOT a typical child account,
-      // OR if it's a DEBIT leg, it implies money OUT from merchant.
-      // This logic might need refinement based on how merchant's own "internal" accounts are identified.
-
-      let merchantPerspectiveLeg = legs.find(leg => leg.type === 'Credit'); // Money IN to an account associated with merchantId
-      let otherLegForPayerInfo = legs.find(leg => leg.type === 'Debit'); // Money OUT from payer
-
-      if (!merchantPerspectiveLeg) { // If no credit, maybe it's a refund (debit from merchant)
+      let merchantPerspectiveLeg = legs.find(leg => leg.type === 'Credit');
+      let otherLegForPayerInfo = legs.find(leg => leg.type === 'Debit');
+      if (!merchantPerspectiveLeg) {
         merchantPerspectiveLeg = legs.find(leg => leg.type === 'Debit');
-        otherLegForPayerInfo = legs.find(leg => leg.type === 'Credit'); // Payer received credit
+        otherLegForPayerInfo = legs.find(leg => leg.type === 'Credit');
       }
-      
-      if (!merchantPerspectiveLeg) { // Fallback if logic is unclear
-          merchantPerspectiveLeg = legs[0]; 
-      }
+      if (!merchantPerspectiveLeg) { merchantPerspectiveLeg = legs[0]; } // Fallback
+      let payerAccountIdForDisplay = merchantPerspectiveLeg.accountId; // Default to current leg's accountId
 
-      let payerAccountIdForDisplay = merchantPerspectiveLeg.accountId; // Default
       if (merchantPerspectiveLeg.type === 'Credit' && otherLegForPayerInfo) {
-        // If this is a credit TO the merchant, the payer is on the debit leg
         payerAccountIdForDisplay = otherLegForPayerInfo.accountId;
       } else if (merchantPerspectiveLeg.type === 'Debit' && otherLegForPayerInfo) {
-        // If this is a debit FROM the merchant (refund), the recipient is on the credit leg
          payerAccountIdForDisplay = otherLegForPayerInfo.accountId;
       }
-      // If there's only one leg, payerAccountIdForDisplay remains merchantPerspectiveLeg.accountId
-      // which should be the customer's account in a direct debit scenario for the merchant.
+      // If only one leg, or if otherLegForPayerInfo is undefined, payerAccountIdForDisplay will remain as merchantPerspectiveLeg.accountId
 
       const account = accounts.find(acc => acc.id === payerAccountIdForDisplay);
-      
       processedTransactions.push({
-        ...merchantPerspectiveLeg, // Base details from merchant's perspective leg
-        displayAccountId: account?.displayId || (payerAccountIdForDisplay ? tuncateUUID(payerAccountIdForDisplay) : "N/A"),
+        ...merchantPerspectiveLeg,
+        displayAccountId: account?.displayId || (payerAccountIdForDisplay ? tuncateUUID(payerAccountIdForDisplay) : "N/A"), // CORRECTED
         accountChildName: account?.childName || "N/A",
-        // The description on the merchantPerspectiveLeg should be what the merchant sees
-        // e.g., "Payment from [Payer]" or "Product Category"
         description: merchantPerspectiveLeg.description || "N/A", 
       });
     }
-    
     return processedTransactions.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
   }, [merchant, transactions, accounts]);
 
@@ -137,10 +114,8 @@ const MerchantDetailModal: React.FC<MerchantDetailModalProps> = ({
   const canReactivate = merchant.status === 'suspended' || merchant.status === 'rejected';
 
   const handleOpenTxDetail = (tx: DisplayableMerchantTransaction) => {
-    // Find the original full transaction object to pass to the detail modal
-    // This is important if DisplayableMerchantTransaction modified some original fields for display
     const originalTx = transactions.find(original => original.id === tx.id);
-    setSelectedTxForDetail(originalTx || tx); // Fallback to tx if original not found (shouldn't happen)
+    setSelectedTxForDetail(originalTx || tx); 
     setIsIndividualTxModalOpen(true);
   };
 
@@ -159,7 +134,7 @@ const MerchantDetailModal: React.FC<MerchantDetailModalProps> = ({
   }
 
   const handleSuspendAction = () => {
-    onRequestConfirm('suspend', merchant, suspensionReason);
+    onRequestConfirm('suspend', merchant, suspensionReason.trim() || undefined); 
     setSuspensionReason(""); 
   }
   
@@ -193,7 +168,7 @@ const MerchantDetailModal: React.FC<MerchantDetailModalProps> = ({
                 <dl className="space-y-3">
                   <DetailItem label="ID:" value={tuncateUUID(merchant.id)} valueClassName="font-mono text-gray-700"/>
                   <DetailItem label="Contact Email:" value={merchant.contactEmail} />
-                  <DetailItem label="Category:" value={merchant.category} />
+                  <DetailItem label="Contact Number:" value={merchant.contactPhone} /> 
                   <DetailItem label="Address:" value={merchant.storeAddress} />
                   <DetailItem label="Status:" value={renderStatusBadge(merchant.status, "merchant")} />
                   <DetailItem label="Submitted:" value={formatDate(merchant.submittedAt)} /> 
@@ -201,6 +176,7 @@ const MerchantDetailModal: React.FC<MerchantDetailModalProps> = ({
                   {merchant.status === 'rejected' && merchant.declineReason && (
                     <DetailItem label="Decline Reason:" value={merchant.declineReason} valueClassName="text-red-700" />
                   )}
+                  {merchant.contactPerson && <DetailItem label="Contact Person:" value={merchant.contactPerson} />}
                 </dl>
               </div>
 
@@ -244,16 +220,16 @@ const MerchantDetailModal: React.FC<MerchantDetailModalProps> = ({
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {merchantTransactionsToDisplay.map(tx => { 
-                          const { date, time } = formatDateTime(tx.timestamp); // tx.timestamp is Date
-                          const amountValue = parseFloat(tx.amount); // tx.amount is string
+                          const { date, time } = formatDateTime(tx.timestamp); 
+                          const amountValue = parseFloat(tx.amount); 
                           return (
                             <tr key={tx.id}>
                               <td className="px-3 py-2 whitespace-nowrap">{date} <span className="text-xs text-gray-500">{time}</span></td>
-                              <td className="px-3 py-2 whitespace-nowrap" title={tx.accountId}> {/* Original accountId on this leg */}
+                              <td className="px-3 py-2 whitespace-nowrap" title={tx.accountId}>
                                 {tx.displayAccountId}
                                 {tx.accountChildName && tx.accountChildName !== "N/A" && <div className="text-xs text-gray-500">({tx.accountChildName})</div>}
                               </td>
-                              <td className="px-3 py-2 whitespace-nowrap font-mono text-xs" title={tx.paymentId}>{tuncateUUID(tx.paymentId)}</td>
+                              <td className="px-3 py-2 whitespace-nowrap font-mono text-xs" title={tx.paymentId || undefined}>{tuncateUUID(tx.paymentId)}</td>
                               <td className="px-3 py-2 text-right whitespace-nowrap font-medium">{formatCurrency(Math.abs(amountValue))}</td>
                               <td className="px-3 py-2 text-center whitespace-nowrap">{renderStatusBadge(tx.status, "transaction")}</td>
                               <td className="px-3 py-2 whitespace-nowrap max-w-[150px] truncate" title={tx.description || ""}>{tx.description || 'N/A'}</td>
