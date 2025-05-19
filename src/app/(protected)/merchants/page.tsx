@@ -203,6 +203,26 @@ function MerchantsPage() {
 
   const combinedLoadingState = merchantsLoading || transactionsLoading || accountsLoading;
 
+   console.log("[MerchantsPage] transactions data before passing to MerchantsTab:", transactions);
+  if (transactions && transactions.length > 0) {
+    console.log("[MerchantsPage] First transaction in MerchantsPage:", transactions[0]);
+    console.log(
+      "[MerchantsPage] Timestamp type of first transaction in MerchantsPage:", 
+      typeof transactions[0].timestamp, 
+      transactions[0].timestamp instanceof Date ? "IS Date object" : "IS NOT Date object"
+    );
+    console.log(
+      "[MerchantsPage] createdAt type of first transaction in MerchantsPage:", 
+      typeof transactions[0].createdAt, 
+      transactions[0].createdAt instanceof Date ? "IS Date object" : "IS NOT Date object"
+    );
+    console.log(
+      "[MerchantsPage] updatedAt type of first transaction in MerchantsPage:", 
+      typeof transactions[0].updatedAt, 
+      transactions[0].updatedAt instanceof Date ? "IS Date object" : "IS NOT Date object"
+    );
+  }
+
   return (
     <div className="container mx-auto p-4">
       <MerchantsTab
