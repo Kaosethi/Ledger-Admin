@@ -87,38 +87,63 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
   };
 
   const filteredTransactions = useMemo(() => {
-    return transactions.filter((tx) => {
+    console.log("[TransactionsTab] Recalculating filteredTransactions. From:", fromDate, "To:", toDate);
+
+    return transactions.filter((tx, index) => { 
+      if (index < 5 || (fromDate || toDate)) { 
+        console.log(`[TransactionsTab] Filtering tx ID: ${tx.id}, Timestamp:`, tx.timestamp, "(Type:", typeof tx.timestamp, tx.timestamp instanceof Date ? "is Date" : "is NOT Date", ")");
+      }
+
       const txDate = tx.timestamp; 
 
-      if (fromDate) {
+      if (!(txDate instanceof Date) || isNaN(txDate.getTime())) {
+        if (index < 5 || (fromDate || toDate)) {
+            console.warn(`[TransactionsTab] Invalid or missing txDate for tx ID: ${tx.id}. Skipping date filter for this tx.`);
+        }
+      }
+
+      let shouldKeep = true;
+
+      if (fromDate && txDate instanceof Date && !isNaN(txDate.getTime())) {
         const startOfDayFromDate = new Date(fromDate);
         startOfDayFromDate.setHours(0, 0, 0, 0);
-        if (txDate < startOfDayFromDate) return false;
+        if (txDate < startOfDayFromDate) {
+            if (index < 5 || (fromDate || toDate)) console.log(`[TransactionsTab] Tx ${tx.id} REJECTED by fromDate. txDate: ${txDate.toISOString()}, startOfDayFromDate: ${startOfDayFromDate.toISOString()}`);
+            shouldKeep = false;
+        }
       }
-      if (toDate) {
+      
+      if (shouldKeep && toDate && txDate instanceof Date && !isNaN(txDate.getTime())) {
         const endOfDayToDate = new Date(toDate);
         endOfDayToDate.setHours(23, 59, 59, 999);
-        if (txDate > endOfDayToDate) return false;
+        if (txDate > endOfDayToDate) {
+            if (index < 5 || (fromDate || toDate)) console.log(`[TransactionsTab] Tx ${tx.id} REJECTED by toDate. txDate: ${txDate.toISOString()}, endOfDayToDate: ${endOfDayToDate.toISOString()}`);
+            shouldKeep = false;
+        }
       }
+
+      if (!shouldKeep) return false;
+
       if (filterAccountId.trim() !== "") {
         const account = accounts.find(acc => acc.id === tx.accountId);
-        if (!account?.displayId?.toLowerCase().includes(filterAccountId.trim().toLowerCase()) && // Optional chaining for displayId
+        if (!account?.displayId?.toLowerCase().includes(filterAccountId.trim().toLowerCase()) &&
             !tx.accountId.toLowerCase().includes(filterAccountId.trim().toLowerCase())) {
           return false;
         }
       }
       if (filterMerchantName.trim() !== "") {
         const merchant = merchants.find(m => m.id === tx.merchantId);
-        if (!merchant?.businessName?.toLowerCase().includes(filterMerchantName.trim().toLowerCase())) { // Optional chaining
+        if (!merchant?.businessName?.toLowerCase().includes(filterMerchantName.trim().toLowerCase())) {
           return false;
         }
       }
       if (filterStatus !== "all" && tx.status !== filterStatus) {
         return false;
       }
-      if (filterPaymentId.trim() !== "" && tx.paymentId && !tx.paymentId.toLowerCase().includes(filterPaymentId.trim().toLowerCase())) { // Ensure tx.paymentId exists
+      if (filterPaymentId.trim() !== "" && tx.paymentId && !tx.paymentId.toLowerCase().includes(filterPaymentId.trim().toLowerCase())) {
         return false;
       }
+      
       return true;
     });
   }, [
@@ -152,33 +177,29 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
   
   const transactionStatuses: Transaction['status'][] = useMemo(() => ["Pending", "Completed", "Failed", "Declined"], []);
 
-
   const handleExportCSV = () => {
     if (filteredTransactions.length === 0) {
       alert("No transactions to export with current filters.");
       return;
     }
-
     const csvData = filteredTransactions.map((tx) => {
-      const { date: txDisplayDate, time: txDisplayTime } = formatDateTime(tx.timestamp); 
-      const { date: createdDate, time: createdTime } = formatDateTime(tx.createdAt); 
-      const { date: updatedDate, time: updatedTime } = formatDateTime(tx.updatedAt); 
+      const { date: txDisplayDate, time: txDisplayTime } = tx.timestamp instanceof Date ? formatDateTime(tx.timestamp) : { date: 'Invalid Date', time: ''};
+      const { date: createdDate, time: createdTime } = tx.createdAt instanceof Date ? formatDateTime(tx.createdAt) : { date: 'Invalid Date', time: ''};
+      const { date: updatedDate, time: updatedTime } = tx.updatedAt instanceof Date ? formatDateTime(tx.updatedAt) : { date: 'Invalid Date', time: ''};
       const merchant = merchants.find((m) => m.id === tx.merchantId);
       const account = accounts.find((acc) => acc.id === tx.accountId);
-      
       let signedAmount = parseFloat(tx.amount); 
       if (tx.type === "Debit" || (tx.type === "Adjustment" && signedAmount < 0)) {
         signedAmount = -Math.abs(signedAmount); 
       } else {
         signedAmount = Math.abs(signedAmount);
       }
-
       return {
-        "Payment ID (User Facing)": tx.paymentId || "N/A", // Handle potential null/undefined paymentId
+        "Payment ID (User Facing)": tx.paymentId || "N/A",
         "Transaction DB ID": tx.id,
         "Date": txDisplayDate,
         "Time": txDisplayTime,
-        "Timestamp (ISO)": tx.timestamp.toISOString(),
+        "Timestamp (ISO)": tx.timestamp instanceof Date ? tx.timestamp.toISOString() : "Invalid Date",
         "Account Display ID": account?.displayId || "N/A",
         "Account Child Name": account?.childName || "N/A",
         "Account DB ID": tx.accountId || "",
@@ -193,11 +214,10 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
         "Description": tx.description || "",
         "Client Reference": tx.reference || "",
         "Metadata (JSON)": tx.metadata ? JSON.stringify(JSON.parse(tx.metadata)) : "",
-        "System Created At (ISO)": tx.createdAt.toISOString(),
-        "System Updated At (ISO)": tx.updatedAt.toISOString(),
+        "System Created At (ISO)": tx.createdAt instanceof Date ? tx.createdAt.toISOString() : "Invalid Date",
+        "System Updated At (ISO)": tx.updatedAt instanceof Date ? tx.updatedAt.toISOString() : "Invalid Date",
       };
     });
-
     try {
       const csv = unparse(csvData);
       const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
@@ -218,8 +238,6 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold text-gray-800">Transaction History</h1>
-
-      {/* Filter Section */}
       <div className="bg-white p-4 rounded-lg shadow">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-3 items-end">
           <div>
@@ -236,7 +254,6 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
                     mode="single" 
                     selected={fromDate} 
                     onSelect={setFromDate} 
-                    // MODIFIED: Added disabled logic for "From Date"
                     disabled={(date) => 
                         toDate ? date > new Date(new Date(toDate).setHours(23,59,59,999)) : false 
                     }
@@ -302,7 +319,6 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
         </div>
       </div>
 
-      {/* Table Section */}
       <div className="bg-white p-4 rounded-lg shadow overflow-x-auto">
         <Table>
           <TableHeader>
@@ -337,15 +353,48 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
               ))
             ) : transactionsToDisplay.length > 0 ? (
               transactionsToDisplay.map((tx) => {
-                const { date, time } = formatDateTime(tx.timestamp);
+                               // CORRECTED AGAIN: More robust handling of formatDateTime output for table display
+                let displayDate = "N/A";
+                let displayTime = "";
+
+                if (tx.timestamp instanceof Date && !isNaN(tx.timestamp.getTime())) {
+                    const formattedResultAsUnknown: unknown = formatDateTime(tx.timestamp);
+
+                    if (
+                        typeof formattedResultAsUnknown === 'object' &&
+                        formattedResultAsUnknown !== null &&
+                        'date' in formattedResultAsUnknown &&
+                        typeof (formattedResultAsUnknown as any).date === 'string' && // Further checks
+                        'time' in formattedResultAsUnknown &&
+                        typeof (formattedResultAsUnknown as any).time === 'string'
+                    ) {
+                        displayDate = (formattedResultAsUnknown as { date: string; time: string }).date;
+                        displayTime = (formattedResultAsUnknown as { date: string; time: string }).time;
+                    } else if (typeof formattedResultAsUnknown === 'string') {
+                        // Now TypeScript should correctly infer formattedResultAsUnknown as string here
+                        const parts = formattedResultAsUnknown.split(" "); 
+                        displayDate = parts[0] || formattedResultAsUnknown;
+                        if (parts.length > 1) {
+                            displayTime = parts.slice(1).join(" ");
+                        }
+                    } else {
+                        // Handles cases where formatDateTime returns null, undefined, or an unexpected object type
+                        console.warn(
+                            "[TransactionsTab] formatDateTime returned an unexpected value or type for tx:",
+                            tx.id,
+                            "Value:", formattedResultAsUnknown
+                        );
+                    }
+                }
+
                 const account = accounts.find(acc => acc.id === tx.accountId);
                 const merchant = merchants.find(m => m.id === tx.merchantId);
                 const amountValue = parseFloat(tx.amount);
 
                 return (
                   <TableRow key={tx.id}>
-                    <TableCell>{date}</TableCell>
-                    <TableCell>{time}</TableCell>
+                    <TableCell>{displayDate}</TableCell>
+                    <TableCell>{displayTime}</TableCell>
                     <TableCell title={account?.id || ""}>{account?.displayId || (tx.accountId ? tuncateUUID(tx.accountId) : "N/A")}</TableCell>
                     <TableCell>{account?.childName || "N/A"}</TableCell>
                     <TableCell title={merchant?.id || ""}>{tx.merchantId ? tuncateUUID(tx.merchantId) : "N/A"}</TableCell>
@@ -385,10 +434,6 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
             isOpen={isDetailModalOpen} 
             onClose={handleCloseDetailModal} 
             transaction={selectedTransactionForDetail}
-            // You might need to pass the specific account/merchant if TransactionDetailModal needs them
-            // For example:
-            // account={accounts.find(acc => acc.id === selectedTransactionForDetail.accountId)}
-            // merchant={merchants.find(m => m.id === selectedTransactionForDetail.merchantId)}
         />
       )}
     </div>
