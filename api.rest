@@ -428,3 +428,18 @@ Authorization: Bearer
 }
 
 
+# Quick Test for QR Validation
+
+###
+# Validate QR Code - Expecting Success
+# exists in your 'accounts' table and its status is 'Active'.
+POST {{baseUrl}}/api/merchant-app/beneficiaries/validate-qr
+Content-Type: application/json
+# Authorization: Bearer YOUR_JWT_TOKEN # Add if your endpoint strictly requires auth
+
+{
+  "type": "pay",
+  "account": "YOUR_VALID_AND_ACTIVE_DISPLAY_ID_FROM_DB",
+  "ver": "1.0",
+  "sig": "mock_sig"
+}
