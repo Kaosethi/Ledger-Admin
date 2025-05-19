@@ -201,13 +201,15 @@ const MerchantsTab: React.FC<MerchantsTabProps> = ({
         message = (
           <>
             <p>Reject application for <strong>{merchantName}</strong>{reason ? " with reason:" : "?"}</p>
-            {reason ? (<p className="mt-1 text-sm italic text-gray-600">"{reason}"</p>) : (<p className="mt-1 text-sm text-yellow-600">Note: No specific reason was provided.</p>)}
+            {reason ? (<p className="mt-1 text-sm italic text-gray-600">&quot;{reason}&quot;</p>
+) : (<p className="mt-1 text-sm text-yellow-600">Note: No specific reason was provided.</p>)}
             <p className="mt-2 font-semibold text-red-700">This action may have significant consequences.</p>
           </>
         );
         return { title: "Confirm Rejection", message, confirmButtonText: rejectionLoading ? "Rejecting..." : "Confirm Rejection", confirmButtonVariant: "danger" as const, isLoading: rejectionLoading };
       case "suspend":
-        message = reason ? (<><p>Suspend merchant <strong>{merchantName}</strong> with reason:</p><p className="mt-1 text-sm italic text-gray-600">"{reason}"</p></>) : (<>Suspend merchant <strong>{merchantName}</strong>?</>);
+        message = reason ? (<><p>Suspend merchant <strong>{merchantName}</strong> with reason:</p><p className="mt-1 text-sm italic text-gray-600">&quot;{reason}&quot;</p>
+</>) : (<>Suspend merchant <strong>{merchantName}</strong>?</>);
         return { title: "Confirm Suspension", message, confirmButtonText: suspensionLoading ? "Suspending..." : "Suspend", confirmButtonVariant: "danger" as const, isLoading: suspensionLoading };
       case "reactivate":
         message = <>Reactivate merchant <strong>{merchantName}</strong>?</>;
