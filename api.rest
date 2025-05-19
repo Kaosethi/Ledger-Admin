@@ -439,7 +439,7 @@ Content-Type: application/json
 
 {
   "type": "pay",
-  "account": "YOUR_VALID_AND_ACTIVE_DISPLAY_ID_FROM_DB",
+  "account": "STC-2025-685V",
   "ver": "1.0",
   "sig": "mock_sig"
 }
