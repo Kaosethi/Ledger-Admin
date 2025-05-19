@@ -64,7 +64,6 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
   merchants = [],
   accounts = [],
   transactionsLoading = false,
-  // accountsLoading and merchantsLoading are accepted but not yet used for specific UI changes
 }) => {
   const [fromDate, setFromDate] = useState<Date | undefined>(undefined);
   const [toDate, setToDate] = useState<Date | undefined>(undefined);
@@ -88,9 +87,8 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
   };
 
   const filteredTransactions = useMemo(() => {
-    // This assumes 'transactions' prop contains the "rich" Transaction objects
     return transactions.filter((tx) => {
-      const txDate = tx.timestamp; // Should be a Date object
+      const txDate = tx.timestamp; 
 
       if (fromDate) {
         const startOfDayFromDate = new Date(fromDate);
@@ -104,22 +102,21 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
       }
       if (filterAccountId.trim() !== "") {
         const account = accounts.find(acc => acc.id === tx.accountId);
-        if (!account?.displayId.toLowerCase().includes(filterAccountId.trim().toLowerCase()) &&
+        if (!account?.displayId?.toLowerCase().includes(filterAccountId.trim().toLowerCase()) && // Optional chaining for displayId
             !tx.accountId.toLowerCase().includes(filterAccountId.trim().toLowerCase())) {
           return false;
         }
       }
       if (filterMerchantName.trim() !== "") {
         const merchant = merchants.find(m => m.id === tx.merchantId);
-        if (!merchant?.businessName.toLowerCase().includes(filterMerchantName.trim().toLowerCase())) {
+        if (!merchant?.businessName?.toLowerCase().includes(filterMerchantName.trim().toLowerCase())) { // Optional chaining
           return false;
         }
       }
       if (filterStatus !== "all" && tx.status !== filterStatus) {
         return false;
       }
-      // tx.paymentId should exist on the rich Transaction type
-      if (filterPaymentId.trim() !== "" && !tx.paymentId.toLowerCase().includes(filterPaymentId.trim().toLowerCase())) {
+      if (filterPaymentId.trim() !== "" && tx.paymentId && !tx.paymentId.toLowerCase().includes(filterPaymentId.trim().toLowerCase())) { // Ensure tx.paymentId exists
         return false;
       }
       return true;
@@ -153,9 +150,9 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
     setTimeout(() => setSelectedTransactionForDetail(null), 300); 
   };
   
-  const transactionStatuses: Transaction['status'][] = ["Pending", "Completed", "Failed", "Declined"];
+  const transactionStatuses: Transaction['status'][] = useMemo(() => ["Pending", "Completed", "Failed", "Declined"], []);
 
-  // --- CSV EXPORT FUNCTION ---
+
   const handleExportCSV = () => {
     if (filteredTransactions.length === 0) {
       alert("No transactions to export with current filters.");
@@ -163,14 +160,13 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
     }
 
     const csvData = filteredTransactions.map((tx) => {
-      // Ensure all fields from the "rich" Transaction type are accessed correctly
-      const { date: txDisplayDate, time: txDisplayTime } = formatDateTime(tx.timestamp); // tx.timestamp is Date
-      const { date: createdDate, time: createdTime } = formatDateTime(tx.createdAt); // tx.createdAt is Date
-      const { date: updatedDate, time: updatedTime } = formatDateTime(tx.updatedAt); // tx.updatedAt is Date
+      const { date: txDisplayDate, time: txDisplayTime } = formatDateTime(tx.timestamp); 
+      const { date: createdDate, time: createdTime } = formatDateTime(tx.createdAt); 
+      const { date: updatedDate, time: updatedTime } = formatDateTime(tx.updatedAt); 
       const merchant = merchants.find((m) => m.id === tx.merchantId);
       const account = accounts.find((acc) => acc.id === tx.accountId);
       
-      let signedAmount = parseFloat(tx.amount); // tx.amount is string
+      let signedAmount = parseFloat(tx.amount); 
       if (tx.type === "Debit" || (tx.type === "Adjustment" && signedAmount < 0)) {
         signedAmount = -Math.abs(signedAmount); 
       } else {
@@ -178,7 +174,7 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
       }
 
       return {
-        "Payment ID (User Facing)": tx.paymentId,
+        "Payment ID (User Facing)": tx.paymentId || "N/A", // Handle potential null/undefined paymentId
         "Transaction DB ID": tx.id,
         "Date": txDisplayDate,
         "Time": txDisplayTime,
@@ -190,7 +186,7 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
         "Merchant DB ID": tx.merchantId || "N/A",
         "Type": tx.type,
         "Amount": signedAmount.toFixed(2),
-        "Currency": "THB", // Assuming THB
+        "Currency": "THB", 
         "Status": tx.status,
         "Decline Reason": tx.declineReason || "",
         "PIN Verified": tx.pinVerified === null ? "N/A" : tx.pinVerified ? "Yes" : "No",
@@ -235,7 +231,18 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
                   {fromDate ? formatDateFns(fromDate, "dd/MM/yyyy") : <span>Pick a date</span>}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={fromDate} onSelect={setFromDate} initialFocus /></PopoverContent>
+              <PopoverContent className="w-auto p-0">
+                <Calendar 
+                    mode="single" 
+                    selected={fromDate} 
+                    onSelect={setFromDate} 
+                    // MODIFIED: Added disabled logic for "From Date"
+                    disabled={(date) => 
+                        toDate ? date > new Date(new Date(toDate).setHours(23,59,59,999)) : false 
+                    }
+                    initialFocus 
+                />
+              </PopoverContent>
             </Popover>
           </div>
           <div>
@@ -247,7 +254,17 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
                   {toDate ? formatDateFns(toDate, "dd/MM/yyyy") : <span>Pick a date</span>}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={toDate} onSelect={setToDate} disabled={(date) => fromDate ? date < fromDate : false} initialFocus /></PopoverContent>
+              <PopoverContent className="w-auto p-0">
+                <Calendar 
+                    mode="single" 
+                    selected={toDate} 
+                    onSelect={setToDate} 
+                    disabled={(date) => 
+                        fromDate ? date < new Date(new Date(fromDate).setHours(0,0,0,0)) : false
+                    } 
+                    initialFocus 
+                />
+              </PopoverContent>
             </Popover>
           </div>
           <div>
@@ -274,12 +291,10 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
             <Label htmlFor="filterPaymentId" className="mb-1 block text-sm font-medium">Payment ID:</Label>
             <Input id="filterPaymentId" type="text" placeholder="Filter by Payment ID" value={filterPaymentId} onChange={(e) => setFilterPaymentId(e.target.value)} className="w-full"/>
           </div>
-          {/* Action Buttons Container */}
-          <div className="flex space-x-2 items-end pt-2 sm:pt-0 md:col-start-3 lg:col-start-3 lg:col-span-2 justify-end"> {/* Adjusted grid positioning for buttons */}
+          <div className="flex space-x-2 items-end pt-2 sm:pt-0 md:col-start-3 lg:col-start-3 lg:col-span-2 justify-end">
             <Button onClick={clearFilters} variant="outline" className="w-full sm:w-auto">
               <XIcon className="mr-2 h-4 w-4" /> Clear
             </Button>
-            {/* EXPORT BUTTON RE-ADDED */}
             <Button onClick={handleExportCSV} className="w-full sm:w-auto">
               <DownloadIcon className="mr-2 h-4 w-4" /> Export CSV
             </Button>
@@ -287,7 +302,7 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
         </div>
       </div>
 
-      {/* Table Section - This part should be working if lib/mockData.ts and AdminDashboard.tsx are correct */}
+      {/* Table Section */}
       <div className="bg-white p-4 rounded-lg shadow overflow-x-auto">
         <Table>
           <TableHeader>
@@ -322,7 +337,6 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
               ))
             ) : transactionsToDisplay.length > 0 ? (
               transactionsToDisplay.map((tx) => {
-                // Assuming tx.timestamp is Date and tx.amount is string from rich Transaction type
                 const { date, time } = formatDateTime(tx.timestamp);
                 const account = accounts.find(acc => acc.id === tx.accountId);
                 const merchant = merchants.find(m => m.id === tx.merchantId);
@@ -338,7 +352,7 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
                     <TableCell>{merchant?.businessName || (tx.merchantId ? "Unknown" : "N/A")}</TableCell>
                     <TableCell className="text-right font-medium">{formatCurrency(Math.abs(amountValue))}</TableCell>
                     <TableCell className="text-center">{renderStatusBadge(tx.status, "transaction")}</TableCell>
-                    <TableCell className="font-mono text-xs" title={tx.paymentId}>{tuncateUUID(tx.paymentId)}</TableCell>
+                    <TableCell className="font-mono text-xs" title={tx.paymentId || undefined}>{tuncateUUID(tx.paymentId)}</TableCell>
                     <TableCell className="text-center">
                       <Button variant="outline" size="sm" onClick={() => handleViewDetailsClick(tx)}>Details</Button>
                     </TableCell>
@@ -354,7 +368,6 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
         </Table>
       </div>
       
-      {/* Pagination Section */}
       {totalPages > 1 && !transactionsLoading && (
         <div className="flex items-center justify-between pt-4">
           <div className="text-sm text-gray-700">
@@ -368,7 +381,15 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
       )}
 
       {selectedTransactionForDetail && (
-        <TransactionDetailModal isOpen={isDetailModalOpen} onClose={handleCloseDetailModal} transaction={selectedTransactionForDetail} />
+        <TransactionDetailModal 
+            isOpen={isDetailModalOpen} 
+            onClose={handleCloseDetailModal} 
+            transaction={selectedTransactionForDetail}
+            // You might need to pass the specific account/merchant if TransactionDetailModal needs them
+            // For example:
+            // account={accounts.find(acc => acc.id === selectedTransactionForDetail.accountId)}
+            // merchant={merchants.find(m => m.id === selectedTransactionForDetail.merchantId)}
+        />
       )}
     </div>
   );
