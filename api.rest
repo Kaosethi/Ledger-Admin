@@ -3,7 +3,8 @@
 ###
 
 # --- Configuration ---
-@baseUrl = https://stc.pinroj.com/api
+@baseUrl = http://stc.pinroj.com/api
+
 @contentType = application/json
 
 # Admin Token - Get this by running the "Admin Login" request below and copying the token
@@ -435,11 +436,10 @@ Authorization: Bearer
 # exists in your 'accounts' table and its status is 'Active'.
 POST {{baseUrl}}/api/merchant-app/beneficiaries/validate-qr
 Content-Type: application/json
-# Authorization: Bearer YOUR_JWT_TOKEN # Add if your endpoint strictly requires auth
 
 {
   "type": "pay",
-  "account": "STC-2025-685V",
+  "account": "aad914cf-5b6c-4f8d-a454-9645a3827bbb",
   "ver": "1.0",
   "sig": "mock_sig"
 }
