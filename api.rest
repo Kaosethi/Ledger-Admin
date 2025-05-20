@@ -438,7 +438,7 @@ Content-Type: application/json
 
 {
   "type": "PAYMENT_REQUEST",
-  "account": "STC-2025-685V",
+  "account": "aad914cf-5b6c-4f8d-a454-9645a3827bbb",
   "version": "1.0",
   "signature": "somesignature"
 }
