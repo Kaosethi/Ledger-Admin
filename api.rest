@@ -3,14 +3,14 @@
 ###
 
 # --- Configuration ---
-@baseUrl = http://stc.pinroj.com/
+@baseUrl = http://stc.pinroj.com/api/
 @contentType = application/json
 
 # Admin Token - Get this by running the "Admin Login" request below and copying the token
 @adminToken = Bearer REPLACE_WITH_ADMIN_JWT_TOKEN
 
 # Merchant Token - Get this by running the "Merchant App - Login" request below and copying the token
-@merchantToken = Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI4ZjJiZTFlZi1hMDgxLTQ1NTQtOGFlOS1hMjRmMDRmYzhiODQiLCJlbWFpbCI6ImFiQGEuY29tIiwicm9sZSI6Im1lcmNoYW50IiwibWVyY2hhbnRJZCI6IjhmMmJlMWVmLWEwODEtNDU1NC04YWU5LWEyNGYwNGZjOGI4NCIsImlhdCI6MTc0NzQyNTE3NSwiZXhwIjoxNzQ3NDY4Mzc1fQ.4SREjPizvVSBmStAAfTydhq8W9hly_p-9c_YUxY6uGM
+@merchantToken = Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJiMDBkN2JiMC1mMmY1LTQ2YmQtOTBjNi0zNjkwMWE4Zjc4YzQiLCJlbWFpbCI6ImFAYS5jb20iLCJyb2xlIjoibWVyY2hhbnQiLCJtZXJjaGFudElkIjoiYjAwZDdiYjAtZjJmNS00NmJkLTkwYzYtMzY5MDFhOGY3OGM0IiwiaWF0IjoxNzQ3NzMyNjY5LCJleHAiOjE3NDc3NzU4Njl9.x5c9-FxFER_kWPI_g2ynb7g5yiuH8_PCtn9Sz_Git_s
 
 
 # ==============================================================================
@@ -19,7 +19,7 @@
 
 ### Admin Login
 # @name adminLogin
-POST https://stc.pinroj.com/api/auth/login
+POST {{baseUrl}}/auth/login
 Content-Type: {{contentType}}
 
 {
@@ -48,14 +48,13 @@ Content-Type: {{contentType}}
 }
 
 ### Merchant App - Login
-# Use credentials of an ACTIVE merchant. Update @merchantToken
 # @name merchantLogin
 POST {{baseUrl}}/merchant-app/auth/login
-Content-Type: {{contentType}}
+Content-Type: application/json                         # Ensure {{contentType}} resolves to this
 
 {
-  "email": "ab@a.com",
-  "password": "password123"
+  "email": "a@a.com",
+  "password": "password"
 }
 
 ### Merchant App - Get Profile (Requires @merchantToken)

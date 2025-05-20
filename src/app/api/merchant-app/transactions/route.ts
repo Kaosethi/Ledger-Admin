@@ -116,29 +116,28 @@ async function getAuthenticatedMerchantInfo(
   try {
     const secretKey = getJwtSecretKey();
 
-    // --- START OF DIAGNOSTIC LOGGING AND jwtVerify MODIFICATION ---
     let payloadForLogging: jose.JWTPayload | null = null;
     try {
-        payloadForLogging = jose.decodeJwt(token); // Decode for logging (does not verify signature)
+        payloadForLogging = jose.decodeJwt(token);
     } catch (e: any) {
         console.warn(`[API Transactions] Auth: Could not decode JWT for logging claims. Error: ${e.message}`);
     }
 
     const serverCurrentTime = new Date();
     const serverCurrentUnixTime = Math.floor(serverCurrentTime.getTime() / 1000);
-    console.log(`[API Transactions] Auth: Server current time for JWT check: ${serverCurrentTime.toISOString()} (Unix: ${serverCurrentUnixTime})`);
+    // console.log(`[API Transactions] Auth: Server current time for JWT check: ${serverCurrentTime.toISOString()} (Unix: ${serverCurrentUnixTime})`); // Optional: Can be noisy
 
     if (payloadForLogging) {
         const tokenExp = payloadForLogging.exp;
-        const tokenIat = payloadForLogging.iat;
-        const expDateStr = tokenExp ? new Date(tokenExp * 1000).toISOString() : "N/A";
-        const iatDateStr = tokenIat ? new Date(tokenIat * 1000).toISOString() : "N/A";
-        console.log(`[API Transactions] Auth: Token claims (decoded for logging): exp: ${tokenExp} (${expDateStr}), iat: ${tokenIat} (${iatDateStr})`);
+        // const tokenIat = payloadForLogging.iat; // Optional
+        // const expDateStr = tokenExp ? new Date(tokenExp * 1000).toISOString() : "N/A"; // Optional
+        // const iatDateStr = tokenIat ? new Date(tokenIat * 1000).toISOString() : "N/A"; // Optional
+        // console.log(`[API Transactions] Auth: Token claims (decoded for logging): exp: ${tokenExp} (${expDateStr}), iat: ${tokenIat} (${iatDateStr})`); // Optional
         if (tokenExp) {
-            console.log(`[API Transactions] Auth: Time to token expiry: ${tokenExp - serverCurrentUnixTime} seconds.`);
+            // console.log(`[API Transactions] Auth: Time to token expiry: ${tokenExp - serverCurrentUnixTime} seconds.`); // Optional
         }
     } else {
-        console.log("[API Transactions] Auth: Token claims could not be decoded for logging prior to verification.");
+        // console.log("[API Transactions] Auth: Token claims could not be decoded for logging prior to verification."); // Optional
     }
 
     const { payload } = await jose.jwtVerify<AuthenticatedMerchantPayload>(
@@ -146,10 +145,9 @@ async function getAuthenticatedMerchantInfo(
       secretKey,
       {
         algorithms: [JWT_ALGORITHM],
-        clockTolerance: "5 minutes", // Add a 5-minute clock tolerance
+        clockTolerance: "5 minutes",
       }
     );
-    // --- END OF DIAGNOSTIC LOGGING AND jwtVerify MODIFICATION ---
 
     if (payload && payload.merchantId) {
       const merchantDetails = await db
@@ -245,10 +243,10 @@ const createTransactionPostSchema = z.object({
 
 // --- API Route Handler: POST /api/merchant-app/transactions ---
 export async function POST(request: NextRequest) {
-  let paymentId: string | null = null;
+  let paymentId: string | null = null; // Define paymentId here
 
   try {
-    getJwtSecretKey();
+    // getJwtSecretKey(); // Called within getAuthenticatedMerchantInfo
 
     const authenticatedMerchant = await getAuthenticatedMerchantInfo(request);
     const { merchantId, merchantInternalAccountId, merchantBusinessName } =
@@ -278,7 +276,7 @@ export async function POST(request: NextRequest) {
 
     const amount = parseFloat(amountString);
 
-    paymentId = uuidv4();
+    paymentId = uuidv4(); // Assign here
     console.log(
       `[TX PaymentID: ${paymentId}] POST PROCESSING STARTED for beneficiary '${beneficiaryDisplayId}', amount: ${amount} (from string '${amountString}'). Merch: ${merchantBusinessName}(${merchantId})`
     );
@@ -497,7 +495,7 @@ export async function POST(request: NextRequest) {
       );
       return {
         paymentId: paymentId!,
-        transactionId: debitLeg.id,
+        transactionId: debitLeg.id, // This is typically the leg ID the merchant app might be interested in for a specific receipt
         status: "Completed",
         message: "Transaction processed successfully.",
         customerNewBalance: updatedCustomerAccountRes[0].balance,
@@ -540,15 +538,13 @@ export async function POST(request: NextRequest) {
 // --- API Route Handler: GET /api/merchant-app/transactions ---
 export async function GET(request: NextRequest) {
   try {
-    // getJwtSecretKey(); // Ensure JWT secret is available - called within getAuthenticatedMerchantInfo
-
     const authenticatedMerchant = await getAuthenticatedMerchantInfo(request);
     const { merchantId, merchantBusinessName } = authenticatedMerchant;
 
     const url = new URL(request.url);
     const pageParam = url.searchParams.get("page");
     const limitParam = url.searchParams.get("limit");
-    const statusFilter = url.searchParams.get("status") || "Completed";
+    const statusQueryParam = url.searchParams.get("status"); // Get raw param
 
     let page = 1;
     if (pageParam) {
@@ -571,18 +567,24 @@ export async function GET(request: NextRequest) {
     }
     const offset = (page - 1) * limit;
 
+    // --- MODIFIED STATUS FILTER LOGIC ---
+    const effectiveStatusFilter = (statusQueryParam && statusQueryParam.toLowerCase() !== "all")
+        ? statusQueryParam
+        : null; // null means no status filter will be applied
+
     const transactionAccount = alias(accounts, "transaction_account_details");
 
     console.log(
-      `[API GET Transactions] Fetching for merchant: ${merchantBusinessName} (ID: ${merchantId}), Page: ${page}, Limit: ${limit}, Status: ${statusFilter}`
+      `[API GET Transactions] Fetching for merchant: ${merchantBusinessName} (ID: ${merchantId}), Page: ${page}, Limit: ${limit}, Status Query Param: '${statusQueryParam}', Effective DB Status Filter: '${effectiveStatusFilter === null ? 'All (none)' : effectiveStatusFilter}'`
     );
 
     const whereClauses = [
         eq(transactions.merchantId, merchantId)
     ];
-    if (statusFilter && statusFilter.toLowerCase() !== "all") {
-        whereClauses.push(eq(transactions.status, statusFilter as typeof transactions.status.enumValues[number]));
+    if (effectiveStatusFilter) {
+        whereClauses.push(eq(transactions.status, effectiveStatusFilter as typeof transactions.status.enumValues[number]));
     }
+    // --- END MODIFIED STATUS FILTER LOGIC ---
 
     const transactionRecords = await db
       .select({
@@ -615,7 +617,7 @@ export async function GET(request: NextRequest) {
         count: sql<number>`coalesce(count(*)::int, 0)`,
       })
       .from(transactions)
-      .where(and(...whereClauses));
+      .where(and(...whereClauses)); 
 
     const totalTransactions = totalResult[0]?.count || 0;
     const totalPages = Math.ceil(totalTransactions / limit) || 1;
@@ -652,11 +654,10 @@ export async function GET(request: NextRequest) {
         totalPages,
         hasNextPage: page < totalPages,
         hasPreviousPage: page > 1,
-        statusFilter: statusFilter
+        statusFilter: statusQueryParam ? statusQueryParam.toLowerCase() === "all" ? "All" : statusQueryParam : "All"
       },
     });
   } catch (error: any) {
-    // If the error is from getAuthenticatedMerchantInfo, it will already be an ApiError
     if (error instanceof ApiError) {
         console.error(
             `[API GET Transactions] ApiError encountered: ${error.message}`, error.details ? JSON.stringify(error.details) : ""
@@ -666,8 +667,6 @@ export async function GET(request: NextRequest) {
         { status: error.statusCode }
       );
     }
-
-    // Generic fallback for other unexpected errors in the GET handler itself
     console.error(
       `[API GET Transactions] Unexpected error fetching transactions: ${
         error.message || "Unknown error"
