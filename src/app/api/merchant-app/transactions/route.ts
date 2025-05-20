@@ -2,11 +2,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { merchants, accounts, transactions } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm"; // Added desc and sql
+import { alias } from "drizzle-orm/pg-core";      // Added alias
 import * as jose from "jose";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
-import { verifyPassword } from "@/lib/auth/password"; // Assuming this uses bcrypt or your chosen algo
+import { verifyPassword } from "@/lib/auth/password";
 import { env } from "@/lib/config";
 
 const JWT_SECRET_STRING = env.JWT_SECRET;
@@ -69,14 +70,14 @@ class InsufficientFundsError extends ApiError {
 }
 class IncorrectPinError extends ApiError {
   constructor(message: string = "Incorrect PIN provided.") {
-    super(message, 400); // Client expects 400 for incorrect PIN to manage attempts
+    super(message, 400);
   }
 }
 class PinEntryLockedError extends ApiError {
   constructor(
     message: string = "PIN entry locked: Too many incorrect attempts."
   ) {
-    super(message, 403); // Client might also check for this
+    super(message, 403);
   }
 }
 class MerchantAccountError extends ApiError {
@@ -180,11 +181,10 @@ async function getAuthenticatedMerchantInfo(
   }
 }
 
-// --- Zod Schema for Request Body Validation ---
+// --- Zod Schema for POST Request Body Validation ---
 const PIN_FAILURE_TYPE_MAX_ATTEMPTS = "MAX_ATTEMPTS_REACHED";
 
-// MODIFIED: amount to be a string, then parsed to number
-const createTransactionSchema = z.object({
+const createTransactionPostSchema = z.object({
   amount: z.string({ required_error: "Amount is required." })
     .regex(/^\d+(\.\d{1,2})?$/, "Amount must be a valid monetary string (e.g., '100.00' or '50').")
     .refine(valStr => {
@@ -207,12 +207,13 @@ const createTransactionSchema = z.object({
   clientReportedPinFailureType: z.string().optional(),
 });
 
+
 // --- API Route Handler: POST /api/merchant-app/transactions ---
 export async function POST(request: NextRequest) {
   let paymentId: string | null = null;
 
   try {
-    getJwtSecretKey(); // Initialize/validate JWT secret early
+    getJwtSecretKey();
 
     const authenticatedMerchant = await getAuthenticatedMerchantInfo(request);
     const { merchantId, merchantInternalAccountId, merchantBusinessName } =
@@ -225,15 +226,13 @@ export async function POST(request: NextRequest) {
       throw new BadRequestError("Invalid request body: Must be valid JSON.");
     }
 
-    const validationResult = createTransactionSchema.safeParse(requestBodyJson);
+    const validationResult = createTransactionPostSchema.safeParse(requestBodyJson);
     if (!validationResult.success) {
       throw new BadRequestError(
         "Invalid request payload.",
-        validationResult.error.flatten() // Using flatten for potentially cleaner error structure
+        validationResult.error.flatten()
       );
     }
-
-    // MODIFIED: Destructure amountString, then parse to numeric 'amount'
     const {
       amount: amountString,
       beneficiaryDisplayId,
@@ -242,11 +241,11 @@ export async function POST(request: NextRequest) {
       clientReportedPinFailureType,
     } = validationResult.data;
 
-    const amount = parseFloat(amountString); // Amount is now a number for logic
+    const amount = parseFloat(amountString);
 
     paymentId = uuidv4();
     console.log(
-      `[TX PaymentID: ${paymentId}] PROCESSING STARTED for beneficiary '${beneficiaryDisplayId}', amount: ${amount} (from string '${amountString}'). Merch: ${merchantBusinessName}(${merchantId})`
+      `[TX PaymentID: ${paymentId}] POST PROCESSING STARTED for beneficiary '${beneficiaryDisplayId}', amount: ${amount} (from string '${amountString}'). Merch: ${merchantBusinessName}(${merchantId})`
     );
 
     const beneficiaryQueryResult = await db
@@ -257,13 +256,12 @@ export async function POST(request: NextRequest) {
         displayId: accounts.displayId,
         childName: accounts.childName,
         hashedPin: accounts.hashedPin,
-        // accountType: accounts.accountType // Potentially useful for logging/validation
       })
       .from(accounts)
       .where(
         and(
           eq(accounts.displayId, beneficiaryDisplayId),
-          eq(accounts.accountType, "CHILD_DISPLAY") // Ensure debiting from correct account type
+          eq(accounts.accountType, "CHILD_DISPLAY")
         )
       )
       .limit(1);
@@ -281,7 +279,6 @@ export async function POST(request: NextRequest) {
       `[TX PaymentID: ${paymentId}] Beneficiary account found: DB_ID ${beneficiaryAccount.id}, DispID ${beneficiaryAccount.displayId}, Status ${beneficiaryAccount.status}`
     );
 
-    // STEP 1: Handle Client-Reported Max PIN Attempts or Perform Server-Side PIN Verification
     if (clientReportedPinFailureType === PIN_FAILURE_TYPE_MAX_ATTEMPTS) {
       const reason = "PIN entry locked: Too many incorrect attempts (reported by client).";
       console.warn(
@@ -290,25 +287,23 @@ export async function POST(request: NextRequest) {
 
       await db.insert(transactions).values({
         paymentId: paymentId!,
-        amount: amount.toFixed(2), // Use toFixed(2) for consistent string format
+        amount: amount.toFixed(2),
         type: "Debit",
         accountId: beneficiaryAccount.id,
         merchantId: merchantId,
         status: "Failed",
         declineReason: reason,
-        pinVerified: false, // PIN was not verified by server
+        pinVerified: false,
         description: reqDescription || `Payment from ${beneficiaryAccount.childName || beneficiaryDisplayId} to ${merchantBusinessName}`,
         timestamp: new Date(),
       });
       console.log(`[TX PaymentID: ${paymentId}] Logged FAILED transaction due to client-reported max PIN attempts.`);
       throw new PinEntryLockedError(reason);
     } else {
-      // Proceed with server-side PIN verification
       if (!beneficiaryAccount.hashedPin) {
         const reason = `Beneficiary account '${beneficiaryDisplayId}' (DB_ID: ${beneficiaryAccount.id}) does not have a PIN set up.`;
         console.warn(`[TX PaymentID: ${paymentId}] ${reason}`);
-        // Not logging to transactions table for this specific case, as it's a setup issue, not a runtime failure by user.
-        throw new IncorrectPinError("Account PIN not set up."); // Generic message to user
+        throw new IncorrectPinError("Account PIN not set up.");
       }
 
       console.log(`[TX PaymentID: ${paymentId}] Verifying PIN for beneficiary '${beneficiaryDisplayId}'.`);
@@ -317,14 +312,11 @@ export async function POST(request: NextRequest) {
       if (!isPinValid) {
         const reason = `Incorrect PIN provided for beneficiary '${beneficiaryDisplayId}'.`;
         console.warn(`[TX PaymentID: ${paymentId}] ${reason}`);
-        // Consider if a failed transaction record should be created here for audit.
-        // For now, following original logic of not inserting.
-        throw new IncorrectPinError(reason); // Client uses this message to handle attempt counting
+        throw new IncorrectPinError(reason);
       }
       console.log(`[TX PaymentID: ${paymentId}] PIN VERIFIED SUCCESSFULLY for beneficiary '${beneficiaryDisplayId}'.`);
     }
 
-    // PIN IS CONSIDERED VALID (either by server verification or bypassed due to client report of other failure type if that logic existed)
     console.log(`[TX PaymentID: ${paymentId}] PIN is valid. Proceeding to account status and balance checks.`);
 
     if (beneficiaryAccount.status !== "Active") {
@@ -339,7 +331,7 @@ export async function POST(request: NextRequest) {
         merchantId: merchantId,
         status: "Failed",
         declineReason: reason,
-        pinVerified: true, // PIN was deemed valid before this check
+        pinVerified: true,
         description: reqDescription || `Payment from ${beneficiaryAccount.childName || beneficiaryDisplayId} to ${merchantBusinessName}`,
         timestamp: new Date(),
       });
@@ -361,7 +353,7 @@ export async function POST(request: NextRequest) {
         merchantId: merchantId,
         status: "Failed",
         declineReason: reason,
-        pinVerified: true, // PIN was deemed valid
+        pinVerified: true,
         description: reqDescription || `Payment from ${beneficiaryAccount.childName || beneficiaryDisplayId} to ${merchantBusinessName}`,
         timestamp: new Date(),
       });
@@ -369,7 +361,6 @@ export async function POST(request: NextRequest) {
       throw new InsufficientFundsError(reason);
     }
 
-    // STEP 2: All pre-validations passed. Proceed with the main atomic transaction
     console.log(`[TX PaymentID: ${paymentId}] All pre-checks passed. Starting DB transaction.`);
     const result = await db.transaction(async (tx) => {
       console.log(`[TX PaymentID: ${paymentId}] Inside DB transaction callback.`);
@@ -383,7 +374,7 @@ export async function POST(request: NextRequest) {
         .where(
           and(
             eq(accounts.id, merchantInternalAccountId),
-            eq(accounts.accountType, "MERCHANT_INTERNAL") // Ensure crediting to correct account type
+            eq(accounts.accountType, "MERCHANT_INTERNAL")
           )
         )
         .limit(1);
@@ -395,7 +386,7 @@ export async function POST(request: NextRequest) {
         const statusInfo = merchantInternalAcctDetails.length > 0 ? merchantInternalAcctDetails[0].status : "Not Found";
         const errMsg = `CRITICAL (within TX): Merchant internal account ${merchantInternalAccountId} (for ${merchantBusinessName}) issue (Status: ${statusInfo}).`;
         console.error(`[TX PaymentID: ${paymentId}] ${errMsg}`);
-        throw new MerchantAccountError(errMsg); // This will rollback the transaction
+        throw new MerchantAccountError(errMsg);
       }
       const merchantLedgerAccount = merchantInternalAcctDetails[0];
       console.log(`[TX PaymentID: ${paymentId}] Merchant internal account (${merchantLedgerAccount.id}) validated. Status: ${merchantLedgerAccount.status}, Balance: ${merchantLedgerAccount.balance}`);
@@ -403,7 +394,6 @@ export async function POST(request: NextRequest) {
       const debitDescription = reqDescription || `Payment to ${merchantBusinessName}`;
       const creditDescription = reqDescription || `Payment from ${beneficiaryAccount.childName || beneficiaryDisplayId}`;
 
-      // --- Debit Payer Account ---
       const newBeneficiaryBalance = beneficiaryBalance - amount;
       console.log(`[TX PaymentID: ${paymentId}] Updating beneficiary account ${beneficiaryAccount.id} balance from ${beneficiaryBalance} to ${newBeneficiaryBalance.toFixed(2)}.`);
       await tx
@@ -418,7 +408,7 @@ export async function POST(request: NextRequest) {
           accountId: beneficiaryAccount.id,
           merchantId: merchantId,
           type: "Debit",
-          amount: amount.toFixed(2), // Store consistent string format
+          amount: amount.toFixed(2),
           status: "Completed",
           pinVerified: true,
           description: debitDescription,
@@ -427,7 +417,6 @@ export async function POST(request: NextRequest) {
         .returning();
       console.log(`[TX PaymentID: ${paymentId}] Inserted DEBIT LEG. ID: ${debitLeg.id}`);
 
-      // --- Credit Merchant Account ---
       const merchantCurrentBalance = parseFloat(merchantLedgerAccount.balance || "0.00");
       const newMerchantBalance = merchantCurrentBalance + amount;
       console.log(`[TX PaymentID: ${paymentId}] Updating merchant account ${merchantInternalAccountId} balance from ${merchantCurrentBalance} to ${newMerchantBalance.toFixed(2)}.`);
@@ -440,27 +429,32 @@ export async function POST(request: NextRequest) {
         .insert(transactions)
         .values({
           paymentId: paymentId!,
-          accountId: merchantInternalAccountId, // Merchant's internal ledger account ID
-          merchantId: merchantId, // The merchant entity ID
+          accountId: merchantInternalAccountId,
+          merchantId: merchantId,
           type: "Credit",
           amount: amount.toFixed(2),
           status: "Completed",
-          pinVerified: true, // Not directly relevant for credit leg but consistent
+          pinVerified: true,
           description: creditDescription,
           timestamp: new Date(),
         })
         .returning();
       console.log(`[TX PaymentID: ${paymentId}] Inserted CREDIT LEG. ID: ${creditLeg.id}`);
 
-      // Fetch updated balances for response (optional, but good for confirmation)
-      const [updatedCustomerAccountRes, updatedMerchantAccountRes] = await Promise.all([
-        tx.select({ id: accounts.id, balance: accounts.balance }).from(accounts).where(eq(accounts.id, beneficiaryAccount.id)).limit(1),
-        tx.select({ id: accounts.id, balance: accounts.balance }).from(accounts).where(eq(accounts.id, merchantInternalAccountId)).limit(1),
-      ]);
+      const [updatedCustomerAccountRes, updatedMerchantAccountRes] =
+        await Promise.all([
+          tx.select({ id: accounts.id, balance: accounts.balance }).from(accounts).where(eq(accounts.id, beneficiaryAccount.id)).limit(1),
+          tx.select({ id: accounts.id, balance: accounts.balance }).from(accounts).where(eq(accounts.id, merchantInternalAccountId)).limit(1),
+        ]);
 
-      if (!updatedCustomerAccountRes[0] || !updatedMerchantAccountRes[0] || !debitLeg || !creditLeg) {
+      if (
+        !updatedCustomerAccountRes[0] ||
+        !updatedMerchantAccountRes[0] ||
+        !debitLeg ||
+        !creditLeg
+      ) {
         console.error(`[TX PaymentID: ${paymentId}] CRITICAL ERROR: Post-update data fetching or leg insertion failed within DB transaction.`);
-        throw new TransactionProcessingError("Failed to confirm all transaction operations post-update."); // Rolls back
+        throw new TransactionProcessingError("Failed to confirm all transaction operations post-update.");
       }
 
       console.log(
@@ -468,52 +462,178 @@ export async function POST(request: NextRequest) {
       );
       return {
         paymentId: paymentId!,
-        transactionId: debitLeg.id, // Main transaction ID can be the debit leg's ID
-        status: "Completed", // Overall status
+        transactionId: debitLeg.id,
+        status: "Completed",
         message: "Transaction processed successfully.",
-        // Optional: return leg details if client needs them
-        // debitTransactionId: debitLeg.id,
-        // creditTransactionId: creditLeg.id,
         customerNewBalance: updatedCustomerAccountRes[0].balance,
         merchantNewBalance: updatedMerchantAccountRes[0].balance,
       };
-    }); // End of db.transaction
+    });
 
     console.log(`[TX PaymentID: ${paymentId}] DB transaction completed successfully. Preparing successful response.`);
     return NextResponse.json(
       {
-        transactionId: result.transactionId, // From the db.transaction result
+        transactionId: result.transactionId,
         status: result.status,
         message: result.message,
-        // You can add more details from 'result' if needed by the client
-        // e.g., customerNewBalance: result.customerNewBalance
       },
-      { status: 201 } // HTTP 201 Created for successful resource creation (transaction)
+      { status: 201 }
     );
-
   } catch (error: any) {
     const logPId = paymentId || "N/A_BEFORE_PAYMENTID_GEN";
     const errorMessage = error.message || "Unknown error occurred.";
     console.error(
-      `[API Transactions - PaymentID: ${logPId}] Processing FAILED. Error: ${errorMessage}`,
+      `[API Transactions - PaymentID: ${logPId}] POST Processing FAILED. Error: ${errorMessage}`,
       error instanceof Error && error.stack ? error.stack : JSON.stringify(error)
     );
 
     if (error instanceof ApiError) {
-      const errorDetails = error.details // Specific to BadRequestError with Zod issues
-          ? error.details
-          : undefined;
+      const errorDetails = error.details ? error.details : undefined;
       return NextResponse.json(
         { error: error.message, details: errorDetails },
         { status: error.statusCode }
       );
     }
-
-    // Generic fallback for unhandled errors
     return NextResponse.json(
-      {
-        error: "An internal server error occurred while processing the transaction.",
+      { error: "An internal server error occurred while processing the transaction." },
+      { status: 500 }
+    );
+  }
+}
+
+
+// --- API Route Handler: GET /api/merchant-app/transactions ---
+export async function GET(request: NextRequest) {
+  try {
+    getJwtSecretKey(); // Ensure JWT secret is available
+
+    const authenticatedMerchant = await getAuthenticatedMerchantInfo(request);
+    const { merchantId, merchantBusinessName } = authenticatedMerchant; // Get business name for logging
+
+    const url = new URL(request.url);
+    const pageParam = url.searchParams.get("page");
+    const limitParam = url.searchParams.get("limit");
+    // Add status filter param
+    const statusFilter = url.searchParams.get("status") || "Completed"; // Default to "Completed"
+
+    let page = 1;
+    if (pageParam) {
+        const parsedPage = parseInt(pageParam, 10);
+        if (!isNaN(parsedPage) && parsedPage > 0) {
+            page = parsedPage;
+        } else {
+            // Optionally throw BadRequestError or log if invalid page format
+            console.warn(`[API GET Transactions] Invalid page parameter received: ${pageParam}. Defaulting to 1.`);
+        }
+    }
+
+    let limit = 20; // Default limit
+    if (limitParam) {
+        const parsedLimit = parseInt(limitParam, 10);
+        if (!isNaN(parsedLimit) && parsedLimit > 0 && parsedLimit <= 100) { // Max limit 100
+            limit = parsedLimit;
+        } else {
+            console.warn(`[API GET Transactions] Invalid limit parameter received: ${limitParam}. Defaulting to 20 (max 100).`);
+        }
+    }
+    const offset = (page - 1) * limit;
+
+    const transactionAccount = alias(accounts, "transaction_account_details"); // More descriptive alias
+
+    console.log(
+      `[API GET Transactions] Fetching for merchant: ${merchantBusinessName} (ID: ${merchantId}), Page: ${page}, Limit: ${limit}, Status: ${statusFilter}`
+    );
+
+    // Build dynamic where clauses
+    const whereClauses = [
+        eq(transactions.merchantId, merchantId)
+    ];
+    if (statusFilter && statusFilter !== "All") { // Allow "All" to fetch all statuses
+        // Validate statusFilter against your enum if needed, for now assuming valid values or 'Completed' default
+        whereClauses.push(eq(transactions.status, statusFilter as typeof transactions.status.enumValues[number]));
+    }
+
+
+    const transactionRecords = await db
+      .select({
+        // Transaction details
+        id: transactions.id, // Transaction leg ID
+        paymentId: transactions.paymentId,
+        timestamp: transactions.timestamp, // Actual transaction time
+        amount: transactions.amount,
+        type: transactions.type, // "Debit" or "Credit" (from merchant's perspective on this leg)
+        status: transactions.status,
+        description: transactions.description, // Original description (e.g., category)
+        createdAt: transactions.createdAt, // Record creation time
+
+        // Details of the account this transaction leg directly involves
+        relatedAccountId: transactionAccount.id,
+        relatedAccountDisplayId: transactionAccount.displayId,
+        relatedAccountChildName: transactionAccount.childName,
+        relatedAccountType: transactionAccount.accountType,
+      })
+      .from(transactions)
+      .leftJoin( // Use leftJoin in case an account was somehow deleted but transaction remains
+        transactionAccount,
+        eq(transactions.accountId, transactionAccount.id)
+      )
+      .where(and(...whereClauses)) // Apply dynamic where clauses
+      .orderBy(desc(transactions.timestamp), desc(transactions.createdAt)) // Primary sort by transaction time, secondary by creation
+      .limit(limit)
+      .offset(offset);
+
+    const totalResult = await db
+      .select({
+        count: sql<number>`coalesce(count(*)::int, 0)`, // Use coalesce for robustness
+      })
+      .from(transactions)
+      .where(and(...whereClauses)); // Apply same filters for total count
+
+    const totalTransactions = totalResult[0]?.count || 0;
+    const totalPages = Math.ceil(totalTransactions / limit) || 1; // Ensure totalPages is at least 1
+
+    console.log(
+      `[API GET Transactions] Found ${transactionRecords.length} records for merchantId: ${merchantId} on page ${page}. Total items matching filter: ${totalTransactions}`
+    );
+
+    return NextResponse.json({
+      data: transactionRecords.map(tx => ({
+        ...tx,
+        // Potentially transform data here if needed for client
+        // e.g., create a user-friendly description based on type and related account
+        displayDescription: tx.type === "Credit" && tx.relatedAccountType === "MERCHANT_INTERNAL"
+          ? `Funds from ${tx.description || 'customer payment'}` // Or get Payer name if we knew the paymentId's other leg
+          : tx.type === "Debit" && tx.relatedAccountType === "CHILD_DISPLAY"
+          ? `Payment to ${merchantBusinessName} by ${tx.relatedAccountChildName || tx.relatedAccountDisplayId}`
+          : tx.description || "Transaction"
+      })),
+      pagination: {
+        page,
+        limit,
+        totalItems: totalTransactions,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+        statusFilter: statusFilter // Echo back the applied filter
       },
+    });
+  } catch (error: any) {
+    console.error(
+      `[API GET Transactions] Error fetching transactions: ${
+        error.message || "Unknown error"
+      }`,
+      error instanceof Error ? error.stack : JSON.stringify(error)
+    );
+
+    if (error instanceof ApiError) {
+      return NextResponse.json(
+        { error: error.message, details: error.details },
+        { status: error.statusCode }
+      );
+    }
+
+    return NextResponse.json(
+      { error: "An internal server error occurred while fetching transactions." },
       { status: 500 }
     );
   }
