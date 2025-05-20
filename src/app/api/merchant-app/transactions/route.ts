@@ -115,13 +115,42 @@ async function getAuthenticatedMerchantInfo(
   }
   try {
     const secretKey = getJwtSecretKey();
+
+    // --- START OF DIAGNOSTIC LOGGING AND jwtVerify MODIFICATION ---
+    let payloadForLogging: jose.JWTPayload | null = null;
+    try {
+        payloadForLogging = jose.decodeJwt(token); // Decode for logging (does not verify signature)
+    } catch (e: any) {
+        console.warn(`[API Transactions] Auth: Could not decode JWT for logging claims. Error: ${e.message}`);
+    }
+
+    const serverCurrentTime = new Date();
+    const serverCurrentUnixTime = Math.floor(serverCurrentTime.getTime() / 1000);
+    console.log(`[API Transactions] Auth: Server current time for JWT check: ${serverCurrentTime.toISOString()} (Unix: ${serverCurrentUnixTime})`);
+
+    if (payloadForLogging) {
+        const tokenExp = payloadForLogging.exp;
+        const tokenIat = payloadForLogging.iat;
+        const expDateStr = tokenExp ? new Date(tokenExp * 1000).toISOString() : "N/A";
+        const iatDateStr = tokenIat ? new Date(tokenIat * 1000).toISOString() : "N/A";
+        console.log(`[API Transactions] Auth: Token claims (decoded for logging): exp: ${tokenExp} (${expDateStr}), iat: ${tokenIat} (${iatDateStr})`);
+        if (tokenExp) {
+            console.log(`[API Transactions] Auth: Time to token expiry: ${tokenExp - serverCurrentUnixTime} seconds.`);
+        }
+    } else {
+        console.log("[API Transactions] Auth: Token claims could not be decoded for logging prior to verification.");
+    }
+
     const { payload } = await jose.jwtVerify<AuthenticatedMerchantPayload>(
       token,
       secretKey,
       {
         algorithms: [JWT_ALGORITHM],
+        clockTolerance: "5 minutes", // Add a 5-minute clock tolerance
       }
     );
+    // --- END OF DIAGNOSTIC LOGGING AND jwtVerify MODIFICATION ---
+
     if (payload && payload.merchantId) {
       const merchantDetails = await db
         .select({
@@ -161,15 +190,13 @@ async function getAuthenticatedMerchantInfo(
   } catch (error: any) {
     if (error instanceof ApiError) throw error;
 
-    // --- START OF MODIFIED DEBUGGING BLOCK ---
-    console.error( // Changed from console.warn to console.error for more visibility
+    console.error(
       "[API Transactions] Auth: DETAILED JWT Verification Error:",
       "Error Name:", error.name,
       "Error Message:", error.message,
-      "Error Code:", error.code, // jose errors often have a 'code' property
-      "Full Error Object (stringified):", JSON.stringify(error, Object.getOwnPropertyNames(error)) // Log the full error
+      "Error Code:", error.code,
+      "Full Error Object (stringified):", JSON.stringify(error, Object.getOwnPropertyNames(error))
     );
-    // console.error("[API Transactions] Auth: Raw Error Object:", error); // Alternative raw log
 
     if (
       [
@@ -177,18 +204,15 @@ async function getAuthenticatedMerchantInfo(
         "JWTExpired",
         "JWTClaimValidationFailed",
         "JWTInvalid",
-      ].includes(error.code || error.name) // Check error.code first, then error.name
+      ].includes(error.code || error.name)
     ) {
-      // This specific message helps differentiate from the generic one below
       throw new UnauthorizedError(
         `Token verification failed or token expired. Original error: ${error.message} (Code: ${error.code || 'N/A'})`
       );
     }
-    // If it's not one of the common JWT errors, throw a more detailed generic message
     throw new UnauthorizedError(
         `Failed to authenticate token. Original error: ${error.message} (Code: ${error.code || 'N/A'})`
     );
-    // --- END OF MODIFIED DEBUGGING BLOCK ---
   }
 }
 
@@ -516,15 +540,15 @@ export async function POST(request: NextRequest) {
 // --- API Route Handler: GET /api/merchant-app/transactions ---
 export async function GET(request: NextRequest) {
   try {
-    getJwtSecretKey(); // Ensure JWT secret is available
+    // getJwtSecretKey(); // Ensure JWT secret is available - called within getAuthenticatedMerchantInfo
 
     const authenticatedMerchant = await getAuthenticatedMerchantInfo(request);
-    const { merchantId, merchantBusinessName } = authenticatedMerchant; // Get business name for logging
+    const { merchantId, merchantBusinessName } = authenticatedMerchant;
 
     const url = new URL(request.url);
     const pageParam = url.searchParams.get("page");
     const limitParam = url.searchParams.get("limit");
-    const statusFilter = url.searchParams.get("status") || "Completed"; // Default to "Completed"
+    const statusFilter = url.searchParams.get("status") || "Completed";
 
     let page = 1;
     if (pageParam) {
@@ -536,10 +560,10 @@ export async function GET(request: NextRequest) {
         }
     }
 
-    let limit = 20; // Default limit
+    let limit = 20;
     if (limitParam) {
         const parsedLimit = parseInt(limitParam, 10);
-        if (!isNaN(parsedLimit) && parsedLimit > 0 && parsedLimit <= 100) { // Max limit 100
+        if (!isNaN(parsedLimit) && parsedLimit > 0 && parsedLimit <= 100) {
             limit = parsedLimit;
         } else {
             console.warn(`[API GET Transactions] Invalid limit parameter received: ${limitParam}. Defaulting to 20 (max 100).`);
@@ -556,7 +580,7 @@ export async function GET(request: NextRequest) {
     const whereClauses = [
         eq(transactions.merchantId, merchantId)
     ];
-    if (statusFilter && statusFilter.toLowerCase() !== "all") { // Allow "All" (case-insensitive) to fetch all statuses
+    if (statusFilter && statusFilter.toLowerCase() !== "all") {
         whereClauses.push(eq(transactions.status, statusFilter as typeof transactions.status.enumValues[number]));
     }
 
@@ -569,7 +593,7 @@ export async function GET(request: NextRequest) {
         type: transactions.type,
         status: transactions.status,
         description: transactions.description,
-        declineReason: transactions.declineReason, // Added missing declineReason
+        declineReason: transactions.declineReason,
         createdAt: transactions.createdAt,
         relatedAccountId: transactionAccount.id,
         relatedAccountDisplayId: transactionAccount.displayId,
@@ -602,15 +626,15 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       data: transactionRecords.map(tx => ({
-        legId: tx.id, // Renaming to match original prompt's expected output
+        legId: tx.id,
         paymentId: tx.paymentId,
-        eventTimestamp: tx.timestamp, // Renaming
-        recordCreatedAt: tx.createdAt, // Renaming
+        eventTimestamp: tx.timestamp,
+        recordCreatedAt: tx.createdAt,
         amount: tx.amount,
         type: tx.type,
         status: tx.status,
-        originalDescription: tx.description, // Renaming
-        declineReason: tx.declineReason, // Now included
+        originalDescription: tx.description,
+        declineReason: tx.declineReason,
         relatedAccountId: tx.relatedAccountId,
         relatedAccountDisplayId: tx.relatedAccountDisplayId,
         relatedAccountChildName: tx.relatedAccountChildName,
@@ -619,7 +643,6 @@ export async function GET(request: NextRequest) {
           ? `Funds from ${tx.description || 'customer payment'}`
           : tx.type === "Debit" && tx.relatedAccountType === "CHILD_DISPLAY"
           ? `Payment to ${merchantBusinessName} by ${tx.relatedAccountChildName || tx.relatedAccountDisplayId}`
-          // Fallback if original description is null/empty for credit/debit that don't match above
           : tx.description || (tx.type === "Credit" ? "Credit Received" : "Debit Made")
       })),
       pagination: {
@@ -633,20 +656,24 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error(
-      `[API GET Transactions] Error fetching transactions: ${
-        error.message || "Unknown error"
-      }`,
-      error instanceof Error ? error.stack : JSON.stringify(error)
-    );
-
+    // If the error is from getAuthenticatedMerchantInfo, it will already be an ApiError
     if (error instanceof ApiError) {
+        console.error(
+            `[API GET Transactions] ApiError encountered: ${error.message}`, error.details ? JSON.stringify(error.details) : ""
+          );
       return NextResponse.json(
         { error: error.message, details: error.details },
         { status: error.statusCode }
       );
     }
 
+    // Generic fallback for other unexpected errors in the GET handler itself
+    console.error(
+      `[API GET Transactions] Unexpected error fetching transactions: ${
+        error.message || "Unknown error"
+      }`,
+      error instanceof Error ? error.stack : JSON.stringify(error)
+    );
     return NextResponse.json(
       { error: "An internal server error occurred while fetching transactions." },
       { status: 500 }
