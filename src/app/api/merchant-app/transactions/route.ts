@@ -2,8 +2,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { merchants, accounts, transactions } from "@/lib/db/schema";
-import { eq, and, desc, sql } from "drizzle-orm"; // Added desc and sql
-import { alias } from "drizzle-orm/pg-core";      // Added alias
+import { eq, and, desc, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import * as jose from "jose";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
@@ -160,24 +160,35 @@ async function getAuthenticatedMerchantInfo(
     throw new UnauthorizedError("Invalid token payload.");
   } catch (error: any) {
     if (error instanceof ApiError) throw error;
-    console.warn(
-      "[API Transactions] Auth: JWT Verification Error:",
-      error.name,
-      error.message
+
+    // --- START OF MODIFIED DEBUGGING BLOCK ---
+    console.error( // Changed from console.warn to console.error for more visibility
+      "[API Transactions] Auth: DETAILED JWT Verification Error:",
+      "Error Name:", error.name,
+      "Error Message:", error.message,
+      "Error Code:", error.code, // jose errors often have a 'code' property
+      "Full Error Object (stringified):", JSON.stringify(error, Object.getOwnPropertyNames(error)) // Log the full error
     );
+    // console.error("[API Transactions] Auth: Raw Error Object:", error); // Alternative raw log
+
     if (
       [
         "JWSSignatureVerificationFailed",
         "JWTExpired",
         "JWTClaimValidationFailed",
         "JWTInvalid",
-      ].includes(error.code || error.name)
+      ].includes(error.code || error.name) // Check error.code first, then error.name
     ) {
+      // This specific message helps differentiate from the generic one below
       throw new UnauthorizedError(
-        "Token verification failed or token expired."
+        `Token verification failed or token expired. Original error: ${error.message} (Code: ${error.code || 'N/A'})`
       );
     }
-    throw new UnauthorizedError("Failed to authenticate token.");
+    // If it's not one of the common JWT errors, throw a more detailed generic message
+    throw new UnauthorizedError(
+        `Failed to authenticate token. Original error: ${error.message} (Code: ${error.code || 'N/A'})`
+    );
+    // --- END OF MODIFIED DEBUGGING BLOCK ---
   }
 }
 
@@ -513,7 +524,6 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const pageParam = url.searchParams.get("page");
     const limitParam = url.searchParams.get("limit");
-    // Add status filter param
     const statusFilter = url.searchParams.get("status") || "Completed"; // Default to "Completed"
 
     let page = 1;
@@ -522,7 +532,6 @@ export async function GET(request: NextRequest) {
         if (!isNaN(parsedPage) && parsedPage > 0) {
             page = parsedPage;
         } else {
-            // Optionally throw BadRequestError or log if invalid page format
             console.warn(`[API GET Transactions] Invalid page parameter received: ${pageParam}. Defaulting to 1.`);
         }
     }
@@ -538,59 +547,54 @@ export async function GET(request: NextRequest) {
     }
     const offset = (page - 1) * limit;
 
-    const transactionAccount = alias(accounts, "transaction_account_details"); // More descriptive alias
+    const transactionAccount = alias(accounts, "transaction_account_details");
 
     console.log(
       `[API GET Transactions] Fetching for merchant: ${merchantBusinessName} (ID: ${merchantId}), Page: ${page}, Limit: ${limit}, Status: ${statusFilter}`
     );
 
-    // Build dynamic where clauses
     const whereClauses = [
         eq(transactions.merchantId, merchantId)
     ];
-    if (statusFilter && statusFilter !== "All") { // Allow "All" to fetch all statuses
-        // Validate statusFilter against your enum if needed, for now assuming valid values or 'Completed' default
+    if (statusFilter && statusFilter.toLowerCase() !== "all") { // Allow "All" (case-insensitive) to fetch all statuses
         whereClauses.push(eq(transactions.status, statusFilter as typeof transactions.status.enumValues[number]));
     }
 
-
     const transactionRecords = await db
       .select({
-        // Transaction details
-        id: transactions.id, // Transaction leg ID
+        id: transactions.id,
         paymentId: transactions.paymentId,
-        timestamp: transactions.timestamp, // Actual transaction time
+        timestamp: transactions.timestamp,
         amount: transactions.amount,
-        type: transactions.type, // "Debit" or "Credit" (from merchant's perspective on this leg)
+        type: transactions.type,
         status: transactions.status,
-        description: transactions.description, // Original description (e.g., category)
-        createdAt: transactions.createdAt, // Record creation time
-
-        // Details of the account this transaction leg directly involves
+        description: transactions.description,
+        declineReason: transactions.declineReason, // Added missing declineReason
+        createdAt: transactions.createdAt,
         relatedAccountId: transactionAccount.id,
         relatedAccountDisplayId: transactionAccount.displayId,
         relatedAccountChildName: transactionAccount.childName,
         relatedAccountType: transactionAccount.accountType,
       })
       .from(transactions)
-      .leftJoin( // Use leftJoin in case an account was somehow deleted but transaction remains
+      .leftJoin(
         transactionAccount,
         eq(transactions.accountId, transactionAccount.id)
       )
-      .where(and(...whereClauses)) // Apply dynamic where clauses
-      .orderBy(desc(transactions.timestamp), desc(transactions.createdAt)) // Primary sort by transaction time, secondary by creation
+      .where(and(...whereClauses))
+      .orderBy(desc(transactions.timestamp), desc(transactions.createdAt))
       .limit(limit)
       .offset(offset);
 
     const totalResult = await db
       .select({
-        count: sql<number>`coalesce(count(*)::int, 0)`, // Use coalesce for robustness
+        count: sql<number>`coalesce(count(*)::int, 0)`,
       })
       .from(transactions)
-      .where(and(...whereClauses)); // Apply same filters for total count
+      .where(and(...whereClauses));
 
     const totalTransactions = totalResult[0]?.count || 0;
-    const totalPages = Math.ceil(totalTransactions / limit) || 1; // Ensure totalPages is at least 1
+    const totalPages = Math.ceil(totalTransactions / limit) || 1;
 
     console.log(
       `[API GET Transactions] Found ${transactionRecords.length} records for merchantId: ${merchantId} on page ${page}. Total items matching filter: ${totalTransactions}`
@@ -598,14 +602,25 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       data: transactionRecords.map(tx => ({
-        ...tx,
-        // Potentially transform data here if needed for client
-        // e.g., create a user-friendly description based on type and related account
+        legId: tx.id, // Renaming to match original prompt's expected output
+        paymentId: tx.paymentId,
+        eventTimestamp: tx.timestamp, // Renaming
+        recordCreatedAt: tx.createdAt, // Renaming
+        amount: tx.amount,
+        type: tx.type,
+        status: tx.status,
+        originalDescription: tx.description, // Renaming
+        declineReason: tx.declineReason, // Now included
+        relatedAccountId: tx.relatedAccountId,
+        relatedAccountDisplayId: tx.relatedAccountDisplayId,
+        relatedAccountChildName: tx.relatedAccountChildName,
+        relatedAccountType: tx.relatedAccountType,
         displayDescription: tx.type === "Credit" && tx.relatedAccountType === "MERCHANT_INTERNAL"
-          ? `Funds from ${tx.description || 'customer payment'}` // Or get Payer name if we knew the paymentId's other leg
+          ? `Funds from ${tx.description || 'customer payment'}`
           : tx.type === "Debit" && tx.relatedAccountType === "CHILD_DISPLAY"
           ? `Payment to ${merchantBusinessName} by ${tx.relatedAccountChildName || tx.relatedAccountDisplayId}`
-          : tx.description || "Transaction"
+          // Fallback if original description is null/empty for credit/debit that don't match above
+          : tx.description || (tx.type === "Credit" ? "Credit Received" : "Debit Made")
       })),
       pagination: {
         page,
@@ -614,7 +629,7 @@ export async function GET(request: NextRequest) {
         totalPages,
         hasNextPage: page < totalPages,
         hasPreviousPage: page > 1,
-        statusFilter: statusFilter // Echo back the applied filter
+        statusFilter: statusFilter
       },
     });
   } catch (error: any) {

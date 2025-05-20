@@ -442,3 +442,9 @@ Content-Type: application/json
   "version": "1.0",
   "signature": "somesignature"
 }
+
+### MERCHANT APP - Get Transaction History (Default Parameters)
+# @name getMerchantTransactionsDefault
+GET {{baseUrl}}/api/merchant-app/transactions
+Authorization: {{merchantToken}}
+Accept: application/json
