@@ -7,10 +7,10 @@ import { z } from 'zod';
 
 // QrPayloadSchema expects 'account' which will be matched against 'display_id'
 const QrPayloadSchema = z.object({
-  type: z.string().optional(),
-  version: z.string().optional(), // Changed to string as per your example "1.0"
-  account: z.string().uuid("Account ID from QR must be a valid UUID").min(1), // The UUID to match against display_id
-  sig: z.string().optional(), // Matching your example "sig"
+  type: z.string().optional(), // Or whatever your actual schema is
+  account: z.string().uuid("Account ID from QR must be a valid UUID"), // <--- THIS IS THE LINE TO CHANGE
+  version: z.string().optional(),
+  signature: z.string().optional(),
 });
 
 interface ValidatedBeneficiaryResponse {

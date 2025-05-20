@@ -437,8 +437,8 @@ POST {{baseUrl}}/api/merchant-app/beneficiaries/validate-qr
 Content-Type: application/json
 
 {
-  "type": "pay",
-  "account": "aad914cf-5b6c-4f8d-a454-9645a3827bbb",
-  "ver": "1.0",
-  "sig": "mock_sig"
+  "type": "PAYMENT_REQUEST",
+  "account": "STC-2025-685V",
+  "version": "1.0",
+  "signature": "somesignature"
 }
