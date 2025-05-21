@@ -10,7 +10,7 @@
 @adminToken = Bearer REPLACE_WITH_ADMIN_JWT_TOKEN
 
 # Merchant Token - Get this by running the "Merchant App - Login" request below and copying the token
-@merchantToken = Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJiMDBkN2JiMC1mMmY1LTQ2YmQtOTBjNi0zNjkwMWE4Zjc4YzQiLCJlbWFpbCI6ImFAYS5jb20iLCJyb2xlIjoibWVyY2hhbnQiLCJtZXJjaGFudElkIjoiYjAwZDdiYjAtZjJmNS00NmJkLTkwYzYtMzY5MDFhOGY3OGM0IiwiaWF0IjoxNzQ3NzMyNjY5LCJleHAiOjE3NDc3NzU4Njl9.x5c9-FxFER_kWPI_g2ynb7g5yiuH8_PCtn9Sz_Git_s
+@merchantToken = Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJiMDBkN2JiMC1mMmY1LTQ2YmQtOTBjNi0zNjkwMWE4Zjc4YzQiLCJlbWFpbCI6ImFAYS5jb20iLCJyb2xlIjoibWVyY2hhbnQiLCJtZXJjaGFudElkIjoiYjAwZDdiYjAtZjJmNS00NmJkLTkwYzYtMzY5MDFhOGY3OGM0IiwiaWF0IjoxNzQ3ODExOTY0LCJleHAiOjE3NDc4NTUxNjR9.WBOixTORKdY97wojRf_ofOEMjpHZ0Lallyy_Sg2XhPE
 
 
 # ==============================================================================
@@ -447,3 +447,11 @@ Content-Type: application/json
 GET {{baseUrl}}/api/merchant-app/transactions
 Authorization: {{merchantToken}}
 Accept: application/json
+
+### TC1_GetDashboardSummary_Success
+# @name getMerchantTransactionsDefault
+GET {{baseUrl}}/api/merchant-app/dashboard/summary
+Authorization: Bearer {{merchantToken}}
+Accept: application/json
+Content-Type: application/json
+
