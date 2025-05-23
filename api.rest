@@ -459,3 +459,14 @@ Content-Type: application/json
   "email": "a@a.com",
 
 }
+
+
+### TC_ForgotPasswordRequest_Success_ExistingEmail
+# @name forgotPasswordRequestExistingEmail
+POST {{baseUrl}}/merchant-app/auth/forgot-password/request
+Accept: application/json
+Content-Type: application/json
+
+{
+  "email": "a@a.com"
+}
