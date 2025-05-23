@@ -463,7 +463,7 @@ Content-Type: application/json
 
 ### TC_ForgotPasswordRequest_Success_ExistingEmail
 # @name forgotPasswordRequestExistingEmail
-POST {{baseUrl}}/merchant-app/auth/forgot-password/request
+POST {{baseUrl}}/api/merchant-app/auth/forgot-password
 Accept: application/json
 Content-Type: application/json
 
