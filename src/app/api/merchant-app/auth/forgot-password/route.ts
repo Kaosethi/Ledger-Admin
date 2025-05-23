@@ -9,7 +9,7 @@ import crypto from 'crypto';
 
 // Environment variable for OTP expiry (e.g., in .env.local)
 // OTP_EXPIRY_MINUTES=15
-const OTP_EXPIRY_MINUTES = parseInt(process.env.OTP_EXPIRY_MINUTES || '15', 10);
+const OTP_EXPIRY_MINUTES = parseInt(process.env.OTP_EXPIRY_MINUTES || '5', 10);
 
 // Zod schema for request body validation
 const requestBodySchema = z.object({
