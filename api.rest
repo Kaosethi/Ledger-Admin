@@ -479,6 +479,6 @@ Accept: application/json
 Content-Type: application/json
 
 {
-  "email": "a@a.com", 
-  "otp": "360767" 
+  "email": "karan.se@ipps.co.th", 
+  "otp": "188448" 
 }
