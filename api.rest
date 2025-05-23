@@ -468,7 +468,7 @@ Accept: application/json
 Content-Type: application/json
 
 {
-  "email": "a@a.com"
+  "email": "karan.se@ipps.co.th"
 }
 
 
