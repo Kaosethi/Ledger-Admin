@@ -8,7 +8,7 @@ import {
   boolean,
   pgEnum,
   index,
-  primaryKey,
+  primaryKey, // Assuming primaryKey is used elsewhere, if not, it might be from a specific table import
 } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -111,7 +111,7 @@ export const merchants = pgTable(
     contactEmail: text("contact_email").notNull().unique(),
     contactPhone: text("contact_phone"),
     storeAddress: text("store_address"),
-    hashedPassword: text("hashed_password").notNull(),
+    hashedPassword: text("hashed_password").notNull(), // This is the password we'll be resetting
     status: merchantStatusEnum("status").default("pending_approval").notNull(),
     submittedAt: timestamp("submitted_at", { withTimezone: true }).defaultNow().notNull(),
     declineReason: text("decline_reason"),
@@ -131,6 +131,7 @@ export const merchants = pgTable(
   },
   (table) => ({
     businessNameIdx: index("merchant_business_name_idx").on(table.businessName),
+    contactEmailIdx: index("merchant_contact_email_idx").on(table.contactEmail), // Added index for contactEmail, good for lookups
     statusIdx: index("merchant_status_idx").on(table.status),
     categoryIdx: index("merchant_category_idx").on(table.category),
     internalAccountIdIdx: index("merchant_internal_account_id_idx").on(table.internalAccountId),
@@ -146,7 +147,7 @@ export const transactions = pgTable(
     amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
     type: transactionTypeEnum("type").notNull(),
     accountId: uuid("account_id").notNull().references(() => accounts.id, { onDelete: "restrict" }),
-    merchantId: uuid("merchant_id").notNull().references(() => merchants.id, { onDelete: "set null" }),
+    merchantId: uuid("merchant_id").notNull().references(() => merchants.id, { onDelete: "set null" }), // onDelete changed to set null if merchant is deleted
     status: transactionStatusEnum("status").notNull(),
     declineReason: text("decline_reason"),
     pinVerified: boolean("pin_verified"),
@@ -167,18 +168,18 @@ export const transactions = pgTable(
 
 export const adminLogs = pgTable(
   "admin_logs",
-  { // Using your original adminLogs structure
+  {
     id: uuid("id").primaryKey().defaultRandom(),
     timestamp: timestamp("timestamp", { withTimezone: true }).defaultNow().notNull(),
     adminId: uuid("admin_id").references(() => administrators.id, { onDelete: "set null" }),
-    adminEmail: text("admin_email").notNull().references(() => administrators.email, { onDelete: "set null" }),
+    adminEmail: text("admin_email").notNull().references(() => administrators.email, { onDelete: "set null" }), // Should this reference unique email?
     action: text("action").notNull(),
     targetType: text("target_type"),
     targetId: text("target_id"),
     details: text("details"),
     ipAddress: text("ip_address"),
     userAgent: text("user_agent"),
-    ...timestampFields, // This will add createdAt and updatedAt
+    ...timestampFields,
   },
   (table) => ({
     timestampIdx: index("admin_log_timestamp_idx").on(table.timestamp),
@@ -190,24 +191,44 @@ export const adminLogs = pgTable(
 export const accountPermissions = pgTable(
   "account_permissions",
   {
-    id: uuid("id").primaryKey().defaultRandom(), // Keep this if you want a surrogate UUID PK
+    id: uuid("id").primaryKey().defaultRandom(),
     accountId: uuid("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
     adminId: uuid("admin_id").notNull().references(() => administrators.id, { onDelete: "cascade" }),
     permission: text("permission").notNull(),
-    grantedAt: timestamp("granted_at", { withTimezone: true }).defaultNow().notNull(), // RESTORED your explicit grantedAt
-    ...timestampFields, // This adds createdAt and updatedAt
-    // ...softDeleteField, // Only if you want soft deletes for permissions
+    grantedAt: timestamp("granted_at", { withTimezone: true }).defaultNow().notNull(),
+    ...timestampFields,
   },
   (table) => {
     return {
       accountIdIdx: index("account_permissions_account_id_idx").on(table.accountId),
       adminIdIdx: index("account_permissions_admin_id_idx").on(table.adminId),
       permissionIdx: index("account_permissions_permission_idx").on(table.permission),
-      // If 'id' is the PK, you don't need the composite PK below unless you also want it as a unique constraint
-      // uniqueConstraint: uniqueIndex("account_admin_permission_unique").on(table.accountId, table.adminId, table.permission),
     };
   }
 );
+
+// --- BEGIN NEW TABLE FOR PASSWORD RESET TOKENS ---
+export const passwordResetTokens = pgTable(
+  "password_reset_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    merchantId: uuid("merchant_id")
+      .notNull()
+      .references(() => merchants.id, { onDelete: "cascade" }), // Assumes forgot password is for merchants
+    
+    tokenHash: text("token_hash").notNull(), // SHA256 hash of the OTP
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }), // Timestamp when the token was used
+
+    ...timestampFields, // createdAt, updatedAt
+  },
+  (table) => ({
+    merchantIdIdx: index("prt_merchant_id_idx").on(table.merchantId),
+    expiresAtIdx: index("prt_expires_at_idx").on(table.expiresAt),
+  })
+);
+// --- END NEW TABLE FOR PASSWORD RESET TOKENS ---
+
 
 // Define relations
 export const accountsRelations = relations(accounts, ({ one, many }) => ({
@@ -224,7 +245,10 @@ export const merchantsRelations = relations(merchants, ({ one, many }) => ({
   internalLedgerAccount: one(accounts, {
     fields: [merchants.internalAccountId],
     references: [accounts.id]
-  })
+  }),
+  // --- BEGIN NEW RELATION FOR MERCHANTS ---
+  passwordResetTokens: many(passwordResetTokens), // A merchant can have many password reset tokens (over time)
+  // --- END NEW RELATION FOR MERCHANTS ---
 }));
 
 export const transactionsRelations = relations(transactions, ({ one }) => ({
@@ -247,7 +271,7 @@ export const administratorsRelations = relations(administrators, ({ many }) => (
 
 export const adminLogsRelations = relations(adminLogs, ({ one }) => ({
   administrator: one(administrators, {
-    fields: [adminLogs.adminId], // Assuming this should be adminId, not adminEmail for FK if adminId exists
+    fields: [adminLogs.adminId],
     references: [administrators.id],
   }),
 }));
@@ -262,6 +286,15 @@ export const accountPermissionsRelations = relations(accountPermissions, ({ one 
     references: [administrators.id],
   }),
 }));
+
+// --- BEGIN NEW RELATIONS FOR PASSWORD RESET TOKENS ---
+export const passwordResetTokensRelations = relations(passwordResetTokens, ({ one }) => ({
+  merchant: one(merchants, {
+    fields: [passwordResetTokens.merchantId],
+    references: [merchants.id],
+  }),
+}));
+// --- END NEW RELATIONS FOR PASSWORD RESET TOKENS ---
 
 
 // Zod schemas for type validation
@@ -282,6 +315,12 @@ export const selectAdminLogSchema = createSelectSchema(adminLogs);
 
 export const insertAccountPermissionSchema = createInsertSchema(accountPermissions);
 export const selectAccountPermissionSchema = createSelectSchema(accountPermissions);
+
+// --- BEGIN NEW ZOD SCHEMAS FOR PASSWORD RESET TOKENS ---
+export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTokens);
+export const selectPasswordResetTokenSchema = createSelectSchema(passwordResetTokens);
+// --- END NEW ZOD SCHEMAS FOR PASSWORD RESET TOKENS ---
+
 
 // Custom schemas with additional validation
 // THESE ARE YOUR ORIGINAL CUSTOM ZOD SCHEMAS.
@@ -345,8 +384,8 @@ export const createMerchantSchema = insertMerchantSchema
     deletedAt: true,
     pinVerified: true,
     declineReason: true,
-    internalAccountId: true, // MUST be omitted as it's set programmatically
-    settlementBankAccountName: true, // Omit if not collected at initial creation
+    internalAccountId: true, 
+    settlementBankAccountName: true, 
     settlementBankName: true,
     settlementBankAccountNumber: true,
     settlementBankSwiftCode: true,
@@ -354,8 +393,8 @@ export const createMerchantSchema = insertMerchantSchema
   })
   .extend({
     businessName: z.string().min(1, "Business name is required"),
-    contactEmail: z.string().email("Invalid email address"), // Should match notNull in table
-    password: z.string().min(8, "Password must be at least 8 characters"), // Removed .optional() if password is required at creation
+    contactEmail: z.string().email("Invalid email address"), 
+    password: z.string().min(8, "Password must be at least 8 characters"), 
     category: z.string().optional(),
   });
 
@@ -365,33 +404,26 @@ export const createTransactionSchema = insertTransactionSchema
     timestamp: true,
     createdAt: true,
     updatedAt: true,
-    paymentId: true, // System generated
-    // merchantId: true, // Will come from JWT
-    // status: true, // System set
-    // type: true, // System set based on flow
+    paymentId: true, 
   })
   .extend({
-    amount: z.number().positive("Amount must be positive"), // Or string for precision
-    accountId: z.string().uuid("Invalid account ID for transaction leg"), // This is the account being acted upon
-    merchantId: z.string().uuid("Merchant ID is required for this transaction"), // Facilitating merchant
-    type: z.enum(transactionTypeEnum.enumValues), // Request body specifies type
+    amount: z.number().positive("Amount must be positive"), 
+    accountId: z.string().uuid("Invalid account ID for transaction leg"), 
+    merchantId: z.string().uuid("Merchant ID is required for this transaction"), 
+    type: z.enum(transactionTypeEnum.enumValues), 
   });
 
 export const createAdminLogSchema = insertAdminLogSchema
   .omit({
     id: true,
-    // timestamp: true, // Your original schema had these fields
-    // createdAt: true,
-    // updatedAt: true,
   })
   .extend({
-    // adminId: z.string().uuid("Invalid admin ID"), // From your original
     action: z.string().min(1, "Action is required"),
   });
 
 export const createAccountPermissionSchema = insertAccountPermissionSchema
   .omit({
-    grantedAt: true, // Your original had this, so likely omit if defaultNow
+    grantedAt: true, 
     createdAt: true,
     updatedAt: true,
   })

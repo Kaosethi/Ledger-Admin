@@ -10,8 +10,7 @@
 @adminToken = Bearer REPLACE_WITH_ADMIN_JWT_TOKEN
 
 # Merchant Token - Get this by running the "Merchant App - Login" request below and copying the token
-@merchantToken = Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJiMDBkN2JiMC1mMmY1LTQ2YmQtOTBjNi0zNjkwMWE4Zjc4YzQiLCJlbWFpbCI6ImFAYS5jb20iLCJyb2xlIjoibWVyY2hhbnQiLCJtZXJjaGFudElkIjoiYjAwZDdiYjAtZjJmNS00NmJkLTkwYzYtMzY5MDFhOGY3OGM0IiwiaWF0IjoxNzQ3ODExOTY0LCJleHAiOjE3NDc4NTUxNjR9.WBOixTORKdY97wojRf_ofOEMjpHZ0Lallyy_Sg2XhPE
-
+@merchantToken = Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJiMDBkN2JiMC1mMmY1LTQ2YmQtOTBjNi0zNjkwMWE4Zjc4YzQiLCJlbWFpbCI6ImFAYS5jb20iLCJyb2xlIjoibWVyY2hhbnQiLCJtZXJjaGFudElkIjoiYjAwZDdiYjAtZjJmNS00NmJkLTkwYzYtMzY5MDFhOGY3OGM0IiwiaWF0IjoxNzQ3ODE0NDQ2LCJleHAiOjE3NDc4NTc2NDZ9.2hMftGjgqiJy0sSPIxgmTdZ6iggytccucnEDlEHIwFg
 
 # ==============================================================================
 # === ADMIN PORTAL AUTHENTICATION & ACTIONS (EXISTING) ===
@@ -432,7 +431,7 @@ Authorization: Bearer
 ###
 # Validate QR Code - Expecting Success
 # exists in your 'accounts' table and its status is 'Active'.
-POST {{baseUrl}}/api/merchant-app/beneficiaries/validate-qr
+POST {{baseUrl}}/merchant-app/beneficiaries/validate-qr
 Content-Type: application/json
 
 {
@@ -444,14 +443,19 @@ Content-Type: application/json
 
 ### MERCHANT APP - Get Transaction History (Default Parameters)
 # @name getMerchantTransactionsDefault
-GET {{baseUrl}}/api/merchant-app/transactions
+GET {{baseUrl}}/merchant-app/transactions
 Authorization: {{merchantToken}}
 Accept: application/json
 
 ### TC1_GetDashboardSummary_Success
 # @name getMerchantTransactionsDefault
-GET {{baseUrl}}/api/merchant-app/dashboard/summary
-Authorization: Bearer {{merchantToken}}
+GET {{baseUrl}}/merchant-app/dashboard/summary
+Authorization:{{merchantToken}}
 Accept: application/json
 Content-Type: application/json
 
+{
+  "merchantId": "b00d7bb0-f2f5-46bd-90c6-36901a8f78c4",
+  "email": "a@a.com",
+
+}

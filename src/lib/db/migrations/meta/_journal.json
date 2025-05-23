@@ -15,6 +15,13 @@
       "when": 1747288553993,
       "tag": "0001_aromatic_bishop",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1747974564922,
+      "tag": "0002_furry_magdalene",
+      "breakpoints": true
     }
   ]
 }
