@@ -470,3 +470,15 @@ Content-Type: application/json
 {
   "email": "a@a.com"
 }
+
+
+### TC_VerifyOtp_Success
+# @name verifyOtpSuccess
+POST {{baseUrl}}/merchant-app/auth/forgot-password/verify-otp
+Accept: application/json
+Content-Type: application/json
+
+{
+  "email": "a@a.com", 
+  "otp": "360767" 
+}
