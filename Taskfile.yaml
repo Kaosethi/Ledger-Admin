@@ -105,3 +105,8 @@ tasks:
     desc: Upgrade the helm chart
     cmds:
       - helm upgrade ledger-admin ./k8s/helm -n oneboss-dev
+
+  fwd:pg:
+    desc: Forward port 5432 to the database
+    cmds:
+      - kubectl port-forward svc/postgresql 5434:5432 -n oneboss-dev

@@ -4,13 +4,8 @@ metadata:
   name: {{ .Values.app.serviceName }}-config
   namespace: {{ .Values.namespace }}
 data:
-  ENV: "{{ .Values.environment }}"
-  APP_ENV: "{{ .Values.environment }}"
-  APP_PORT: "{{ .Values.app.configs.appPort }}"
-  BUN_DEBUG: "{{ .Values.app.configs.bunDebug }}"
-  TZ: "{{ .Values.app.configs.timezone }}"
-  V2_BASE_URL: "{{ .Values.app.configs.v2BaseUrl }}"
-  APP_BASE_URL: "{{ .Values.app.configs.appBaseUrl }}"
-  CALLBACK_WHITELIST: "{{ .Values.app.configs.callbackWhitelist }}"
-  EMAIL_PROVIDER: "{{ .Values.app.secrets.emailProvider }}"
-  MAILPIT_UI: "{{ .Values.app.configs.mailpitUI }}" 
+  NODE_ENV: "{{ .Values.environment }}"
+  NODE_TLS_REJECT_UNAUTHORIZED: "{{ .Values.app.configs.nodeTlsRejectUnauthorized }}"
+  APP_NAME: "{{ .Values.app.configs.appName }}"
+  OTP_EXPIRY_MINUTES: "{{ .Values.app.configs.otpExpiryMinutes }}"
+  RESET_AUTH_TOKEN_EXPIRY_MINUTES: "{{ .Values.app.configs.resetAuthTokenExpiryMinutes }}" 
