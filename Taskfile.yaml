@@ -90,3 +90,18 @@ tasks:
     desc: Set k8s namespace (later change this ns to stc-ledger-dev)
     cmds:
       - kubectl config set-context --current --namespace=oneboss-dev
+
+  helm:i:
+    desc: Install the helm chart
+    cmds:
+      - helm install ledger-admin ./k8s/helm -n oneboss-dev
+
+  helm:d:
+    desc: Delete the helm chart
+    cmds:
+      - helm delete ledger-admin -n oneboss-dev
+
+  helm:u:
+    desc: Upgrade the helm chart
+    cmds:
+      - helm upgrade ledger-admin ./k8s/helm -n oneboss-dev

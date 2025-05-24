@@ -4,13 +4,13 @@ metadata:
   name: {{ .Values.app.serviceName }}-callbacks
   namespace: {{ .Values.namespace }}
   annotations:
-    kubernetes.io/ingress.class: {{ .Values.ingressClass }}
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     # Additional useful annotations for specific path handling
     nginx.ingress.kubernetes.io/rewrite-target: /api/v1/callbacks/qr
     # For rate limiting if needed
     # nginx.ingress.kubernetes.io/limit-rps: "10"
 spec:
+  ingressClassName: {{ .Values.ingressClass }}
   tls:
     - hosts:
         - {{ .Values.app.host }}

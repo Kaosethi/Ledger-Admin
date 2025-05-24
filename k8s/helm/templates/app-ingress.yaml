@@ -4,9 +4,9 @@ metadata:
   name: {{ .Values.app.serviceName }}
   namespace: {{ .Values.namespace }}
   annotations:
-    kubernetes.io/ingress.class: {{ .Values.ingressClass }}
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
 spec:
+  ingressClassName: {{ .Values.ingressClass }}
   tls:
     - hosts:
         - {{ .Values.app.host }}
