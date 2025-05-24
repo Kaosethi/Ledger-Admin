@@ -5,7 +5,7 @@ import { eq, and, isNull, ne } from "drizzle-orm";
 import { withAuth } from "@/lib/auth/middleware";
 import { JWTPayload } from "@/lib/auth/jwt";
 import crypto from "crypto";
-import { env } from "@/lib/config";
+import { env } from "@/lib/env";
 
 // GET /api/accounts/[id]/regenerate-qr - Regenerate QR code for an account
 export const GET = withAuth(

@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { administrators } from "@/lib/db/schema";
 import { eq, isNull } from "drizzle-orm";
 import mockDataInstance, { AdminUser } from "@/lib/mockData";
-import { env } from "@/lib/config";
+import { env } from "@/lib/env";
 import { verifyPassword } from "@/lib/auth/password";
 import { createJWT } from "@/lib/auth/jwt";
 

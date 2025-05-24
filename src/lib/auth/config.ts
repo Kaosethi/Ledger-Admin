@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { administrators, adminLogs } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { verifyPassword } from "./password";
-import { env } from "../config";
+import { env } from "../env";
 
 // Define the expected interface for our authentication service
 interface AuthService {

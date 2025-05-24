@@ -6,13 +6,8 @@ import { db } from '@/lib/db'; // Adjust path
 import { merchants, passwordResetTokens } from '@/lib/db/schema'; // Adjust path
 import { and, eq, desc, isNull, gte } from 'drizzle-orm';
 import crypto from 'crypto';
-import jwt from 'jsonwebtoken'; // For generating the reset authorization token
-
-// Environment variables
-// JWT_SECRET should be a strong, random string (used for signing JWTs)
-// RESET_AUTH_TOKEN_EXPIRY_MINUTES=5 (e.g., how long the token for final reset is valid)
-const JWT_SECRET = process.env.JWT_SECRET;
-const RESET_AUTH_TOKEN_EXPIRY_MINUTES = parseInt(process.env.RESET_AUTH_TOKEN_EXPIRY_MINUTES || '5', 10);
+import * as jose from 'jose'; // For generating the reset authorization token
+import { env } from '@/lib/env'; // Import centralized environment variables
 
 // Zod schema for request body validation
 const verifyOtpBodySchema = z.object({
@@ -21,7 +16,7 @@ const verifyOtpBodySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  if (!JWT_SECRET) {
+  if (!env.JWT_SECRET) {
     console.error('JWT_SECRET is not defined in environment variables.');
     return NextResponse.json({ message: 'Server configuration error.' }, { status: 500 });
   }
@@ -100,11 +95,14 @@ export async function POST(req: NextRequest) {
       email: merchant.contactEmail, // Could be useful for logging or confirmation
       purpose: 'password-reset-authorization', // Good practice to scope tokens
     };
-    const resetAuthorizationToken = jwt.sign(
-      resetAuthTokenPayload,
-      JWT_SECRET,
-      { expiresIn: `${RESET_AUTH_TOKEN_EXPIRY_MINUTES}m` }
-    );
+    
+    // Create a new JWT with jose
+    const secret = new TextEncoder().encode(env.JWT_SECRET);
+    const resetAuthorizationToken = await new jose.SignJWT(resetAuthTokenPayload)
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setExpirationTime(`${env.RESET_AUTH_TOKEN_EXPIRY_MINUTES}m`)
+      .sign(secret);
 
     // 6. Return the reset authorization token to the client
     return NextResponse.json(

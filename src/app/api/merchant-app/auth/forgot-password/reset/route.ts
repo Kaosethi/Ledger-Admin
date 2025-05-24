@@ -5,11 +5,10 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { merchants } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
-import jwt from 'jsonwebtoken';
+import * as jose from 'jose';
 // Import your existing password hashing function
-import { hashPassword } from '@/lib/auth/password'; // THIS IS THE KEY CHANGE
-
-const JWT_SECRET = process.env.JWT_SECRET;
+import { hashPassword } from '@/lib/auth/password';
+import { env } from '@/lib/env'; // Import centralized environment variables
 
 // Zod schema for request body validation
 const resetPasswordBodySchema = z.object({
@@ -27,7 +26,7 @@ interface DecodedResetToken {
 }
 
 export async function POST(req: NextRequest) {
-  if (!JWT_SECRET) {
+  if (!env.JWT_SECRET) {
     console.error('JWT_SECRET is not defined. Password reset cannot proceed.');
     return NextResponse.json({ message: 'Server configuration error.' }, { status: 500 });
   }
@@ -52,10 +51,12 @@ export async function POST(req: NextRequest) {
 
     let decodedTokenPayload: DecodedResetToken;
     try {
-      decodedTokenPayload = jwt.verify(resetAuthorizationToken, JWT_SECRET) as DecodedResetToken;
+      const secret = new TextEncoder().encode(env.JWT_SECRET);
+      const { payload } = await jose.jwtVerify(resetAuthorizationToken, secret);
+      decodedTokenPayload = payload as unknown as DecodedResetToken;
     } catch (error: any) {
       console.error("JWT verification failed:", error.message);
-      if (error.name === 'TokenExpiredError') {
+      if (error.code === 'ERR_JWT_EXPIRED') {
         return NextResponse.json({ message: 'Password reset session has expired. Please start over.' }, { status: 401 });
       }
       return NextResponse.json({ message: 'Invalid or malformed reset token. Please start over.' }, { status: 401 });

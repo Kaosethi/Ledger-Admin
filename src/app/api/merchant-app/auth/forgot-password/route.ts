@@ -7,22 +7,16 @@ import { merchants, passwordResetTokens } from '@/lib/db/schema'; // ENSURE THIS
 import { eq } from 'drizzle-orm';
 import crypto from 'crypto';
 import sgMail from '@sendgrid/mail';
-
-// Environment variables
-const OTP_EXPIRY_MINUTES = parseInt(process.env.OTP_EXPIRY_MINUTES || '15', 10);
-// These are loaded once when the module is initialized
-const MODULE_SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
-const MODULE_APP_NAME = process.env.APP_NAME || 'Our Application';
-const MODULE_SENDER_EMAIL_ADDRESS = process.env.SENDER_EMAIL_ADDRESS;
+import { env } from '@/lib/env'; // Import centralized environment variables
 
 // Configure SendGrid (This part runs when the module is first loaded/cached by Node)
-if (MODULE_SENDGRID_API_KEY) {
-  sgMail.setApiKey(MODULE_SENDGRID_API_KEY);
+if (env.SENDGRID_API_KEY) {
+  sgMail.setApiKey(env.SENDGRID_API_KEY);
   console.log("DEBUG: SendGrid API key found at module load time and configured.");
 } else {
   console.warn('DEBUG: WARNING - SENDGRID_API_KEY was NOT found at module load time.');
 }
-if (!MODULE_SENDER_EMAIL_ADDRESS) {
+if (!env.SENDER_EMAIL_ADDRESS) {
     console.warn('DEBUG: WARNING - SENDER_EMAIL_ADDRESS was NOT found at module load time.');
 }
 
@@ -32,17 +26,13 @@ const requestBodySchema = z.object({
 });
 
 async function sendPasswordResetEmail(to: string, businessName: string | null, otp: string): Promise<void> {
-  // Explicitly log the values *inside* the function when it's called, using process.env directly for up-to-date check
-  const currentSendGridApiKey = process.env.SENDGRID_API_KEY;
-  const currentSenderEmail = process.env.SENDER_EMAIL_ADDRESS;
-  const currentAppName = process.env.APP_NAME || 'Our Application'; // Use process.env here too
-
-  console.log(`DEBUG sendPasswordResetEmail: SENDGRID_API_KEY is "${currentSendGridApiKey}"`);
-  console.log(`DEBUG sendPasswordResetEmail: SENDER_EMAIL_ADDRESS is "${currentSenderEmail}"`);
-  console.log(`DEBUG sendPasswordResetEmail: APP_NAME is "${currentAppName}"`);
+  // Log the values from the centralized env object
+  console.log(`DEBUG sendPasswordResetEmail: SENDGRID_API_KEY is "${env.SENDGRID_API_KEY}"`);
+  console.log(`DEBUG sendPasswordResetEmail: SENDER_EMAIL_ADDRESS is "${env.SENDER_EMAIL_ADDRESS}"`);
+  console.log(`DEBUG sendPasswordResetEmail: APP_NAME is "${env.APP_NAME}"`);
 
 
-  if (!currentSendGridApiKey || !currentSenderEmail) {
+  if (!env.SENDGRID_API_KEY || !env.SENDER_EMAIL_ADDRESS) {
     console.error('SendGrid not fully configured (API Key or Sender Email missing according to process.env). OTP will be logged to console.');
     console.log(`Password Reset OTP for ${to} (${businessName || 'Merchant'}): ${otp}`);
     return;
@@ -51,26 +41,26 @@ async function sendPasswordResetEmail(to: string, businessName: string | null, o
   const msg = {
     to: to,
     from: {
-      email: currentSenderEmail, // Use value directly from process.env
-      name: currentAppName,      // Use value directly from process.env
+      email: env.SENDER_EMAIL_ADDRESS, 
+      name: env.APP_NAME,
     },
-    subject: `Your Password Reset Code for ${currentAppName}`,
+    subject: `Your Password Reset Code for ${env.APP_NAME}`,
     html: `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
         <h2 style="color: #0056b3;">Password Reset Request</h2>
         <p>Hi ${businessName || 'Merchant'},</p>
-        <p>We received a request to reset the password for your account associated with ${currentAppName}.</p>
+        <p>We received a request to reset the password for your account associated with ${env.APP_NAME}.</p>
         <p>Your One-Time Password (OTP) is: <strong style="font-size: 1.2em; color: #d9534f;">${otp}</strong></p>
-        <p>This code is valid for <strong>${OTP_EXPIRY_MINUTES} minutes</strong>.</p>
+        <p>This code is valid for <strong>${env.OTP_EXPIRY_MINUTES} minutes</strong>.</p>
         <p>If you did not request a password reset, please ignore this email. No changes will be made to your account.</p>
         <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
         <p style="font-size: 0.9em; color: #777;">
           Thanks,<br>
-          The ${currentAppName} Team
+          The ${env.APP_NAME} Team
         </p>
       </div>
     `,
-    text: `Hi ${businessName || 'Merchant'},\n\nYour One-Time Password (OTP) for resetting your password for ${currentAppName} is: ${otp}\nThis code will expire in ${OTP_EXPIRY_MINUTES} minutes.\nIf you did not request this, please ignore this email.\n\nThanks,\nThe ${currentAppName} Team`,
+    text: `Hi ${businessName || 'Merchant'},\n\nYour One-Time Password (OTP) for resetting your password for ${env.APP_NAME} is: ${otp}\nThis code will expire in ${env.OTP_EXPIRY_MINUTES} minutes.\nIf you did not request this, please ignore this email.\n\nThanks,\nThe ${env.APP_NAME} Team`,
   };
 
   try {
@@ -133,7 +123,7 @@ export async function POST(req: NextRequest) {
     if (existingMerchant) {
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
         const otpHash = crypto.createHash('sha256').update(otp).digest('hex');
-        const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+        const expiresAt = new Date(Date.now() + env.OTP_EXPIRY_MINUTES * 60 * 1000);
         
         // Corrected db.insert call
         await db.insert(passwordResetTokens).values({

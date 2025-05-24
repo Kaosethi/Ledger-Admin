@@ -1,5 +1,5 @@
 import * as jose from "jose";
-import { env } from "../config";
+import { env } from "../env";
 
 // Define the payload structure - make it compatible with jose's JWTPayload
 export interface JWTPayload extends jose.JWTPayload {

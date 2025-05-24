@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { withAuth } from "@/lib/auth/middleware";
 import { JWTPayload } from "@/lib/auth/jwt";
-import { env } from "@/lib/config";
+import { env } from "@/lib/env";
 
 // POST /api/qr-sign - Create a signed QR code payload (protected)
 export const POST = withAuth(

@@ -6,7 +6,7 @@ import mockDataInstance from "@/lib/mockData";
 import { generateFallbackId } from "@/lib/utils";
 import { withAuth } from "@/lib/auth/middleware";
 import { JWTPayload } from "@/lib/auth/jwt";
-import { env } from "@/lib/config";
+import { env } from "@/lib/env";
 import { and, eq, ilike, isNull, or } from "drizzle-orm";
 import { hashPassword } from "@/lib/auth/password";
 import { removeSensitiveData } from "@/lib/utils";
