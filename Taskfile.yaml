@@ -85,3 +85,8 @@ tasks:
     cmds:
       - git add . && git commit --amend --no-edit
 
+  # k8s tasks
+  set-ns:
+    desc: Set k8s namespace (later change this ns to stc-ledger-dev)
+    cmds:
+      - kubectl config set-context --current --namespace=oneboss-dev

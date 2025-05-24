@@ -1,7 +1,7 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ .Values.api.serviceName }}-callbacks
+  name: {{ .Values.app.serviceName }}-callbacks
   namespace: {{ .Values.namespace }}
   annotations:
     kubernetes.io/ingress.class: {{ .Values.ingressClass }}
@@ -13,16 +13,16 @@ metadata:
 spec:
   tls:
     - hosts:
-        - {{ .Values.api.host }}
-      secretName: {{ .Values.api.cert.secretName }}
+        - {{ .Values.app.host }}
+      secretName: {{ .Values.app.cert.secretName }}
   rules:
-    - host: {{ .Values.api.host }}
+    - host: {{ .Values.app.host }}
       http:
         paths:
           - path: /api/v1/callbacks/qr
             pathType: Exact
             backend:
               service:
-                name: {{ .Values.api.serviceName }}
+                name: {{ .Values.app.serviceName }}
                 port:
-                  number: {{ .Values.api.servicePort }} 
+                  number: {{ .Values.app.servicePort }} 
