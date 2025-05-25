@@ -1,8 +1,8 @@
-import { betterAuth } from "better-auth";
 import { db } from "@/lib/db";
 import { administrators, adminLogs } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { verifyPassword } from "./password";
+import { createJWT } from "./jwt";
 import { env } from "../env";
 
 // Define the expected interface for our authentication service
@@ -16,83 +16,74 @@ interface AuthService {
         email: string;
         role: string;
       };
+      token?: string;
     }>;
   };
 }
 
-// Create the auth configuration
-const authConfig = betterAuth({
-  // Connect to our existing Drizzle database
-  database: db,
-
-  // Configure email and password authentication
+// Create our custom authentication service
+const authConfig: AuthService = {
   emailAndPassword: {
-    enabled: true,
-    requireEmailVerification: false, // Disable email verification for now
+    login: async ({ email, password }: { email: string; password: string }) => {
+      try {
+        // Find administrator by email
+        const admin = await db
+          .select()
+          .from(administrators)
+          .where(eq(administrators.email, email));
 
-    // Use our custom login function to verify credentials against our existing schema
-    onLogin: async ({
-      email,
-      password,
-    }: {
-      email: string;
-      password: string;
-    }) => {
-      // Find administrator by email
-      const admin = await db
-        .select()
-        .from(administrators)
-        .where(eq(administrators.email, email));
+        if (!admin.length) {
+          return { success: false, error: "Invalid credentials" };
+        }
 
-      if (!admin.length) {
-        return { success: false, error: "Invalid credentials" };
-      }
+        // Verify password using our utility function
+        const isValidPassword = await verifyPassword(
+          password,
+          admin[0].passwordHash
+        );
 
-      // Verify password using our utility function
-      const isValidPassword = await verifyPassword(
-        password,
-        admin[0].passwordHash
-      );
+        if (!isValidPassword) {
+          return { success: false, error: "Invalid credentials" };
+        }
 
-      if (!isValidPassword) {
-        return { success: false, error: "Invalid credentials" };
-      }
+        // Log the login activity
+        await db.insert(adminLogs).values({
+          adminEmail: admin[0].email,
+          action: "login",
+          targetType: "system",
+          details: "Admin logged in",
+        });
 
-      // Log the login activity
-      await db.insert(adminLogs).values({
-        adminEmail: admin[0].email,
-        action: "login",
-        targetType: "system",
-        details: "Admin logged in via Better Auth",
-      });
-
-      // Return the user information
-      return {
-        success: true,
-        user: {
+        // Create user object
+        const user = {
           id: admin[0].id.toString(),
           email: admin[0].email,
           role: "admin",
-        },
-      };
+        };
+
+        // Generate JWT token
+        const token = await createJWT({
+          sub: user.id,
+          email: user.email,
+          role: user.role,
+        });
+
+        // Return the user information and token
+        return {
+          success: true,
+          user,
+          token,
+        };
+      } catch (error) {
+        console.error("Login error:", error);
+        return { success: false, error: "Authentication failed" };
+      }
     },
   },
+};
 
-  // Configure JWT session handling
-  sessionStrategy: "jwt",
-  jwt: {
-    // Secret key from environment variables
-    secret: env.JWT_SECRET,
-    // Token expiration time (12 hours)
-    expiresIn: 60 * 60 * 12,
-  },
-
-  // Add any additional plugins as needed
-  plugins: [],
-});
-
-// Export as auth with the expected interface
-export const auth = authConfig as unknown as AuthService;
+// Export the auth service
+export const auth = authConfig;
 
 // Export types for use in components
 export type Auth = typeof auth;
