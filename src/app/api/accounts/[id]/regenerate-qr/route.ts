@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { accounts } from "@/lib/db/schema";
 import { eq, and, isNull, ne } from "drizzle-orm";
-import { withAuth } from "@/lib/auth/middleware";
+import { withAuth } from '@/lib/audit';
 import { JWTPayload } from "@/lib/auth/jwt";
 import crypto from "crypto";
 import { env } from "@/lib/env";

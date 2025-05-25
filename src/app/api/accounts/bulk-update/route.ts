@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { accounts } from "@/lib/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { withAuth } from "@/lib/auth/middleware";
+import { withAuth } from '@/lib/audit';
 import { z } from "zod";
 import { removeSensitiveData } from "@/lib/utils";
 

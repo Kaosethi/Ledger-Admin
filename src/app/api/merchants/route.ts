@@ -7,7 +7,7 @@ import {
   createMerchantSchema,
 } from "@/lib/db/schema";
 import { z } from "zod";
-import { withAuth } from "@/lib/auth/middleware"; // Assuming this handles admin authentication
+import { withAuth } from '@/lib/audit'; // Assuming this handles admin authentication
 import { JWTPayload } from "@/lib/auth/jwt";
 import { hashPassword } from "@/lib/auth/password";
 

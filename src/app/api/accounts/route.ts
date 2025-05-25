@@ -4,7 +4,7 @@ import { accounts, createAccountSchema } from "@/lib/db/schema";
 import { z } from "zod";
 import mockDataInstance from "@/lib/mockData";
 import { generateFallbackId } from "@/lib/utils";
-import { withAuth } from "@/lib/auth/middleware";
+import { withAuth } from '@/lib/audit';
 import { JWTPayload } from "@/lib/auth/jwt";
 import { env } from "@/lib/env";
 import { and, eq, ilike, isNull, or } from "drizzle-orm";

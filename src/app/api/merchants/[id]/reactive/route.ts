@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { merchantStatusEnum, merchants } from "@/lib/db/schema"; // Use merchantStatusEnum
 import { eq, and, isNull } from "drizzle-orm";
-import { withAuth } from "@/lib/auth/middleware";
+import { withAuth } from '@/lib/audit';
 import { JWTPayload } from "@/lib/auth/jwt";
 import { z } from "zod";
 

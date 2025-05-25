@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { accounts, adminLogs } from "@/lib/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
-import { withAuth } from "@/lib/auth/middleware";
+import { withAuth } from '@/lib/audit';
 import { z } from "zod";
 import { hashPassword } from "@/lib/auth/password";
 

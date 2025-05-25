@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { transactions, createTransactionSchema } from "@/lib/db/schema";
 import { z } from "zod";
 import mockDataInstance from "@/lib/mockData";
-import { withAuth } from "@/lib/auth/middleware";
+import { withAuth } from '@/lib/audit';
 import { JWTPayload } from "@/lib/auth/jwt";
 
 // GET /api/transactions - Get all transactions (protected)

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { administrators, createAdministratorSchema } from "@/lib/db/schema";
 import { z } from "zod";
-import { withAuth } from "@/lib/auth/middleware";
+import { withAuth } from '@/lib/audit';
 import { JWTPayload } from "@/lib/auth/jwt";
 
 // GET /api/administrators - Get all administrators (protected)

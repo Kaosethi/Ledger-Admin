@@ -46,7 +46,7 @@ const authConfig: AuthService = {
           return { success: false, error: "Invalid credentials" };
         }
 
-        // Log the login activity
+        // Log the login activity using the audit system
         await db.insert(adminLogs).values({
           adminEmail: admin[0].email,
           action: "login",

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import mockDataInstance from "@/lib/mockData";
-import { withAuth } from "@/lib/auth/middleware";
+import { withAuth } from '@/lib/audit';
 import { JWTPayload } from "@/lib/auth/jwt";
 import { NextRequest } from "next/server";
 
