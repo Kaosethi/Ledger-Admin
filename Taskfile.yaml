@@ -70,6 +70,11 @@ tasks:
     cmds:
       - docker build -t ledger-admin .
 
+  docker:build:dev:
+    desc: Build the Docker image with environment variables registry.gitlab.com/ipps-gtm/ledger-admin:dev
+    cmds:
+      - docker buildx build --platform linux/amd64 -t registry.gitlab.com/ipps-gtm/ledger-admin:dev --push .
+
   docker:run:
     desc: Run the Docker container
     cmds:

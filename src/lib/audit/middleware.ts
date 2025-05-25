@@ -33,8 +33,14 @@ function createAuditContext(
   request: NextRequest,
   payload: JWTPayload
 ): AuditContext {
+  // Check if the adminId is a valid UUID format
+  // If not (e.g., mock data like "ADM-001"), set it to null
+  const uuidRegex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const isValidUUID = uuidRegex.test(payload.sub);
+
   return {
-    adminId: payload.sub,
+    adminId: isValidUUID ? payload.sub : undefined,
     adminEmail: payload.email,
     ipAddress: getClientIP(request),
     userAgent: request.headers.get("user-agent") || "unknown",

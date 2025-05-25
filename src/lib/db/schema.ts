@@ -31,26 +31,30 @@ export const merchantStatusEnum = pgEnum("merchant_status", [
 
 export const transactionStatusEnum = pgEnum("transaction_status", [
   "Completed", // Index 0
-  "Pending",   // Index 1
-  "Failed",    // Index 2
-  "Declined",  // Index 3
+  "Pending", // Index 1
+  "Failed", // Index 2
+  "Declined", // Index 3
 ]);
 
 export const transactionTypeEnum = pgEnum("transaction_type", [
-  "Debit",     // Index 0
-  "Credit",    // Index 1
-  "Adjustment",// Index 2
+  "Debit", // Index 0
+  "Credit", // Index 1
+  "Adjustment", // Index 2
 ]);
 
 export const accountTypeEnum = pgEnum("account_type", [
   "CHILD_DISPLAY",
   "MERCHANT_INTERNAL",
-  "SYSTEM"
+  "SYSTEM",
 ]);
 
 const timestampFields = {
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .$defaultFn(() => new Date())
+    .notNull(),
 };
 
 const softDeleteField = {
@@ -81,16 +85,22 @@ export const accounts = pgTable(
     childName: text("child_name").notNull(),
     guardianName: text("guardian_name").notNull(),
     status: accountStatusEnum("status").default("Active").notNull(),
-    balance: numeric("balance", { precision: 10, scale: 2 }).default("0.00").notNull(),
+    balance: numeric("balance", { precision: 10, scale: 2 })
+      .default("0.00")
+      .notNull(),
     hashedPin: text("hashed_pin"),
-    lastActivity: timestamp("last_activity", { withTimezone: true }).defaultNow().notNull(),
+    lastActivity: timestamp("last_activity", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     currentQrToken: text("current_qr_token"),
     guardianDob: text("guardian_dob"),
     guardianContact: text("guardian_contact"),
     email: text("email"),
     address: text("address"),
     notes: text("notes"),
-    accountType: accountTypeEnum("account_type").notNull().default("CHILD_DISPLAY"),
+    accountType: accountTypeEnum("account_type")
+      .notNull()
+      .default("CHILD_DISPLAY"),
     ...timestampFields,
     ...softDeleteField,
   },
@@ -113,14 +123,19 @@ export const merchants = pgTable(
     storeAddress: text("store_address"),
     hashedPassword: text("hashed_password").notNull(), // This is the password we'll be resetting
     status: merchantStatusEnum("status").default("pending_approval").notNull(),
-    submittedAt: timestamp("submitted_at", { withTimezone: true }).defaultNow().notNull(),
+    submittedAt: timestamp("submitted_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     declineReason: text("decline_reason"),
     pinVerified: boolean("pin_verified").default(false),
     category: text("category"),
     website: text("website"),
     description: text("description"),
     logoUrl: text("logo_url"),
-    internalAccountId: uuid("internal_account_id").references(() => accounts.id, { onDelete: "restrict" }).notNull().unique(),
+    internalAccountId: uuid("internal_account_id")
+      .references(() => accounts.id, { onDelete: "restrict" })
+      .notNull()
+      .unique(),
     settlementBankAccountName: text("settlement_bank_account_name"),
     settlementBankName: text("settlement_bank_name"),
     settlementBankAccountNumber: text("settlement_bank_account_number"),
@@ -134,7 +149,9 @@ export const merchants = pgTable(
     contactEmailIdx: index("merchant_contact_email_idx").on(table.contactEmail), // Added index for contactEmail, good for lookups
     statusIdx: index("merchant_status_idx").on(table.status),
     categoryIdx: index("merchant_category_idx").on(table.category),
-    internalAccountIdIdx: index("merchant_internal_account_id_idx").on(table.internalAccountId),
+    internalAccountIdIdx: index("merchant_internal_account_id_idx").on(
+      table.internalAccountId
+    ),
   })
 );
 
@@ -143,11 +160,17 @@ export const transactions = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     paymentId: uuid("payment_id").notNull(),
-    timestamp: timestamp("timestamp", { withTimezone: true }).defaultNow().notNull(),
+    timestamp: timestamp("timestamp", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
     type: transactionTypeEnum("type").notNull(),
-    accountId: uuid("account_id").notNull().references(() => accounts.id, { onDelete: "restrict" }),
-    merchantId: uuid("merchant_id").notNull().references(() => merchants.id, { onDelete: "set null" }), // onDelete changed to set null if merchant is deleted
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "restrict" }),
+    merchantId: uuid("merchant_id")
+      .notNull()
+      .references(() => merchants.id, { onDelete: "set null" }), // onDelete changed to set null if merchant is deleted
     status: transactionStatusEnum("status").notNull(),
     declineReason: text("decline_reason"),
     pinVerified: boolean("pin_verified"),
@@ -170,9 +193,11 @@ export const adminLogs = pgTable(
   "admin_logs",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    timestamp: timestamp("timestamp", { withTimezone: true }).defaultNow().notNull(),
-    adminId: uuid("admin_id").references(() => administrators.id, { onDelete: "set null" }),
-    adminEmail: text("admin_email").notNull().references(() => administrators.email, { onDelete: "set null" }), // Should this reference unique email?
+    timestamp: timestamp("timestamp", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    adminId: uuid("admin_id"), // Removed foreign key constraint to allow mock data and deleted admin accounts
+    adminEmail: text("admin_email").notNull(), // Removed foreign key constraint to allow mock data and anonymous users
     action: text("action").notNull(),
     targetType: text("target_type"),
     targetId: text("target_id"),
@@ -192,17 +217,27 @@ export const accountPermissions = pgTable(
   "account_permissions",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    accountId: uuid("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
-    adminId: uuid("admin_id").notNull().references(() => administrators.id, { onDelete: "cascade" }),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    adminId: uuid("admin_id")
+      .notNull()
+      .references(() => administrators.id, { onDelete: "cascade" }),
     permission: text("permission").notNull(),
-    grantedAt: timestamp("granted_at", { withTimezone: true }).defaultNow().notNull(),
+    grantedAt: timestamp("granted_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     ...timestampFields,
   },
   (table) => {
     return {
-      accountIdIdx: index("account_permissions_account_id_idx").on(table.accountId),
+      accountIdIdx: index("account_permissions_account_id_idx").on(
+        table.accountId
+      ),
       adminIdIdx: index("account_permissions_admin_id_idx").on(table.adminId),
-      permissionIdx: index("account_permissions_permission_idx").on(table.permission),
+      permissionIdx: index("account_permissions_permission_idx").on(
+        table.permission
+      ),
     };
   }
 );
@@ -215,7 +250,7 @@ export const passwordResetTokens = pgTable(
     merchantId: uuid("merchant_id")
       .notNull()
       .references(() => merchants.id, { onDelete: "cascade" }), // Assumes forgot password is for merchants
-    
+
     tokenHash: text("token_hash").notNull(), // SHA256 hash of the OTP
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     usedAt: timestamp("used_at", { withTimezone: true }), // Timestamp when the token was used
@@ -229,22 +264,23 @@ export const passwordResetTokens = pgTable(
 );
 // --- END NEW TABLE FOR PASSWORD RESET TOKENS ---
 
-
 // Define relations
 export const accountsRelations = relations(accounts, ({ one, many }) => ({
   transactions: many(transactions, { relationName: "accountTransactions" }),
   permissions: many(accountPermissions),
   merchantDetailsForInternalAccount: one(merchants, {
     fields: [accounts.id],
-    references: [merchants.internalAccountId]
-  })
+    references: [merchants.internalAccountId],
+  }),
 }));
 
 export const merchantsRelations = relations(merchants, ({ one, many }) => ({
-  facilitatedTransactions: many(transactions, { relationName: "merchantFacilitatedTransactions" }),
+  facilitatedTransactions: many(transactions, {
+    relationName: "merchantFacilitatedTransactions",
+  }),
   internalLedgerAccount: one(accounts, {
     fields: [merchants.internalAccountId],
-    references: [accounts.id]
+    references: [accounts.id],
   }),
   // --- BEGIN NEW RELATION FOR MERCHANTS ---
   passwordResetTokens: many(passwordResetTokens), // A merchant can have many password reset tokens (over time)
@@ -255,47 +291,56 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
   account: one(accounts, {
     fields: [transactions.accountId],
     references: [accounts.id],
-    relationName: "accountTransactions"
+    relationName: "accountTransactions",
   }),
   merchant: one(merchants, {
     fields: [transactions.merchantId],
     references: [merchants.id],
-    relationName: "merchantFacilitatedTransactions"
+    relationName: "merchantFacilitatedTransactions",
   }),
 }));
 
-export const administratorsRelations = relations(administrators, ({ many }) => ({
-  adminLogs: many(adminLogs),
-  accountPermissions: many(accountPermissions),
-}));
+export const administratorsRelations = relations(
+  administrators,
+  ({ many }) => ({
+    adminLogs: many(adminLogs),
+    accountPermissions: many(accountPermissions),
+  })
+);
 
 export const adminLogsRelations = relations(adminLogs, ({ one }) => ({
-  administrator: one(administrators, {
-    fields: [adminLogs.adminId],
-    references: [administrators.id],
-  }),
+  // Removed administrator relation since foreign key constraint was removed
+  // administrator: one(administrators, {
+  //   fields: [adminLogs.adminId],
+  //   references: [administrators.id],
+  // }),
 }));
 
-export const accountPermissionsRelations = relations(accountPermissions, ({ one }) => ({
-  account: one(accounts, {
-    fields: [accountPermissions.accountId],
-    references: [accounts.id],
-  }),
-  administrator: one(administrators, {
-    fields: [accountPermissions.adminId],
-    references: [administrators.id],
-  }),
-}));
+export const accountPermissionsRelations = relations(
+  accountPermissions,
+  ({ one }) => ({
+    account: one(accounts, {
+      fields: [accountPermissions.accountId],
+      references: [accounts.id],
+    }),
+    administrator: one(administrators, {
+      fields: [accountPermissions.adminId],
+      references: [administrators.id],
+    }),
+  })
+);
 
 // --- BEGIN NEW RELATIONS FOR PASSWORD RESET TOKENS ---
-export const passwordResetTokensRelations = relations(passwordResetTokens, ({ one }) => ({
-  merchant: one(merchants, {
-    fields: [passwordResetTokens.merchantId],
-    references: [merchants.id],
-  }),
-}));
+export const passwordResetTokensRelations = relations(
+  passwordResetTokens,
+  ({ one }) => ({
+    merchant: one(merchants, {
+      fields: [passwordResetTokens.merchantId],
+      references: [merchants.id],
+    }),
+  })
+);
 // --- END NEW RELATIONS FOR PASSWORD RESET TOKENS ---
-
 
 // Zod schemas for type validation
 export const insertAdministratorSchema = createInsertSchema(administrators);
@@ -313,14 +358,17 @@ export const selectTransactionSchema = createSelectSchema(transactions);
 export const insertAdminLogSchema = createInsertSchema(adminLogs);
 export const selectAdminLogSchema = createSelectSchema(adminLogs);
 
-export const insertAccountPermissionSchema = createInsertSchema(accountPermissions);
-export const selectAccountPermissionSchema = createSelectSchema(accountPermissions);
+export const insertAccountPermissionSchema =
+  createInsertSchema(accountPermissions);
+export const selectAccountPermissionSchema =
+  createSelectSchema(accountPermissions);
 
 // --- BEGIN NEW ZOD SCHEMAS FOR PASSWORD RESET TOKENS ---
-export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTokens);
-export const selectPasswordResetTokenSchema = createSelectSchema(passwordResetTokens);
+export const insertPasswordResetTokenSchema =
+  createInsertSchema(passwordResetTokens);
+export const selectPasswordResetTokenSchema =
+  createSelectSchema(passwordResetTokens);
 // --- END NEW ZOD SCHEMAS FOR PASSWORD RESET TOKENS ---
-
 
 // Custom schemas with additional validation
 // THESE ARE YOUR ORIGINAL CUSTOM ZOD SCHEMAS.
@@ -370,7 +418,10 @@ export const createPublicRegistrationSchema = createAccountSchema
     // Consider omitting accountType if it's always 'CHILD_DISPLAY' here
   })
   .extend({
-    pin: z.string().length(4, "PIN must be exactly 4 digits").regex(/^\d+$/, "PIN must contain only digits"),
+    pin: z
+      .string()
+      .length(4, "PIN must be exactly 4 digits")
+      .regex(/^\d+$/, "PIN must contain only digits"),
     guardianDob: z.string().min(1, "Guardian date of birth is required"),
     submissionLanguage: z.string().optional(),
   });
@@ -384,8 +435,8 @@ export const createMerchantSchema = insertMerchantSchema
     deletedAt: true,
     pinVerified: true,
     declineReason: true,
-    internalAccountId: true, 
-    settlementBankAccountName: true, 
+    internalAccountId: true,
+    settlementBankAccountName: true,
     settlementBankName: true,
     settlementBankAccountNumber: true,
     settlementBankSwiftCode: true,
@@ -393,8 +444,8 @@ export const createMerchantSchema = insertMerchantSchema
   })
   .extend({
     businessName: z.string().min(1, "Business name is required"),
-    contactEmail: z.string().email("Invalid email address"), 
-    password: z.string().min(8, "Password must be at least 8 characters"), 
+    contactEmail: z.string().email("Invalid email address"),
+    password: z.string().min(8, "Password must be at least 8 characters"),
     category: z.string().optional(),
   });
 
@@ -404,13 +455,13 @@ export const createTransactionSchema = insertTransactionSchema
     timestamp: true,
     createdAt: true,
     updatedAt: true,
-    paymentId: true, 
+    paymentId: true,
   })
   .extend({
-    amount: z.number().positive("Amount must be positive"), 
-    accountId: z.string().uuid("Invalid account ID for transaction leg"), 
-    merchantId: z.string().uuid("Merchant ID is required for this transaction"), 
-    type: z.enum(transactionTypeEnum.enumValues), 
+    amount: z.number().positive("Amount must be positive"),
+    accountId: z.string().uuid("Invalid account ID for transaction leg"),
+    merchantId: z.string().uuid("Merchant ID is required for this transaction"),
+    type: z.enum(transactionTypeEnum.enumValues),
   });
 
 export const createAdminLogSchema = insertAdminLogSchema
@@ -423,7 +474,7 @@ export const createAdminLogSchema = insertAdminLogSchema
 
 export const createAccountPermissionSchema = insertAccountPermissionSchema
   .omit({
-    grantedAt: true, 
+    grantedAt: true,
     createdAt: true,
     updatedAt: true,
   })
