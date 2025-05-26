@@ -386,7 +386,10 @@ export const createPublicRegistrationSchema = createAccountSchema
     submissionLanguage: z.string().optional(),
   });
 
-const displayIdRegex = /^[A-Z]{3}-\d{4}-\d{4}$/; // e.g., STC-2023-0001
+const displayIdRegex = /^[A-Z]{3}-\d{4}-\d{4}(?:-[DC])?$/;
+
+// src/lib/db/schema.ts
+// ... (other imports and schemas) ...
 
 export const createMerchantSchema = insertMerchantSchema
   .omit({
@@ -397,25 +400,35 @@ export const createMerchantSchema = insertMerchantSchema
     deletedAt: true,
     pinVerified: true,
     declineReason: true,
-    // internalAccountId should be handled by service logic (create internal account first)
-    // Omitting it here implies it's set by the service, not directly by client in this schema.
-    // Or, if client is expected to provide an existing one, it should be uuid().
-    internalAccountId: true, 
-    settlementBankAccountName: true, 
+    internalAccountId: true, // This (the UUID FK) is set by backend logic, not client
+    settlementBankAccountName: true,
     settlementBankName: true,
     settlementBankAccountNumber: true,
     settlementBankSwiftCode: true,
     settlementBankBranchName: true,
+    // Omit status as well, it should default to 'pending_approval' on new registration
+    status: true, 
   })
   .extend({
-    displayId: z.string().regex(displayIdRegex, "Invalid Display ID format. Expected PREFIX-YYYY-NNNN"), // ADDED
-    businessName: z.string().min(1, "Business name is required"),
-    contactEmail: z.string().email("Invalid email address"), 
-    password: z.string().min(8, "Password must be at least 8 characters"), 
-    category: z.string().optional(),
-    // If client needs to provide an existing internalAccountId UUID:
-    // internalAccountIdToLink: z.string().uuid("Valid Internal Account UUID is required to link.").optional(),
+    // Fields expected from the client (MerchantApp registration payload)
+    displayId: z.string().regex(displayIdRegex, "Invalid Merchant Display ID format. Expected MER-YYYY-NNNN"),
+    internalAccountDisplayId: z.string().regex(displayIdRegex, "Internal Account Display ID is required. Expected STC-YYYY-NNNN format."), // <<< --- THIS WAS MISSING ---
+    
+    businessName: z.string().min(1, "Business name is required"), // Client sends this (was storeName)
+    contactEmail: z.string().email("Invalid email address"),    // Client sends this (was email)
+    password: z.string().min(8, "Password must be at least 8 characters long."), // Client sends this
+    storeAddress: z.string().min(1, "Store address (location) is required."), // Client sends this (was location)
+    contactPerson: z.string().min(1, "Contact person is required."),  // Client sends this
+    contactPhone: z.string().min(10, "Contact phone number is required and should be valid."), // Client sends this (was contactPhoneNumber)
+
+    // Optional fields client might send
+    category: z.string().optional().nullable(),
+    website: z.string().url({ message: "Invalid website URL" }).optional().nullable(),
+    description: z.string().max(500, "Description too long").optional().nullable(),
+    logoUrl: z.string().url({ message: "Invalid logo URL" }).optional().nullable(),
   });
+
+// ... (rest of your schema.ts)
 
 // ADDED basic Zod schema for creating payments
 export const createPaymentSchema = insertPaymentSchema
