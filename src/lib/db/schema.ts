@@ -1,4 +1,4 @@
-// FULL SCHEMA (Corrected Zod Stubs): src/lib/db/schema.ts
+// src/lib/db/schema.ts
 import {
   pgTable,
   text,
@@ -8,13 +8,12 @@ import {
   boolean,
   pgEnum,
   index,
-  primaryKey, // Assuming primaryKey is used elsewhere, if not, it might be from a specific table import
+  primaryKey,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 
-// ENUMs
 export const accountStatusEnum = pgEnum("account_status", [
   "Pending",
   "Active",
@@ -30,16 +29,16 @@ export const merchantStatusEnum = pgEnum("merchant_status", [
 ]);
 
 export const transactionStatusEnum = pgEnum("transaction_status", [
-  "Completed", // Index 0
-  "Pending",   // Index 1
-  "Failed",    // Index 2
-  "Declined",  // Index 3
+  "Completed",
+  "Pending",
+  "Failed",
+  "Declined",
 ]);
 
 export const transactionTypeEnum = pgEnum("transaction_type", [
-  "Debit",     // Index 0
-  "Credit",    // Index 1
-  "Adjustment",// Index 2
+  "Debit",
+  "Credit",
+  "Adjustment",
 ]);
 
 export const accountTypeEnum = pgEnum("account_type", [
@@ -106,12 +105,13 @@ export const merchants = pgTable(
   "merchants",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    displayId: text("display_id").notNull().unique(), // ADDED
     businessName: text("business_name").notNull(),
     contactPerson: text("contact_person"),
     contactEmail: text("contact_email").notNull().unique(),
     contactPhone: text("contact_phone"),
     storeAddress: text("store_address"),
-    hashedPassword: text("hashed_password").notNull(), // This is the password we'll be resetting
+    hashedPassword: text("hashed_password").notNull(),
     status: merchantStatusEnum("status").default("pending_approval").notNull(),
     submittedAt: timestamp("submitted_at", { withTimezone: true }).defaultNow().notNull(),
     declineReason: text("decline_reason"),
@@ -130,11 +130,27 @@ export const merchants = pgTable(
     ...softDeleteField,
   },
   (table) => ({
+    displayIdIdx: index("merchant_display_id_idx").on(table.displayId), // ADDED
     businessNameIdx: index("merchant_business_name_idx").on(table.businessName),
-    contactEmailIdx: index("merchant_contact_email_idx").on(table.contactEmail), // Added index for contactEmail, good for lookups
+    contactEmailIdx: index("merchant_contact_email_idx").on(table.contactEmail),
     statusIdx: index("merchant_status_idx").on(table.status),
     categoryIdx: index("merchant_category_idx").on(table.category),
     internalAccountIdIdx: index("merchant_internal_account_id_idx").on(table.internalAccountId),
+  })
+);
+
+// NEW TABLE: payments
+export const payments = pgTable(
+  "payments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(), // This is the conceptual "payment_id"
+    displayId: text("display_id").notNull().unique(), // e.g., PAY-YYYY-NNNN
+    // You can add other fields specific to the overall payment event here if needed
+    // For example: initiatedBy (merchantId or accountId), overallStatus, etc.
+    ...timestampFields,
+  },
+  (table) => ({
+    displayIdIdx: index("payment_display_id_idx").on(table.displayId),
   })
 );
 
@@ -142,12 +158,13 @@ export const transactions = pgTable(
   "transactions",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    paymentId: uuid("payment_id").notNull(),
+    displayId: text("display_id").notNull().unique(), // ADDED
+    paymentId: uuid("payment_id").notNull().references(() => payments.id, { onDelete: "cascade" }), // UPDATED to reference payments table
     timestamp: timestamp("timestamp", { withTimezone: true }).defaultNow().notNull(),
     amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
     type: transactionTypeEnum("type").notNull(),
     accountId: uuid("account_id").notNull().references(() => accounts.id, { onDelete: "restrict" }),
-    merchantId: uuid("merchant_id").notNull().references(() => merchants.id, { onDelete: "set null" }), // onDelete changed to set null if merchant is deleted
+    merchantId: uuid("merchant_id").references(() => merchants.id, { onDelete: "set null" }), // onDelete changed to set null if merchant is deleted. Note: original had .notNull() which conflicts with set null. Making it nullable.
     status: transactionStatusEnum("status").notNull(),
     declineReason: text("decline_reason"),
     pinVerified: boolean("pin_verified"),
@@ -157,6 +174,7 @@ export const transactions = pgTable(
     ...timestampFields,
   },
   (table) => ({
+    displayIdIdx: index("transaction_display_id_idx").on(table.displayId), // ADDED
     accountIdIdx: index("transaction_account_id_idx").on(table.accountId),
     merchantIdIdx: index("transaction_merchant_id_idx").on(table.merchantId),
     timestampIdx: index("transaction_timestamp_idx").on(table.timestamp),
@@ -172,7 +190,7 @@ export const adminLogs = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     timestamp: timestamp("timestamp", { withTimezone: true }).defaultNow().notNull(),
     adminId: uuid("admin_id").references(() => administrators.id, { onDelete: "set null" }),
-    adminEmail: text("admin_email").notNull().references(() => administrators.email, { onDelete: "set null" }), // Should this reference unique email?
+    adminEmail: text("admin_email").notNull().references(() => administrators.email, { onDelete: "set null" }),
     action: text("action").notNull(),
     targetType: text("target_type"),
     targetId: text("target_id"),
@@ -207,30 +225,24 @@ export const accountPermissions = pgTable(
   }
 );
 
-// --- BEGIN NEW TABLE FOR PASSWORD RESET TOKENS ---
 export const passwordResetTokens = pgTable(
   "password_reset_tokens",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     merchantId: uuid("merchant_id")
       .notNull()
-      .references(() => merchants.id, { onDelete: "cascade" }), // Assumes forgot password is for merchants
-    
-    tokenHash: text("token_hash").notNull(), // SHA256 hash of the OTP
+      .references(() => merchants.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-    usedAt: timestamp("used_at", { withTimezone: true }), // Timestamp when the token was used
-
-    ...timestampFields, // createdAt, updatedAt
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    ...timestampFields,
   },
   (table) => ({
     merchantIdIdx: index("prt_merchant_id_idx").on(table.merchantId),
     expiresAtIdx: index("prt_expires_at_idx").on(table.expiresAt),
   })
 );
-// --- END NEW TABLE FOR PASSWORD RESET TOKENS ---
 
-
-// Define relations
 export const accountsRelations = relations(accounts, ({ one, many }) => ({
   transactions: many(transactions, { relationName: "accountTransactions" }),
   permissions: many(accountPermissions),
@@ -246,9 +258,12 @@ export const merchantsRelations = relations(merchants, ({ one, many }) => ({
     fields: [merchants.internalAccountId],
     references: [accounts.id]
   }),
-  // --- BEGIN NEW RELATION FOR MERCHANTS ---
-  passwordResetTokens: many(passwordResetTokens), // A merchant can have many password reset tokens (over time)
-  // --- END NEW RELATION FOR MERCHANTS ---
+  passwordResetTokens: many(passwordResetTokens),
+}));
+
+// ADDED relations for payments
+export const paymentsRelations = relations(payments, ({ many }) => ({
+  transactions: many(transactions), // A payment can have many transaction legs
 }));
 
 export const transactionsRelations = relations(transactions, ({ one }) => ({
@@ -261,6 +276,10 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
     fields: [transactions.merchantId],
     references: [merchants.id],
     relationName: "merchantFacilitatedTransactions"
+  }),
+  payment: one(payments, { // ADDED relation to the payment
+    fields: [transactions.paymentId],
+    references: [payments.id],
   }),
 }));
 
@@ -287,17 +306,13 @@ export const accountPermissionsRelations = relations(accountPermissions, ({ one 
   }),
 }));
 
-// --- BEGIN NEW RELATIONS FOR PASSWORD RESET TOKENS ---
 export const passwordResetTokensRelations = relations(passwordResetTokens, ({ one }) => ({
   merchant: one(merchants, {
     fields: [passwordResetTokens.merchantId],
     references: [merchants.id],
   }),
 }));
-// --- END NEW RELATIONS FOR PASSWORD RESET TOKENS ---
 
-
-// Zod schemas for type validation
 export const insertAdministratorSchema = createInsertSchema(administrators);
 export const selectAdministratorSchema = createSelectSchema(administrators);
 
@@ -306,6 +321,10 @@ export const selectAccountSchema = createSelectSchema(accounts);
 
 export const insertMerchantSchema = createInsertSchema(merchants);
 export const selectMerchantSchema = createSelectSchema(merchants);
+
+// ADDED Zod schemas for payments
+export const insertPaymentSchema = createInsertSchema(payments);
+export const selectPaymentSchema = createSelectSchema(payments);
 
 export const insertTransactionSchema = createInsertSchema(transactions);
 export const selectTransactionSchema = createSelectSchema(transactions);
@@ -316,16 +335,9 @@ export const selectAdminLogSchema = createSelectSchema(adminLogs);
 export const insertAccountPermissionSchema = createInsertSchema(accountPermissions);
 export const selectAccountPermissionSchema = createSelectSchema(accountPermissions);
 
-// --- BEGIN NEW ZOD SCHEMAS FOR PASSWORD RESET TOKENS ---
 export const insertPasswordResetTokenSchema = createInsertSchema(passwordResetTokens);
 export const selectPasswordResetTokenSchema = createSelectSchema(passwordResetTokens);
-// --- END NEW ZOD SCHEMAS FOR PASSWORD RESET TOKENS ---
 
-
-// Custom schemas with additional validation
-// THESE ARE YOUR ORIGINAL CUSTOM ZOD SCHEMAS.
-// THEY WILL LIKELY NEED MANUAL UPDATES TO REFLECT THE NEW TABLE COLUMNS
-// AND LOGIC (e.g., how internalAccountId is handled on merchant creation).
 export const createAdministratorSchema = insertAdministratorSchema
   .omit({
     id: true,
@@ -356,7 +368,7 @@ export const createAccountSchema = insertAccountSchema
     email: z.string().email("Invalid email address").optional().nullable(),
     guardianContact: z.string().optional().nullable(),
     currentQrToken: z.string().optional().nullable(),
-    displayId: z.string().optional(),
+    displayId: z.string().min(1, "Display ID is required when creating an account via this schema."), // Made displayId required if this schema is used for creation where frontend sends it
     guardianDob: z.string().optional().nullable(),
     address: z.string().optional().nullable(),
   });
@@ -365,15 +377,16 @@ export const createPublicRegistrationSchema = createAccountSchema
   .omit({
     status: true,
     hashedPin: true,
-    displayId: true,
+    displayId: true, // Assuming public registration doesn't provide displayId initially
     currentQrToken: true,
-    // Consider omitting accountType if it's always 'CHILD_DISPLAY' here
   })
   .extend({
     pin: z.string().length(4, "PIN must be exactly 4 digits").regex(/^\d+$/, "PIN must contain only digits"),
     guardianDob: z.string().min(1, "Guardian date of birth is required"),
     submissionLanguage: z.string().optional(),
   });
+
+const displayIdRegex = /^[A-Z]{3}-\d{4}-\d{4}$/; // e.g., STC-2023-0001
 
 export const createMerchantSchema = insertMerchantSchema
   .omit({
@@ -384,6 +397,9 @@ export const createMerchantSchema = insertMerchantSchema
     deletedAt: true,
     pinVerified: true,
     declineReason: true,
+    // internalAccountId should be handled by service logic (create internal account first)
+    // Omitting it here implies it's set by the service, not directly by client in this schema.
+    // Or, if client is expected to provide an existing one, it should be uuid().
     internalAccountId: true, 
     settlementBankAccountName: true, 
     settlementBankName: true,
@@ -392,10 +408,25 @@ export const createMerchantSchema = insertMerchantSchema
     settlementBankBranchName: true,
   })
   .extend({
+    displayId: z.string().regex(displayIdRegex, "Invalid Display ID format. Expected PREFIX-YYYY-NNNN"), // ADDED
     businessName: z.string().min(1, "Business name is required"),
     contactEmail: z.string().email("Invalid email address"), 
     password: z.string().min(8, "Password must be at least 8 characters"), 
     category: z.string().optional(),
+    // If client needs to provide an existing internalAccountId UUID:
+    // internalAccountIdToLink: z.string().uuid("Valid Internal Account UUID is required to link.").optional(),
+  });
+
+// ADDED basic Zod schema for creating payments
+export const createPaymentSchema = insertPaymentSchema
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    displayId: z.string().regex(displayIdRegex, "Invalid Display ID format. Expected PREFIX-YYYY-NNNN"), // ADDED
+    // Add any other fields the client must provide when creating a payment event
   });
 
 export const createTransactionSchema = insertTransactionSchema
@@ -404,12 +435,14 @@ export const createTransactionSchema = insertTransactionSchema
     timestamp: true,
     createdAt: true,
     updatedAt: true,
-    paymentId: true, 
+    // paymentId will be linked by service logic using the UUID of the created Payment record
   })
   .extend({
+    displayId: z.string().regex(displayIdRegex, "Invalid Display ID format. Expected PREFIX-YYYY-NNNN"), // ADDED
+    paymentId: z.string().uuid("Valid Payment UUID is required."), // Client provides UUID of parent Payment record
     amount: z.number().positive("Amount must be positive"), 
     accountId: z.string().uuid("Invalid account ID for transaction leg"), 
-    merchantId: z.string().uuid("Merchant ID is required for this transaction"), 
+    merchantId: z.string().uuid("Merchant ID is required for this transaction").nullable(), // Made nullable to match schema's onDelete: 'set null'
     type: z.enum(transactionTypeEnum.enumValues), 
   });
 

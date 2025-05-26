@@ -480,5 +480,18 @@ Content-Type: application/json
 
 {
   "email": "karan.se@ipps.co.th", 
-  "otp": "188448" 
+  "otp": "683144" 
+}
+
+
+
+### TC_ResetPassword_Success
+# @name resetPasswordSuccess
+POST {{baseUrl}}/merchant-app/auth/forgot-password/reset
+Accept: application/json
+Content-Type: application/json
+
+{
+  "resetAuthorizationToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJtZXJjaGFudElkIjoiYjAwZDdiYjAtZjJmNS00NmJkLTkwYzYtMzY5MDFhOGY3OGM0IiwiZW1haWwiOiJrYXJhbi5zZUBpcHBzLmNvLnRoIiwicHVycG9zZSI6InBhc3N3b3JkLXJlc2V0LWF1dGhvcml6YXRpb24iLCJpYXQiOjE3NDc5ODg1OTUsImV4cCI6MTc0Nzk4ODg5NX0.qpV_vSyEYTvCO8cYaUC39xGof9b5vXXR9zItxSKyv-c", 
+  "newPassword": "password888"
 }
