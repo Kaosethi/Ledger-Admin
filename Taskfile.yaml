@@ -94,24 +94,24 @@ tasks:
   set-ns:
     desc: Set k8s namespace (later change this ns to stc-ledger-dev)
     cmds:
-      - kubectl config set-context --current --namespace=oneboss-dev
+      - kubectl config set-context --current --namespace=stc-ledger-dev
 
   helm:i:
     desc: Install the helm chart
     cmds:
-      - helm install ledger-admin ./k8s/helm -n oneboss-dev
+      - helm install ledger-admin ./k8s/helm -n stc-ledger-dev
 
   helm:d:
     desc: Delete the helm chart
     cmds:
-      - helm delete ledger-admin -n oneboss-dev
+      - helm delete ledger-admin -n stc-ledger-dev
 
   helm:u:
     desc: Upgrade the helm chart
     cmds:
-      - helm upgrade ledger-admin ./k8s/helm -n oneboss-dev
+      - helm upgrade ledger-admin ./k8s/helm -n stc-ledger-dev
 
   fwd:pg:
     desc: Forward port 5432 to the database
     cmds:
-      - kubectl port-forward svc/postgresql 5434:5432 -n oneboss-dev
+      - kubectl port-forward svc/postgresql 5434:5432 -n stc-ledger-dev
