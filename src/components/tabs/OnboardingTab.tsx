@@ -203,7 +203,8 @@ const OnboardingTab: React.FC<OnboardingTabProps> = ({
       const payload = { type: "pay", account: accountId, ver: 1 };
       const signedPayload = await getSignedQrPayload(payload);
       const qrTokenString = JSON.stringify(signedPayload);
-      setQrCodeValue(qrTokenString);
+      const base64 = btoa(qrTokenString);
+      setQrCodeValue(base64);
       setShowQrPreview(true);
     } catch (e) {
       setFormMessage({ type: "error", text: "Failed to generate QR code." });
