@@ -180,10 +180,16 @@ const EditAccountModal: React.FC<EditAccountModalProps> = ({
 
   const accountTransactionsForDisplay: DisplayTransaction[] = useMemo(() => {
     if (!account) return [];
-    return allTransactions
+
+     // VVVV --- ADD DEFENSIVE CHECKS HERE --- VVVV
+    const safeAllTransactions = Array.isArray(allTransactions) ? allTransactions : [];
+    const safeMerchants = Array.isArray(merchants) ? merchants : [];
+    // VVVV --- END DEFENSIVE CHECKS --- VVVV
+
+    return safeAllTransactions
       .filter((tx) => tx.accountId === account.id)
       .map((tx) => {
-        const merchant = merchants.find((m) => m.id === tx.merchantId);
+        const merchant = safeMerchants.find((m) => m.id === tx.merchantId);
         return {
           ...tx,
           merchantNameDisplay:
