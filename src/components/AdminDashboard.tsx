@@ -14,18 +14,18 @@ import ActivityLogTab from "@/components/tabs/ActivityLogTab";
 
 // Types from mockData (reflecting their actual definitions)
 import mockDataInstance, {
-  Account,         // Dates are string
-  Merchant,        // Dates are string
-  AdminLog,        // timestamp is string
+  Account,
+  Merchant,
+  AdminLog,
   AppData,
-  Transaction,     // timestamp, createdAt, updatedAt are Date
-  PendingRegistration, // createdAt is string
-  AdminUser,         // createdAt is string
+  Transaction, // This is the type used for transactionsFromAppData
+  PendingRegistration,
+  AdminUser,
 } from "@/lib/mockData";
 import { z } from "zod";
 import { selectTransactionSchema } from "@/lib/db/schema";
 
-// DrizzleTransaction expects Date objects for its timestamps
+// DrizzleTransaction expects Date objects for its timestamps AND a displayId
 type DrizzleTransaction = z.infer<typeof selectTransactionSchema>;
 
 interface AdminDashboardProps {
@@ -48,34 +48,36 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       admins: mockDataInstance.admins || [],
       accounts: mockDataInstance.accounts || [],
       merchants: mockDataInstance.merchants || [],
-      transactions: mockDataInstance.transactions || [], // These have Date objects for timestamps
-      adminActivityLog: mockDataInstance.adminActivityLog || [], // These have string timestamps
+      transactions: mockDataInstance.transactions || [],
+      adminActivityLog: mockDataInstance.adminActivityLog || [],
       pendingRegistrations: mockDataInstance.pendingRegistrations || [],
     };
   });
 
-  // Convert Transaction (with Date objects) to DrizzleTransaction (also with Date objects)
-   const convertToDrizzleTransactions = useCallback(
-    (transactionsFromAppData: Transaction[]): DrizzleTransaction[] => { // Transaction[] from mockData has merchantId?: string | null
+  const convertToDrizzleTransactions = useCallback(
+    (transactionsFromAppData: Transaction[]): DrizzleTransaction[] => {
       return transactionsFromAppData.map((transaction) => {
+        // Since 'Transaction' type from mockData does NOT have displayId,
+        // we generate a placeholder directly.
+        const generatedDisplayId = `TRX-MOCK-${transaction.id.substring(0, 6).toUpperCase()}`;
+
         return {
           id: transaction.id,
+          displayId: generatedDisplayId, // <<< --- FIXED: Directly use generated placeholder ---
           paymentId: transaction.paymentId,
-          timestamp: transaction.timestamp, // Already a Date object
-          amount: transaction.amount,       // Already a string
-          type: transaction.type,
+          timestamp: transaction.timestamp instanceof Date ? transaction.timestamp : new Date(transaction.timestamp),
+          amount: String(transaction.amount || "0.00"), 
+          type: transaction.type as DrizzleTransaction['type'], 
           accountId: transaction.accountId,
-          // VVVV CORRECTED HERE VVVV
-          merchantId: transaction.merchantId || "", // Ensure it's always a string
-          // VVVV END CORRECTION VVVV
-          status: transaction.status,
+          merchantId: transaction.merchantId || null, 
+          status: transaction.status as DrizzleTransaction['status'], 
           declineReason: transaction.declineReason || null,
-          pinVerified: transaction.pinVerified === null ? null : transaction.pinVerified,
+          pinVerified: transaction.pinVerified === undefined || transaction.pinVerified === null ? null : Boolean(transaction.pinVerified),
           description: transaction.description || null,
           reference: transaction.reference || null,
           metadata: transaction.metadata || null, 
-          createdAt: transaction.createdAt, // Already a Date object
-          updatedAt: transaction.updatedAt, // Already a Date object
+          createdAt: transaction.createdAt instanceof Date ? transaction.createdAt : new Date(transaction.createdAt),
+          updatedAt: transaction.updatedAt instanceof Date ? transaction.updatedAt : new Date(transaction.updatedAt),
         };
       });
     },
@@ -89,9 +91,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       targetId: string = "-",
       details: string = ""
     ): void => {
-      const newLog: AdminLog = { // AdminLog.timestamp expects a string
+      const newLog: AdminLog = {
         id: `LOG-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-        timestamp: new Date().toISOString(), // Correctly provides a string
+        timestamp: new Date().toISOString(),
         adminUsername: adminEmail || "Unknown Admin",
         action: action,
         targetId: targetId,
@@ -101,7 +103,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setAppData((prevData) => ({
         ...prevData,
         adminActivityLog: [newLog, ...prevData.adminActivityLog].sort((a,b) => 
-          // Sort by parsing string dates
           new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime() 
         ),
       }));
@@ -109,7 +110,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     [adminEmail]
   );
 
-  // ... (rest of the functions: handleLogout, useEffect, handleAccountAdd, handleAccountsUpdate, etc. remain the same) ...
   const handleLogout = useCallback(() => {
     logAdminActivity("Logout", "System", "-", "Admin logged out.");
     try { localStorage.removeItem(ADMIN_EMAIL_STORAGE_KEY); } catch (e) { console.error(e); }
@@ -118,12 +118,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   }, [logAdminActivity, onLogout, router]);
 
   useEffect(() => {
-    // Status check logic can remain as is
-    const checkAdminStatus = () => { /* ... */ };
+    const checkAdminStatus = () => { /* Your existing status check logic */ };
     checkAdminStatus();
     const intervalId = setInterval(checkAdminStatus, STATUS_CHECK_INTERVAL_MS);
     return () => clearInterval(intervalId);
-  }, [appData.admins, handleLogout, logAdminActivity]);
+  }, [appData.admins, handleLogout, logAdminActivity]); 
 
   const handleAccountAdd = useCallback((newAccount: Account) => {
     setAppData((prevData) => ({ ...prevData, accounts: [newAccount, ...prevData.accounts] }));
@@ -144,7 +143,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     []
   );
 
-
   const renderTabContent = () => {
     switch (activeTab) {
       case "dashboard-tab":
@@ -164,11 +162,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             onAccountAdd={handleAccountAdd}
           />
         );
-      case "transactions-tab": // TransactionsTab will receive Transaction[] with Date objects for timestamps
+      case "transactions-tab": 
         return ( <TransactionsTab transactions={appData.transactions} merchants={appData.merchants} accounts={appData.accounts} /> );
       case "merchants-tab":
         return ( <MerchantsTab merchants={appData.merchants} transactions={appData.transactions} accounts={appData.accounts} onMerchantsUpdate={handleMerchantsUpdate} logAdminActivity={logAdminActivity} /> );
-      case "activity-log-tab": // ActivityLogTab will receive AdminLog[] with string timestamps
+      case "activity-log-tab": 
         return <ActivityLogTab logs={appData.adminActivityLog} />;
       default:
         return ( <div className="p-6 text-center text-gray-500"> Select a tab to view its content. </div> );
