@@ -135,7 +135,9 @@ function AccountsContent() {
       if (!res.ok) {
         throw new Error("Failed to fetch transactions");
       }
-      return res.json();
+      const responseData = await res.json();
+      // The API returns { data, totalCount }, so we need to access the data property
+      return responseData.data || responseData;
     },
   });
 
@@ -327,8 +329,8 @@ function AccountsContent() {
       onAccountSearch={handleAccountSearch}
       onAccountStatusFilter={handleAccountStatusFilter}
       accountsFilter={{
-       status: accountsFilter.status,
-       search: accountSearchInput, // Use the input state for immediate UI feedback
+        status: accountsFilter.status,
+        search: accountSearchInput, // Use the input state for immediate UI feedback
       }}
       onPendingRegistrationsSearch={handlePendingRegistrationsSearch}
       pendingRegistrationsSearch={pendingSearchInput} // Use the input state for immediate UI feedback

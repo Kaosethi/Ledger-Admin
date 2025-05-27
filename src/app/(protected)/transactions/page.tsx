@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import TransactionsTab from "@/components/tabs/TransactionsTab";
 // Ensure Transaction type from mockData expects Date objects for timestamp, createdAt, updatedAt
-import type { Transaction, Account, Merchant } from "@/lib/mockData"; 
+import type { Transaction, Account, Merchant } from "@/lib/mockData";
 
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -16,12 +16,15 @@ export default function TransactionsPage() {
 
   // Fetch transactions
   useEffect(() => {
-    const fetchAndTransformTransactions = async () => { // Renamed for clarity
+    const fetchAndTransformTransactions = async () => {
+      // Renamed for clarity
       setTransactionsLoading(true); // Set loading true at the start of fetch
       try {
         const response = await fetch("/api/transactions");
         if (response.ok) {
-          const data = await response.json();
+          const responseData = await response.json();
+          // The API returns { data, totalCount }, so we need to access the data property
+          const data = responseData.data || responseData;
           // VVVV ADD TRANSFORMATION HERE VVVV
           const transformedTransactions = data.map((tx: any) => ({
             ...tx,
@@ -31,12 +34,16 @@ export default function TransactionsPage() {
             amount: String(tx.amount), // Ensure amount is string
             // Ensure other fields match your Transaction type in lib/mockData
             // For example, if paymentId is crucial and might be missing:
-            // paymentId: tx.paymentId || `fallback-pid-${tx.id}`, 
+            // paymentId: tx.paymentId || `fallback-pid-${tx.id}`,
           }));
           setTransactions(transformedTransactions);
           // ^^^^ END TRANSFORMATION ^^^^
         } else {
-          console.error("Failed to fetch transactions:", response.status, response.statusText);
+          console.error(
+            "Failed to fetch transactions:",
+            response.status,
+            response.statusText
+          );
           // Optionally set an error state here to display to the user
         }
       } catch (error) {
@@ -59,7 +66,11 @@ export default function TransactionsPage() {
           const data = await response.json();
           setAccounts(data);
         } else {
-          console.error("Failed to fetch accounts:", response.status, response.statusText);
+          console.error(
+            "Failed to fetch accounts:",
+            response.status,
+            response.statusText
+          );
         }
       } catch (error) {
         console.error("Error fetching accounts:", error);
@@ -80,7 +91,11 @@ export default function TransactionsPage() {
           const data = await response.json();
           setMerchants(data);
         } else {
-          console.error("Failed to fetch merchants:", response.status, response.statusText);
+          console.error(
+            "Failed to fetch merchants:",
+            response.status,
+            response.statusText
+          );
         }
       } catch (error) {
         console.error("Error fetching merchants:", error);

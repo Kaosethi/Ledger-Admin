@@ -55,8 +55,10 @@ export default function DashboardPage() {
       try {
         const response = await fetch("/api/transactions");
         if (response.ok) {
-          const data = await response.json();
-          setTransactions(data);
+          const responseData = await response.json();
+          // The API returns { data, totalCount }, so we need to access the data property
+          const transactions = responseData.data || responseData;
+          setTransactions(transactions);
         }
       } catch (error) {
         console.error("Error fetching transactions data:", error);
