@@ -8,7 +8,8 @@ import {
   boolean,
   pgEnum,
   index,
-  primaryKey,
+  serial,
+  uniqueIndex
 } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -105,7 +106,7 @@ export const merchants = pgTable(
   "merchants",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    displayId: text("display_id").notNull().unique(), // ADDED
+    displayId: text("display_id").notNull().unique(),
     businessName: text("business_name").notNull(),
     contactPerson: text("contact_person"),
     contactEmail: text("contact_email").notNull().unique(),
@@ -130,7 +131,7 @@ export const merchants = pgTable(
     ...softDeleteField,
   },
   (table) => ({
-    displayIdIdx: index("merchant_display_id_idx").on(table.displayId), // ADDED
+    displayIdIdx: index("merchant_display_id_idx").on(table.displayId),
     businessNameIdx: index("merchant_business_name_idx").on(table.businessName),
     contactEmailIdx: index("merchant_contact_email_idx").on(table.contactEmail),
     statusIdx: index("merchant_status_idx").on(table.status),
@@ -139,14 +140,11 @@ export const merchants = pgTable(
   })
 );
 
-// NEW TABLE: payments
 export const payments = pgTable(
   "payments",
   {
-    id: uuid("id").primaryKey().defaultRandom(), // This is the conceptual "payment_id"
-    displayId: text("display_id").notNull().unique(), // e.g., PAY-YYYY-NNNN
-    // You can add other fields specific to the overall payment event here if needed
-    // For example: initiatedBy (merchantId or accountId), overallStatus, etc.
+    id: uuid("id").primaryKey().defaultRandom(),
+    displayId: text("display_id").notNull().unique(),
     ...timestampFields,
   },
   (table) => ({
@@ -158,13 +156,13 @@ export const transactions = pgTable(
   "transactions",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    displayId: text("display_id").notNull().unique(), // ADDED
-    paymentId: uuid("payment_id").notNull().references(() => payments.id, { onDelete: "cascade" }), // UPDATED to reference payments table
+    displayId: text("display_id").notNull().unique(),
+    paymentId: uuid("payment_id").notNull().references(() => payments.id, { onDelete: "cascade" }),
     timestamp: timestamp("timestamp", { withTimezone: true }).defaultNow().notNull(),
     amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
     type: transactionTypeEnum("type").notNull(),
     accountId: uuid("account_id").notNull().references(() => accounts.id, { onDelete: "restrict" }),
-    merchantId: uuid("merchant_id").references(() => merchants.id, { onDelete: "set null" }), // onDelete changed to set null if merchant is deleted. Note: original had .notNull() which conflicts with set null. Making it nullable.
+    merchantId: uuid("merchant_id").references(() => merchants.id, { onDelete: "set null" }),
     status: transactionStatusEnum("status").notNull(),
     declineReason: text("decline_reason"),
     pinVerified: boolean("pin_verified"),
@@ -174,7 +172,7 @@ export const transactions = pgTable(
     ...timestampFields,
   },
   (table) => ({
-    displayIdIdx: index("transaction_display_id_idx").on(table.displayId), // ADDED
+    displayIdIdx: index("transaction_display_id_idx").on(table.displayId),
     accountIdIdx: index("transaction_account_id_idx").on(table.accountId),
     merchantIdIdx: index("transaction_merchant_id_idx").on(table.merchantId),
     timestampIdx: index("transaction_timestamp_idx").on(table.timestamp),
@@ -183,6 +181,19 @@ export const transactions = pgTable(
     paymentIdIdx: index("transaction_payment_id_idx").on(table.paymentId),
   })
 );
+
+export const accountDisplayIdSequence = pgTable("account_display_id_sequence", {
+    id: serial("id").primaryKey(),
+    prefix: text("prefix").notNull(),
+    year: text("year").notNull(),
+    currentValue: numeric("current_value").notNull().default("0"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).$defaultFn(() => new Date()).notNull(),
+}, (table) => {
+    return {
+        unique_prefix_year: uniqueIndex("unique_prefix_year_idx").on(table.prefix, table.year),
+    };
+});
 
 export const adminLogs = pgTable(
   "admin_logs",
@@ -261,9 +272,8 @@ export const merchantsRelations = relations(merchants, ({ one, many }) => ({
   passwordResetTokens: many(passwordResetTokens),
 }));
 
-// ADDED relations for payments
 export const paymentsRelations = relations(payments, ({ many }) => ({
-  transactions: many(transactions), // A payment can have many transaction legs
+  transactions: many(transactions),
 }));
 
 export const transactionsRelations = relations(transactions, ({ one }) => ({
@@ -277,7 +287,7 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
     references: [merchants.id],
     relationName: "merchantFacilitatedTransactions"
   }),
-  payment: one(payments, { // ADDED relation to the payment
+  payment: one(payments, {
     fields: [transactions.paymentId],
     references: [payments.id],
   }),
@@ -322,7 +332,6 @@ export const selectAccountSchema = createSelectSchema(accounts);
 export const insertMerchantSchema = createInsertSchema(merchants);
 export const selectMerchantSchema = createSelectSchema(merchants);
 
-// ADDED Zod schemas for payments
 export const insertPaymentSchema = createInsertSchema(payments);
 export const selectPaymentSchema = createSelectSchema(payments);
 
@@ -356,6 +365,7 @@ export const createAdministratorSchema = insertAdministratorSchema
 export const createAccountSchema = insertAccountSchema
   .omit({
     id: true,
+    displayId: true, 
     createdAt: true,
     updatedAt: true,
     deletedAt: true,
@@ -368,16 +378,15 @@ export const createAccountSchema = insertAccountSchema
     email: z.string().email("Invalid email address").optional().nullable(),
     guardianContact: z.string().optional().nullable(),
     currentQrToken: z.string().optional().nullable(),
-    displayId: z.string().min(1, "Display ID is required when creating an account via this schema."), // Made displayId required if this schema is used for creation where frontend sends it
     guardianDob: z.string().optional().nullable(),
     address: z.string().optional().nullable(),
+    accountType: z.enum(accountTypeEnum.enumValues).optional(),
   });
 
 export const createPublicRegistrationSchema = createAccountSchema
   .omit({
     status: true,
     hashedPin: true,
-    displayId: true, // Assuming public registration doesn't provide displayId initially
     currentQrToken: true,
   })
   .extend({
@@ -386,91 +395,60 @@ export const createPublicRegistrationSchema = createAccountSchema
     submissionLanguage: z.string().optional(),
   });
 
-const displayIdRegex = /^[A-Z]{3}-\d{4}-\d{4}(?:-[DC])?$/;
-
-// src/lib/db/schema.ts
-// ... (other imports and schemas) ...
-
-export const createMerchantSchema = insertMerchantSchema // Base schema from Drizzle
-  .omit({
-    // Fields NOT expected from client / generated by DB or backend logic
-    id: true,                         // DB generated UUID
-    hashedPassword: true,             // <<< CRITICAL: Ensure this is OMITTED
-    submittedAt: true,                // DB default
-    updatedAt: true,                  // DB default/trigger
-    createdAt: true,                  // DB default
-    deletedAt: true,                  // Not set on creation
-    pinVerified: true,                // Not set on creation
-    declineReason: true,              // Not set on creation
-    internalAccountId: true,          // Backend logic creates internal account and links its UUID here
-    settlementBankAccountName: true,  // Assume these are set later or optional for initial registration
-    settlementBankName: true,
-    settlementBankAccountNumber: true,
-    settlementBankSwiftCode: true,
-    settlementBankBranchName: true,
-    status: true,                     // Defaults to 'pending_approval' in DB schema
-  })
-  .extend({
-    // Fields expected from the client (MerchantApp registration payload)
-    displayId: z.string().regex(displayIdRegex, "Invalid Merchant Display ID format. Expected MER-YYYY-NNNN"),
-    internalAccountDisplayId: z.string().regex(displayIdRegex, "Internal Account Display ID is required. Expected STC-YYYY-NNNN format."),
-    
-    businessName: z.string().min(1, "Business name is required"),
-    contactEmail: z.string().email("Invalid email address"),
-    password: z.string().min(8, "Password must be at least 8 characters long."), // <<< CRITICAL: Expects plain 'password'
-    
-    storeAddress: z.string().min(1, "Store address (location) is required."),
+export const createMerchantApiPayloadSchema = z.object({
+    storeName: z.string().min(1, "Store name is required"),
+    email: z.string().email("Invalid email address"),
+    password: z.string().min(8, "Password must be at least 8 characters long."),
+    location: z.string().min(1, "Location (store address) is required."),
     contactPerson: z.string().min(1, "Contact person is required."),
-    contactPhone: z.string().min(10, "Contact phone number is required and should be valid."), // Adjust min length if necessary
-
-    // Optional fields client might send
+    contactPhoneNumber: z.string().min(10, "Contact phone number is required."),
     category: z.string().optional().nullable(),
     website: z.string().url({ message: "Invalid website URL" }).optional().nullable(),
     description: z.string().max(500, "Description too long").optional().nullable(),
     logoUrl: z.string().url({ message: "Invalid logo URL" }).optional().nullable(),
   });
 
-
-
-// ADDED basic Zod schema for creating payments
-export const createPaymentSchema = insertPaymentSchema
-  .omit({
-    id: true,
-    createdAt: true,
-    updatedAt: true,
-  })
-  .extend({
-    displayId: z.string().regex(displayIdRegex, "Invalid Display ID format. Expected PREFIX-YYYY-NNNN"), // ADDED
-    // Add any other fields the client must provide when creating a payment event
+export const createPaymentApiPayloadSchema = z.object({
+    // Define fields client sends to initiate a payment event, e.g.:
+    // initiatedByAccountId: z.string().uuid().optional(),
+    // initiatedByMerchantId: z.string().uuid().optional(),
+    // amount: z.number().positive().optional(),
+    // currency: z.string().length(3).optional(),
+    // metadata: z.record(z.string(), z.any()).optional(), // Example for generic metadata
   });
 
-export const createTransactionSchema = insertTransactionSchema
-  .omit({
-    id: true,
-    timestamp: true,
-    createdAt: true,
-    updatedAt: true,
-    // paymentId will be linked by service logic using the UUID of the created Payment record
-  })
-  .extend({
-    displayId: z.string().regex(displayIdRegex, "Invalid Display ID format. Expected PREFIX-YYYY-NNNN"), // ADDED
-    paymentId: z.string().uuid("Valid Payment UUID is required."), // Client provides UUID of parent Payment record
-    amount: z.number().positive("Amount must be positive"), 
-    accountId: z.string().uuid("Invalid account ID for transaction leg"), 
-    merchantId: z.string().uuid("Merchant ID is required for this transaction").nullable(), // Made nullable to match schema's onDelete: 'set null'
-    type: z.enum(transactionTypeEnum.enumValues), 
+export const createTransactionApiPayloadSchema = z.object({
+    paymentId: z.string().uuid("Valid Payment UUID (from created payment event) is required."),
+    amount: z.number().refine(val => val !== 0, "Amount cannot be zero"),
+    type: z.enum(transactionTypeEnum.enumValues),
+    accountId: z.string().uuid("Invalid account ID for transaction leg"),
+    merchantId: z.string().uuid("Merchant ID for this transaction").optional().nullable(),
+    description: z.string().optional(),
+    reference: z.string().optional(),
+    // metadata: z.record(z.string(), z.any()).optional(), // Example
   });
 
 export const createAdminLogSchema = insertAdminLogSchema
   .omit({
     id: true,
+    createdAt: true, // Assuming these are handled by default/trigger
+    updatedAt: true, // Assuming these are handled by default/trigger
+    timestamp: true, // If defaultNow() is used
   })
   .extend({
     action: z.string().min(1, "Action is required"),
+    adminEmail: z.string().email("Admin email is required or invalid."), // Ensure this is provided if adminId isn't always available
+    // targetType, targetId, details, ipAddress, userAgent can be optional or required based on logging needs
+    targetType: z.string().optional(),
+    targetId: z.string().optional(),
+    details: z.string().optional(),
+    ipAddress: z.string().ip().optional(),
+    userAgent: z.string().optional(),
   });
 
 export const createAccountPermissionSchema = insertAccountPermissionSchema
   .omit({
+    id: true, // Assuming DB generated
     grantedAt: true, 
     createdAt: true,
     updatedAt: true,

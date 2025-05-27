@@ -4,99 +4,92 @@ import { db } from "@/lib/db";
 import {
   merchants,
   accounts,
-  createMerchantSchema,
+  createMerchantApiPayloadSchema, // <<< CORRECTED IMPORT
   accountTypeEnum,
   accountStatusEnum,
 } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { hashPassword } from "@/lib/auth/password";
-import { z } from "zod";
+import { hashPassword } from "@/lib/auth/password"; 
+import { generateDisplayId } from "@/lib/utils/idGenerator"; 
+import { z } from "zod"; 
 
 export async function POST(request: NextRequest) {
   console.log("[API /merchant-app/auth/register] Request received");
   try {
     const body = await request.json();
 
-    const validatedData = createMerchantSchema.parse(body);
+    // Validate incoming payload against the specific API payload schema
+    const validatedData = createMerchantApiPayloadSchema.parse(body); // <<< CORRECTED USAGE
 
+    // Destructure fields based on createMerchantApiPayloadSchema
     const {
-      displayId,
-      internalAccountDisplayId, // <<< --- ADDED THIS TO DESTRUCTURING ---
-      businessName,
-      contactEmail,
+      storeName,      
+      email,          
       password,
-      storeAddress,
-      category,
+      location,       
       contactPerson,
-      contactPhone,
+      contactPhoneNumber, 
+      category,
       website,
       description,
       logoUrl,
     } = validatedData;
 
-    console.log("[API /merchant-app/auth/register] Validated request body:", {
-      displayId, internalAccountDisplayId, businessName, contactEmail, /* no password */
-      storeAddress, category, contactPerson, contactPhone,
+    console.log("[API /merchant-app/auth/register] Validated request body (client payload):", {
+      storeName, email, /* no password logging */
+      location, contactPerson, contactPhoneNumber, category, website, description, logoUrl
     });
 
     const registrationResult = await db.transaction(async (tx) => {
       const existingMerchantByEmail = await tx
         .select({ id: merchants.id })
         .from(merchants)
-        .where(eq(merchants.contactEmail, contactEmail.toLowerCase()))
+        .where(eq(merchants.contactEmail, email.toLowerCase())) 
         .limit(1);
 
       if (existingMerchantByEmail.length > 0) {
-        console.warn("[API /merchant-app/auth/register] Merchant with email already exists in tx");
+        console.warn(`[API /merchant-app/auth/register] Merchant with email ${email} already exists.`);
         const err = new Error("A merchant with this email already exists.");
         (err as any).statusCode = 409;
         throw err;
       }
 
-      const existingInternalAccountByDisplayId = await tx
-        .select({ id: accounts.id })
-        .from(accounts)
-        .where(eq(accounts.displayId, internalAccountDisplayId)) // Use the destructured variable
-        .limit(1);
-      
-      if (existingInternalAccountByDisplayId.length > 0) {
-        console.warn(`[API /merchant-app/auth/register] Internal account displayId ${internalAccountDisplayId} already exists.`);
-        const err = new Error("Internal account setup conflict. Please try a different identifier or contact support.");
-        (err as any).statusCode = 409;
-        throw err;
-      }
-      
+      const internalAccountDisplayId = await generateDisplayId(tx, 'MIA'); 
+      const merchantDisplayId = await generateDisplayId(tx, 'MER');
+
       const [newInternalAccount] = await tx
         .insert(accounts)
         .values({
-          displayId: internalAccountDisplayId, // Use the destructured variable
-          childName: `${businessName} Internal Acct.`,
-          guardianName: contactPerson || "Merchant System", 
-          status: accountStatusEnum.enumValues[1], // "Active"
+          displayId: internalAccountDisplayId, 
+          childName: `${storeName} Internal Acc.`, 
+          guardianName: contactPerson || `${storeName} System`, 
+          status: accountStatusEnum.enumValues[1], 
           balance: "0.00",
           hashedPin: null, 
-          accountType: accountTypeEnum.enumValues[1], // "MERCHANT_INTERNAL"
-          email: contactEmail.toLowerCase(),
+          accountType: accountTypeEnum.enumValues[1], 
+          email: email.toLowerCase(), 
         })
-        .returning({ id: accounts.id });
+        .returning({ id: accounts.id, displayId: accounts.displayId });
 
       if (!newInternalAccount || !newInternalAccount.id) {
-        console.error("[API /merchant-app/auth/register] Failed to create internal account for merchant in tx.");
+        console.error("[API /merchant-app/auth/register] Failed to create internal account for merchant.");
         throw new Error("Failed to set up merchant account structure (internal account).");
       }
       const merchantInternalAccountUUID = newInternalAccount.id;
+      console.log(`[API /merchant-app/auth/register] Internal account created: ${newInternalAccount.id} (Display ID: ${newInternalAccount.displayId})`);
+
 
       const hashedPassword = await hashPassword(password);
 
       const newMerchantInsertData = {
-        displayId: displayId, 
-        businessName: businessName,
-        contactEmail: contactEmail.toLowerCase(),
+        displayId: merchantDisplayId, 
+        businessName: storeName,         
+        contactEmail: email.toLowerCase(), 
         hashedPassword: hashedPassword,
-        storeAddress: storeAddress,
+        storeAddress: location,        
         internalAccountId: merchantInternalAccountUUID,
-        contactPerson: contactPerson,
-        contactPhone: contactPhone,
+        contactPerson: contactPerson,    
+        contactPhone: contactPhoneNumber,
         category: category || null,
         website: website || null,
         description: description || null,
@@ -115,24 +108,29 @@ export async function POST(request: NextRequest) {
         });
 
       if (!insertedMerchant) {
-        console.error("[API /merchant-app/auth/register] Failed to insert merchant into database in tx.");
+        console.error("[API /merchant-app/auth/register] Failed to insert merchant into database.");
         throw new Error("Failed to register merchant entity.");
       }
 
-      console.log("[API /merchant-app/auth/register] Merchant registered successfully in tx:", insertedMerchant);
-      return insertedMerchant; 
+      console.log(`[API /merchant-app/auth/register] Merchant registered successfully: ${insertedMerchant.id} (Display ID: ${insertedMerchant.displayId})`);
+      
+      return { merchant: insertedMerchant, account: newInternalAccount }; 
     });
 
     return NextResponse.json(
       {
         message: "Merchant registration successful. Your application is pending admin approval.",
         merchant: {
-          id: registrationResult.id,
-          displayId: registrationResult.displayId,
-          name: registrationResult.businessName,
-          email: registrationResult.contactEmail,
-          status: registrationResult.status,
+          id: registrationResult.merchant.id,
+          displayId: registrationResult.merchant.displayId, 
+          name: registrationResult.merchant.businessName, 
+          email: registrationResult.merchant.contactEmail,  
+          status: registrationResult.merchant.status,
         },
+        internalAccount: {
+            id: registrationResult.account.id,
+            displayId: registrationResult.account.displayId, 
+        }
       },
       { status: 201 }
     );
@@ -141,22 +139,31 @@ export async function POST(request: NextRequest) {
     console.error("[API /merchant-app/auth/register] Error processing request:", error.message, error.stack);
     
     if (error instanceof z.ZodError) {
-      console.warn("[API /merchant-app/auth/register] Validation error:", error.flatten());
-      return NextResponse.json({ error: "Validation failed. Please check your input.", details: error.flatten().fieldErrors }, { status: 400 });
+      console.warn("[API /merchant-app/auth/register] Validation error:", error.flatten().fieldErrors);
+      return NextResponse.json({ 
+        error: "Validation failed. Please check your input.", 
+        details: error.flatten().fieldErrors 
+      }, { status: 400 });
     }
-    if (error.statusCode) { 
-      return NextResponse.json({ error: error.message }, { status: error.statusCode });
+    if ((error as any).statusCode) { 
+      return NextResponse.json({ error: error.message }, { status: (error as any).statusCode });
     }
     if (error.code === '23505') { 
         if (error.detail && error.detail.toLowerCase().includes('display_id')) {
-            return NextResponse.json({ error: "A record with this Display ID already exists. Please try a different one." }, { status: 409 });
+             console.warn(`[API /merchant-app/auth/register] Unique constraint violation for display_id: ${error.detail}`);
+            return NextResponse.json({ error: "A record with this Display ID already exists. This is a rare server issue, please try again." }, { status: 409 });
         }
-        return NextResponse.json({ error: "A record with some unique identifier already exists." }, { status: 409 });
+        if (error.detail && error.detail.toLowerCase().includes(merchants.contactEmail.name)) { 
+            console.warn(`[API /merchant-app/auth/register] Unique constraint violation for email: ${error.detail}`);
+            return NextResponse.json({ error: "A merchant with this email already exists." }, { status: 409 });
+        }
+        console.warn(`[API /merchant-app/auth/register] Unique constraint violation: ${error.detail || error.message}`);
+        return NextResponse.json({ error: "A record with a unique identifier already exists. Please check your input or contact support." }, { status: 409 });
     }
     if (error instanceof SyntaxError && error.message.includes("JSON")) {
       return NextResponse.json({ error: "Invalid request body. Ensure JSON is well-formed." }, { status: 400 });
     }
     
-    return NextResponse.json({ error: "Internal Server Error during registration." }, { status: 500 });
+    return NextResponse.json({ error: "An internal server error occurred during registration." }, { status: 500 });
   }
 }
