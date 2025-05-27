@@ -1,10 +1,18 @@
+// src/app/api/transactions/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { transactions, createTransactionSchema, selectTransactionSchema } from "@/lib/db/schema";
+import { 
+    transactions, 
+    createTransactionApiPayloadSchema,
+    // selectTransactionSchema, // Keep if you use it for specific select projections
+    transactionStatusEnum, 
+    transactionTypeEnum,   
+} from "@/lib/db/schema";
 import { z } from "zod";
-import { withAuth } from "@/lib/auth/middleware";
-import { JWTPayload } from "@/lib/auth/jwt";
-import { desc, eq, and, or, ilike, sql } from "drizzle-orm"; // Added sql for count
+import { withAuth } from "@/lib/auth/middleware"; 
+import { JWTPayload } from "@/lib/auth/jwt"; 
+import { desc, eq, and, or, ilike, sql } from "drizzle-orm";
+import { generateDisplayId } from "@/lib/utils/idGenerator";
 
 // GET /api/transactions - Get all transactions (protected)
 export const GET = withAuth(
@@ -12,59 +20,46 @@ export const GET = withAuth(
     try {
       const searchParams = request.nextUrl.searchParams;
       const accountId = searchParams.get("accountId");
-      const merchantId = searchParams.get("merchantId");
+      const merchantIdParam = searchParams.get("merchantId");
       const paymentId = searchParams.get("paymentId");
-      const status = searchParams.get("status");
-      const type = searchParams.get("type");
+      const statusParam = searchParams.get("status");
+      const typeParam = searchParams.get("type");
       const limit = parseInt(searchParams.get("limit") || "50", 10);
       const offset = parseInt(searchParams.get("offset") || "0", 10);
 
       const conditions = [];
-
-      if (accountId) {
-        conditions.push(eq(transactions.accountId, accountId));
+      if (accountId) conditions.push(eq(transactions.accountId, accountId));
+      if (merchantIdParam) conditions.push(eq(transactions.merchantId, merchantIdParam));
+      if (paymentId) conditions.push(eq(transactions.paymentId, paymentId));
+      if (statusParam && transactionStatusEnum.enumValues.includes(statusParam as any)) {
+        conditions.push(eq(transactions.status, statusParam as typeof transactionStatusEnum.enumValues[number]));
       }
-      if (merchantId) {
-        conditions.push(eq(transactions.merchantId, merchantId));
-      }
-      if (paymentId) {
-        conditions.push(eq(transactions.paymentId, paymentId));
-      }
-      if (status && ["Completed", "Pending", "Failed", "Declined"].includes(status)) {
-        conditions.push(eq(transactions.status, status as typeof transactions.status.enumValues[number]));
-      }
-      if (type && ["Debit", "Credit", "Adjustment"].includes(type)) {
-        conditions.push(eq(transactions.type, type as typeof transactions.type.enumValues[number]));
+      if (typeParam && transactionTypeEnum.enumValues.includes(typeParam as any)) {
+        conditions.push(eq(transactions.type, typeParam as typeof transactionTypeEnum.enumValues[number]));
       }
 
-      const query = db
+      const whereCondition = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const data = await db
         .select()
         .from(transactions)
+        .where(whereCondition) 
         .orderBy(desc(transactions.createdAt))
         .limit(limit)
         .offset(offset);
 
-      if (conditions.length > 0) {
-        query.where(and(...conditions));
-      }
-      
-      const data = await query;
-
-      const totalCountQuery = db
+      const totalCountResult = await db
         .select({ value: sql<number>`count(${transactions.id})`.mapWith(Number) })
-        .from(transactions);
-      
-      if (conditions.length > 0) {
-        totalCountQuery.where(and(...conditions));
-      }
-      const totalCountResult = await totalCountQuery;
+        .from(transactions)
+        .where(whereCondition); 
+        
       const totalCount = totalCountResult[0]?.value || 0;
 
       return NextResponse.json({ data, totalCount });
 
-    } catch (error) {
-      console.error("Error fetching transactions:", error);
-      return NextResponse.json({ error: "Failed to fetch transactions" }, { status: 500 });
+    } catch (error: any) {
+      console.error("[API GET /transactions] Error fetching transactions:", { message: error.message, stack: error.stack });
+      return NextResponse.json({ error: error.message || "Failed to fetch transactions" }, { status: 500 });
     }
   }
 );
@@ -72,69 +67,87 @@ export const GET = withAuth(
 // POST /api/transactions - Create a new transaction (protected)
 export const POST = withAuth(
   async (request: NextRequest, context: any, payload: JWTPayload) => {
-    let transactionInsertData: any; // Define here to be accessible in catch for merchantId check
+    let rawClientPayloadForLogging: any; 
+
     try {
       const body = await request.json();
-      const validatedData = createTransactionSchema.parse(body);
+      rawClientPayloadForLogging = body; 
+      console.log("[API POST /transactions] Raw request body:", JSON.stringify(body));
 
-      const reference =
-        validatedData.reference ||
-        `TX-${new Date().getFullYear()}-${String(Date.now()).slice(-7)}`;
+      const validatedData = createTransactionApiPayloadSchema.parse(body);
+      console.log("[API POST /transactions] Validated client payload:", validatedData);
+      
+      const result = await db.transaction(async (tx) => {
+        const newTransactionDisplayId = await generateDisplayId(tx, 'TRX'); 
+        console.log(`[API POST /transactions] Generated transaction displayId: ${newTransactionDisplayId}`);
 
-      transactionInsertData = { // Assign to the higher-scoped variable
-        displayId: validatedData.displayId,
-        paymentId: validatedData.paymentId,
-        amount: validatedData.amount.toString(),
-        type: validatedData.type,
-        accountId: validatedData.accountId,
-        merchantId: validatedData.merchantId,
-        status: validatedData.status,
-        declineReason: validatedData.declineReason,
-        pinVerified: validatedData.pinVerified,
-        description: validatedData.description,
-        reference: reference,
-        metadata: validatedData.metadata,
-      };
+        const reference = validatedData.reference || `TX-${new Date().getFullYear()}-${String(Date.now()).slice(-7)}`;
 
-      const newTransactionResult = await db
-        .insert(transactions)
-        .values(transactionInsertData)
-        .returning();
+        const transactionDataForDb: typeof transactions.$inferInsert = {
+          displayId: newTransactionDisplayId,
+          paymentId: validatedData.paymentId,
+          amount: validatedData.amount.toString(), 
+          type: validatedData.type, 
+          accountId: validatedData.accountId, 
+          merchantId: validatedData.merchantId || null, 
+          status: transactionStatusEnum.enumValues[1], 
+          description: validatedData.description || null, 
+          reference: reference,
+          timestamp: new Date(), 
+          pinVerified: false, 
+          metadata: null, 
+          declineReason: null, 
+        };
+        console.log("[API POST /transactions] Data for DB insertion:", transactionDataForDb);
+        
+        const [newTransactionResult] = await tx
+          .insert(transactions)
+          .values(transactionDataForDb)
+          .returning(); 
 
-      if (!newTransactionResult || newTransactionResult.length === 0) {
-        console.error("Failed to insert transaction, DB returned no result.");
-        return NextResponse.json({ error: "Failed to create transaction record in database" }, { status: 500 });
-      }
+        if (!newTransactionResult) {
+          console.error("[API POST /transactions] Transaction insertion failed, DB returned no result.");
+          throw new Error("Failed to insert transaction, DB returned no result.");
+        }
+        console.log("[API POST /transactions] Transaction created successfully:", newTransactionResult.id);
+        return newTransactionResult;
+      });
 
-      return NextResponse.json(newTransactionResult[0], { status: 201 });
+      return NextResponse.json(result, { status: 201 });
 
     } catch (error: any) {
-      console.error("Error creating transaction:", error);
+      console.error("[API POST /transactions] Error creating transaction:", {
+          message: error.message,
+          stack: error.stack,
+          code: error.code, 
+          detail: error.detail, 
+          constraint: error.constraint, 
+          clientPayload: rawClientPayloadForLogging 
+      });
 
       if (error instanceof z.ZodError) {
         return NextResponse.json(
-          { error: "Validation error", details: error.format() },
+          { error: "Validation error", details: error.flatten().fieldErrors },
           { status: 400 }
         );
       }
       
-      if (error.code === '23505' && error.detail && error.detail.toLowerCase().includes('display_id')) {
-        return NextResponse.json({ error: "Display ID already exists for a transaction. Please use a unique Display ID." }, { status: 409 });
+      if (error.code === '23505' && error.detail && error.detail.toLowerCase().includes(transactions.displayId.name)) {
+        return NextResponse.json({ error: "Generated Transaction Display ID conflict. Please try again." }, { status: 409 });
       }
-      
-      if (error.code === '23503' && error.constraint_name && error.constraint_name.toLowerCase().includes('transactions_payment_id_fkey')) {
-         return NextResponse.json({ error: "Invalid Payment ID: The specified payment does not exist." }, { status: 400 });
+      if (error.code === '23502') { 
+        return NextResponse.json({ error: `A required field was missing or null for the transaction: ${error.column || 'unknown column'}.`, detail: error.detail }, { status: 500 });
       }
-      if (error.code === '23503' && error.constraint_name && error.constraint_name.toLowerCase().includes('transactions_account_id_fkey')) {
-         return NextResponse.json({ error: "Invalid Account ID: The specified account does not exist." }, { status: 400 });
-      }
-      // Check if a merchantId was provided in the data that was attempted to be inserted
-      if (transactionInsertData && transactionInsertData.merchantId && error.code === '23503' && error.constraint_name && error.constraint_name.toLowerCase().includes('transactions_merchant_id_fkey')) {
-         return NextResponse.json({ error: "Invalid Merchant ID: The specified merchant does not exist." }, { status: 400 });
+      if (error.code === '23503') { 
+        let msg = "Invalid reference ID provided for transaction (e.g., paymentId, accountId, or merchantId does not exist).";
+        if (error.constraint && error.constraint.includes(transactions.paymentId.name)) msg = "Invalid Payment ID: The specified payment does not exist.";
+        else if (error.constraint && error.constraint.includes(transactions.accountId.name)) msg = "Invalid Account ID: The specified account does not exist.";
+        else if (rawClientPayloadForLogging?.merchantId && error.constraint && error.constraint.includes(transactions.merchantId.name)) msg = "Invalid Merchant ID: The specified merchant does not exist.";
+        return NextResponse.json({ error: msg , detail: error.detail}, { status: 400 });
       }
 
       return NextResponse.json(
-        { error: "Failed to create transaction" },
+        { error: error.message || "Failed to create transaction due to an internal server error." },
         { status: 500 }
       );
     }

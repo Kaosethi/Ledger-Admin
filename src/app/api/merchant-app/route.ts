@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { transactions, createTransactionSchema } from "@/lib/db/schema";
+import { transactions, createTransactionApiPayloadSchema } from "@/lib/db/schema";
 import mockDataInstance from "@/lib/mockData";
 import { JWTPayload } from "@/lib/auth/jwt";
 
