@@ -2,99 +2,95 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { accounts, accountStatusEnum } from '@/lib/db/schema'; // Import accountStatusEnum
+import { accounts, accountStatusEnum } from '@/lib/db/schema'; // Ensure accountStatusEnum is imported
 import { eq } from 'drizzle-orm';
 
-// Define a regex that matches your account displayId format
-// Example: STC-YYYY-NNNN or MIA-YYYY-NNNN etc. Adjust if format varies.
-const accountDisplayIdRegex = /^[A-Z]{3}-\d{4}-[A-Z0-9]{4}(?:-[A-Z0-9]{1,4})?$/; 
-// Example STC-2025-3T6W. If it's always 4 alphanumeric for the last part: /^[A-Z]{3}-\d{4}-[A-Z0-9]{4}$/
-
+// Zod schema for the payload expected from the QR code's JSON content
+// after Base64 decoding by the client.
 const QrPayloadSchema = z.object({
-  type: z.string().optional(),
-  account: z.string().regex(accountDisplayIdRegex, "Account identifier from QR must be a valid display ID format"), // <<< CHANGED: Expect displayId format
-  // version: z.string().optional(), // 'version' was in your schema, 'ver' in client log. Standardize.
-  ver: z.string().optional(), // Matching client log
-  // signature: z.string().optional(), // 'signature' was in your schema, 'sig' in client log. Standardize.
-  sig: z.string().optional(), // Matching client log
+  type: z.string().optional(),      // e.g., "pay"
+  account: z.string().uuid("Account ID from QR must be a valid UUID."), // Expects the account's UUID
+  ver: z.string().optional(),       // e.g., "1.0" - matches client log example
+  sig: z.string().optional(),       // Signature - matches client log example
 });
 
 export async function POST(request: NextRequest) {
-  console.log("[API POST /validate-qr] Received request.");
+  console.log("[API POST /validate-qr] Received request to validate QR.");
   try {
     const body = await request.json();
-    console.log("[API POST /validate-qr] Raw body:", JSON.stringify(body));
+    console.log("[API POST /validate-qr] Raw JSON body from client:", JSON.stringify(body)); 
+
     const validationResult = QrPayloadSchema.safeParse(body);
 
     if (!validationResult.success) {
-      console.warn("[API POST /validate-qr] Zod validation failed:", validationResult.error.flatten().fieldErrors);
+      console.warn("[API POST /validate-qr] Zod validation failed for QR payload:", validationResult.error.flatten().fieldErrors);
       return NextResponse.json(
         {
-          error: 'Invalid QR payload structure.',
+          error: 'Invalid QR payload structure received by server.',
           details: validationResult.error.flatten().fieldErrors,
         },
         { status: 400 }
       );
     }
-    console.log("[API POST /validate-qr] Zod validation successful.");
+    console.log("[API POST /validate-qr] Zod validation successful. Validated QR data:", validationResult.data);
 
-    // 'accountDisplayIdFromQr' is the displayId from the QR code (e.g., "STC-2025-3T6W")
-    const { account: accountDisplayIdFromQr } = validationResult.data;
-    console.log(`[API POST /validate-qr] Attempting to find account by displayId: ${accountDisplayIdFromQr}`);
+    // 'accountIdFromQr' is the UUID from the QR code's "account" field.
+    const { account: accountIdFromQr } = validationResult.data; 
+    console.log(`[API POST /validate-qr] Attempting to find account by UUID: ${accountIdFromQr}`);
 
     const foundAccounts = await db
       .select({
-        id: accounts.id, // The internal UUID of the account
-        displayId: accounts.displayId, // The human-readable displayId (which was scanned)
-        name: accounts.childName,
-        status: accounts.status,
-        // Add any other fields needed by the client after validation
+        retrievedAccountUUID: accounts.id,         // The internal UUID of the account
+        retrievedAccountDisplayId: accounts.displayId, // The human-readable displayId
+        retrievedAccountName: accounts.childName,
+        retrievedAccountStatus: accounts.status,
       })
       .from(accounts)
-      .where(eq(accounts.displayId, accountDisplayIdFromQr)); // <<< CHANGED: Query by accounts.displayId
+      .where(eq(accounts.id, accountIdFromQr)) // Query by the account's primary UUID key
+      .limit(1); // Expecting only one account for a given UUID
 
     if (foundAccounts.length === 0) {
-      console.warn(`[API POST /validate-qr] Account with displayId '${accountDisplayIdFromQr}' not found.`);
+      console.warn(`[API POST /validate-qr] Account with UUID '${accountIdFromQr}' not found in database.`);
       return NextResponse.json(
-        { error: `Beneficiary account with identifier '${accountDisplayIdFromQr}' not found.` },
+        { error: `Beneficiary account (ID: ${accountIdFromQr}) not found.` },
         { status: 404 }
       );
     }
 
     const accountFromDb = foundAccounts[0];
-    console.log(`[API POST /validate-qr] Account found: UUID=${accountFromDb.id}, DisplayID=${accountFromDb.displayId}, Status=${accountFromDb.status}`);
+    console.log(`[API POST /validate-qr] Account found: UUID=${accountFromDb.retrievedAccountUUID}, DisplayID=${accountFromDb.retrievedAccountDisplayId}, Status=${accountFromDb.retrievedAccountStatus}`);
 
-    // Use the imported enum for status comparison for type safety
-    if (accountFromDb.status !== accountStatusEnum.enumValues.find(s => s === 'Active')) {
-      console.warn(`[API POST /validate-qr] Account ${accountFromDb.displayId} is not active. Status: ${accountFromDb.status}`);
+    // Check if the account is active using the imported enum for type safety
+    if (accountFromDb.retrievedAccountStatus !== accountStatusEnum.enumValues.find(s => s === 'Active')) {
+      console.warn(`[API POST /validate-qr] Account ${accountFromDb.retrievedAccountDisplayId} (UUID: ${accountFromDb.retrievedAccountUUID}) is not active. Status: ${accountFromDb.retrievedAccountStatus}`);
       return NextResponse.json(
-        { error: 'Beneficiary account is not active.' },
+        { error: 'Beneficiary account is not active.', currentStatus: accountFromDb.retrievedAccountStatus },
         { status: 403 } // 403 Forbidden is appropriate for a valid account that cannot be used
       );
     }
 
-    console.log(`[API POST /validate-qr] Account ${accountFromDb.displayId} is active. Returning details.`);
-    // If found and active, return beneficiary details.
-    // The client will receive the displayId (which it scanned) and the name.
-    // It might also need the internal UUID (accountFromDb.id) for subsequent operations like creating a transaction.
+    console.log(`[API POST /validate-qr] Account ${accountFromDb.retrievedAccountDisplayId} is active. Returning details to client.`);
+    // If found and active, return beneficiary details to the client.
+    // Client will need UUID for processing, and DisplayID/Name for showing to user.
     return NextResponse.json(
       {
-        accountId: accountFromDb.id,         // The internal UUID, useful for further processing
-        accountDisplayId: accountFromDb.displayId, // The scanned displayId
-        name: accountFromDb.name,
-        // You can add other safe-to-expose details if needed
+        accountId: accountFromDb.retrievedAccountUUID,      // The internal UUID (client uses this for next API calls)
+        accountDisplayId: accountFromDb.retrievedAccountDisplayId, // The human-readable ID (for display on client)
+        name: accountFromDb.retrievedAccountName,            // Account holder's name (for display on client)
+        // status: accountFromDb.retrievedAccountStatus,     // Optionally return status if client needs it
       },
       { status: 200 }
     );
-  } catch (error: any) { // Catch as 'any'
-    console.error('[API POST /validate-qr] Error validating QR:', error);
-    if (error instanceof SyntaxError && error.message.toLowerCase().includes("json")) { // More specific JSON error check
-        return NextResponse.json({ error: 'Invalid JSON payload.' }, { status: 400 });
+  } catch (error: any) { 
+    console.error('[API POST /validate-qr] Error during QR validation process:', {
+      message: error.message,
+      stack: error.stack, // Full stack for server-side debugging
+      errorObject: JSON.stringify(error, Object.getOwnPropertyNames(error)) // Log the whole error object
+    });
+    if (error instanceof SyntaxError && error.message.toLowerCase().includes("json")) { 
+        return NextResponse.json({ error: 'Invalid JSON payload provided to server.' }, { status: 400 });
     }
-    // If you have custom ApiError types and they are thrown, they could be handled here
-    // if (error instanceof ApiError) { 
-    //   return NextResponse.json({ error: error.message, details: error.details }, { status: error.statusCode });
-    // }
+    // Add more specific error handling here if needed (e.g. for custom ApiError types if thrown from helpers)
     return NextResponse.json(
       { error: error.message || 'An unexpected error occurred during QR validation.' },
       { status: 500 }
