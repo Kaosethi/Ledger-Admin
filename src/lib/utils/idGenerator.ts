@@ -12,43 +12,51 @@ import { accountDisplayIdSequence } from '@/lib/db/schema'; // Adjust path if yo
 type DrizzleTransaction = PgTransaction<any, any, any>; // Common for pg-based drivers
 
 export async function generateDisplayId(
-    tx: DrizzleTransaction, // The Drizzle transaction object
+    tx: DrizzleTransaction,
     prefix: string
 ): Promise<string> {
     const year = new Date().getFullYear().toString();
+    console.log(`[generateDisplayId] Generating ID for prefix: ${prefix}, year: ${year}`);
 
-    // Atomically increment or insert the sequence for the given prefix and year
-    // This uses a raw SQL query for a more robust "upsert and increment"
     const sequenceQuery = sql`
         INSERT INTO ${accountDisplayIdSequence} (prefix, year, current_value, created_at, updated_at)
         VALUES (${prefix}, ${year}, 1, NOW(), NOW())
         ON CONFLICT (prefix, year) DO UPDATE
-SET current_value = account_display_id_sequence.current_value + 1, updated_at = NOW()
-        RETURNING current_value;
+        SET current_value = ${sql.identifier(accountDisplayIdSequence.currentValue.name)} + 1, 
+            updated_at = NOW()
+        RETURNING ${accountDisplayIdSequence.currentValue};
     `;
     
-    const result = await tx.execute(sequenceQuery);
+    let result;
+    try {
+        console.log(`[generateDisplayId] Executing sequence query for ${prefix}-${year}`);
+        result = await tx.execute(sequenceQuery);
+        console.log(`[generateDisplayId] Sequence query result for ${prefix}-${year}:`, JSON.stringify(result, null, 2));
+    } catch (e: any) {
+        console.error(`[generateDisplayId] ERROR executing sequence query for ${prefix}-${year}: ${e.message}`, e.stack);
+        throw e; // Re-throw
+    }
     
     let nextVal: number;
-
-    // Result parsing depends on the Drizzle driver (node-postgres, neon, etc.)
-    // This attempts to cover common scenarios.
+    // ... (same result parsing logic as before) ...
+    // Add more detailed logging in the parsing logic if needed
     if (Array.isArray(result) && result.length > 0 && typeof result[0].current_value !== 'undefined') {
         nextVal = Number(result[0].current_value);
     } else if (typeof (result as any).rows !== 'undefined' && Array.isArray((result as any).rows) && (result as any).rows.length > 0 && typeof (result as any).rows[0].current_value !== 'undefined') {
          nextVal = Number((result as any).rows[0].current_value);
-    } else if (result && typeof (result as any).length === 'number' && (result as any).length > 0 && typeof (result as any)[0]?.current_value !== 'undefined' ) { // for some drivers that return array-like directly
+    } else if (result && typeof (result as any).length === 'number' && (result as any).length > 0 && typeof (result as any)[0]?.current_value !== 'undefined' ) {
         nextVal = Number((result as any)[0].current_value);
-    }
-     else {
-        console.error("Unexpected result structure from sequence query. Full result:", JSON.stringify(result, null, 2));
+    } else {
+        console.error(`[generateDisplayId] Unexpected result structure for ${prefix}-${year}. Full result:`, JSON.stringify(result, null, 2));
         throw new Error(`Failed to retrieve sequence value for ${prefix}-${year}. Result structure not recognized.`);
     }
 
     if (isNaN(nextVal)) {
-        console.error("Parsed nextVal is NaN. Original result from DB:", JSON.stringify(result, null, 2));
+        console.error(`[generateDisplayId] Parsed nextVal is NaN for ${prefix}-${year}. Original result from DB:`, JSON.stringify(result, null, 2));
         throw new Error(`Parsed sequence value is not a number for ${prefix}-${year}.`);
     }
     
-    return `${prefix.toUpperCase()}-${year}-${String(nextVal).padStart(4, '0')}`;
+    const generatedId = `${prefix.toUpperCase()}-${year}-${String(nextVal).padStart(4, '0')}`;
+    console.log(`[generateDisplayId] Successfully generated ID for ${prefix}-${year}: ${generatedId}`);
+    return generatedId;
 }
