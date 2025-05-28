@@ -35,7 +35,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
       if (selectedPeriod === 'monthly') return isSameMonth(txDate, today);
       return true;
     });
-  }, [transactions, selectedPeriod]);
+  }, [transactions, selectedPeriod, today]);
 
   const totalAccounts = useMemo(() => accounts.length, [accounts]);
   const activeMerchantsCount = useMemo(() => merchants.filter((m) => m.status === "active").length, [merchants]);
