@@ -28,14 +28,15 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
   const today = new Date();
 
   const filteredTransactions = useMemo(() => {
-    return transactions.filter((tx) => {
-      const txDate = new Date(tx.timestamp);
-      if (selectedPeriod === 'daily') return isSameDay(txDate, today);
-      if (selectedPeriod === 'weekly') return isSameWeek(txDate, today);
-      if (selectedPeriod === 'monthly') return isSameMonth(txDate, today);
-      return true;
-    });
-  }, [transactions, selectedPeriod, today]);
+  const today = new Date();
+  return transactions.filter((tx) => {
+    const txDate = new Date(tx.timestamp);
+    if (selectedPeriod === 'daily') return isSameDay(txDate, today);
+    if (selectedPeriod === 'weekly') return isSameWeek(txDate, today);
+    if (selectedPeriod === 'monthly') return isSameMonth(txDate, today);
+    return true;
+  });
+}, [transactions, selectedPeriod]);
 
   const totalAccounts = useMemo(() => accounts.length, [accounts]);
   const activeMerchantsCount = useMemo(() => merchants.filter((m) => m.status === "active").length, [merchants]);
@@ -77,6 +78,7 @@ const DashboardTab: React.FC<DashboardTabProps> = ({
           <h3 className="text-sm font-medium text-gray-500">Total Accounts</h3>
           <p className="mt-1 text-3xl font-semibold text-gray-900">{totalAccounts}</p>
         </div>
+        <div className="text-red-500 text-2xl">Tailwind test</div>
         <div className="bg-white p-6 rounded-lg shadow">
           <h3 className="text-sm font-medium text-gray-500">Active Merchants</h3>
           <p className="mt-1 text-3xl font-semibold text-gray-900">{activeMerchantsCount}</p>
