@@ -5,7 +5,7 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 // Define the main page component
-export default function HomePage() {
+export default function Test() {
   const router = useRouter();
   const [isRedirecting, setIsRedirecting] = useState(true);
 
@@ -20,8 +20,8 @@ export default function HomePage() {
   }, [router]);
 
   return (
-    <div className="flex justify-center items-center min-h-screen">
-      <div className="text-lg">Redirecting to dashboard...</div>
+    <div className="bg-red-500 text-white p-10 text-3xl">
+      If this is red, Tailwind is working!
     </div>
   );
 }
