@@ -60,8 +60,8 @@ export async function POST(request: NextRequest) {
       let merchantDisplayId: string | undefined;
 
       try {
-        console.log("[API /merchant-app/auth/register] Attempting to generate internalAccountDisplayId for prefix 'MIA'...");
-        internalAccountDisplayId = await generateDisplayId(tx, 'MIA'); 
+        console.log("[API /merchant-app/auth/register] Attempting to generate internalAccountDisplayId for prefix 'MER'...");
+        internalAccountDisplayId = await generateDisplayId(tx, 'MER'); 
         console.log(`[API /merchant-app/auth/register] SUCCESSFULLY generated internalAccountDisplayId: ${internalAccountDisplayId}`);
       } catch (genError: any) {
         console.error(`[API /merchant-app/auth/register] FAILED to generate internalAccountDisplayId: ${genError.message}`, genError.stack);

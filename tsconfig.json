@@ -33,7 +33,7 @@
         "name": "next"
       }
     ],
-    "types": ["node", "bun-types"]
+    "types": ["node", "bun-types", "react"]
     // Include both node and bun-types
   },
   "include": [

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { 
     transactions, 
+    accounts,
     createTransactionApiPayloadSchema,
     // selectTransactionSchema, // Keep if you use it for specific select projections
     transactionStatusEnum, 
@@ -83,28 +84,102 @@ export const POST = withAuth(
 
         const reference = validatedData.reference || `TX-${new Date().getFullYear()}-${String(Date.now()).slice(-7)}`;
 
+        // Fetch account details
+        const [account] = await tx.select().from(accounts).where(eq(accounts.id, validatedData.accountId));
+        if (!account) {
+          // Account does not exist (should be caught by FK, but handle gracefully)
+          const failedTx = await tx.insert(transactions).values({
+            displayId: newTransactionDisplayId,
+            paymentId: validatedData.paymentId,
+            amount: validatedData.amount.toString(),
+            type: validatedData.type,
+            accountId: validatedData.accountId,
+            merchantId: validatedData.merchantId || null,
+            status: 'Failed',
+            project: validatedData.project,
+            description: validatedData.description || null,
+            reference,
+            timestamp: new Date(),
+            pinVerified: false,
+            metadata: null,
+            declineReason: 'Account does not exist',
+          }).returning();
+          return failedTx[0];
+        }
+
+        // Check account status
+        if (['Inactive', 'Suspended', 'Pending'].includes(account.status)) {
+          const failedTx = await tx.insert(transactions).values({
+            displayId: newTransactionDisplayId,
+            paymentId: validatedData.paymentId,
+            amount: validatedData.amount.toString(),
+            type: validatedData.type,
+            accountId: validatedData.accountId,
+            merchantId: validatedData.merchantId || null,
+            status: 'Failed',
+            project: validatedData.project,
+            description: validatedData.description || null,
+            reference,
+            timestamp: new Date(),
+            pinVerified: false,
+            metadata: null,
+            declineReason: `Account status: ${account.status}`,
+          }).returning();
+          return failedTx[0];
+        }
+
+        // Check for PIN attempts exceeded (if you have a field or logic for this, replace this check accordingly)
+        // Example: if (account.pinAttempts && account.pinAttempts >= MAX_PIN_ATTEMPTS)
+        // We'll assume a placeholder check for now:
+        // const MAX_PIN_ATTEMPTS = 3;
+        // if (account.pinAttempts >= MAX_PIN_ATTEMPTS) { ... }
+
+        // Check for insufficient balance (for Debit transactions)
+        if (validatedData.type === 'Debit') {
+          const balance = typeof account.balance === 'string' ? parseFloat(account.balance) : account.balance;
+          if (balance < validatedData.amount) {
+            const failedTx = await tx.insert(transactions).values({
+              displayId: newTransactionDisplayId,
+              paymentId: validatedData.paymentId,
+              amount: validatedData.amount.toString(),
+              type: validatedData.type,
+              accountId: validatedData.accountId,
+              merchantId: validatedData.merchantId || null,
+              status: 'Failed',
+              project: validatedData.project,
+              description: validatedData.description || null,
+              reference,
+              timestamp: new Date(),
+              pinVerified: false,
+              metadata: null,
+              declineReason: 'Insufficient Balance',
+            }).returning();
+            return failedTx[0];
+          }
+        }
+
+        // If all checks pass, insert as 'Pending'
         const transactionDataForDb: typeof transactions.$inferInsert = {
           displayId: newTransactionDisplayId,
           paymentId: validatedData.paymentId,
-          amount: validatedData.amount.toString(), 
-          type: validatedData.type, 
-          accountId: validatedData.accountId, 
-          merchantId: validatedData.merchantId || null, 
-          status: transactionStatusEnum.enumValues[1], 
-          description: validatedData.description || null, 
-          reference: reference,
-          timestamp: new Date(), 
-          pinVerified: false, 
-          metadata: null, 
-          declineReason: null, 
+          amount: validatedData.amount.toString(),
+          type: validatedData.type,
+          accountId: validatedData.accountId,
+          merchantId: validatedData.merchantId || null,
+          project: validatedData.project,
+          status: transactionStatusEnum.enumValues[1], // 'Pending'
+          description: validatedData.description || null,
+          reference,
+          timestamp: new Date(),
+          pinVerified: false,
+          metadata: null,
+          declineReason: null,
         };
         console.log("[API POST /transactions] Data for DB insertion:", transactionDataForDb);
-        
         const [newTransactionResult] = await tx
           .insert(transactions)
           .values(transactionDataForDb)
-          .returning(); 
-
+          .returning();
         if (!newTransactionResult) {
           console.error("[API POST /transactions] Transaction insertion failed, DB returned no result.");
           throw new Error("Failed to insert transaction, DB returned no result.");
@@ -113,7 +188,7 @@ export const POST = withAuth(
         return newTransactionResult;
       });
 
-      return NextResponse.json(result, { status: 201 });
+      return NextResponse.json(result, { status: result.status === 'Failed' ? 400 : 201 });
 
     } catch (error: any) {
       console.error("[API POST /transactions] Error creating transaction:", {

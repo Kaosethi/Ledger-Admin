@@ -163,6 +163,7 @@ export const transactions = pgTable(
     type: transactionTypeEnum("type").notNull(),
     accountId: uuid("account_id").notNull().references(() => accounts.id, { onDelete: "restrict" }),
     merchantId: uuid("merchant_id").references(() => merchants.id, { onDelete: "set null" }),
+    project: text("project").notNull(),
     status: transactionStatusEnum("status").notNull(),
     declineReason: text("decline_reason"),
     pinVerified: boolean("pin_verified"),
@@ -323,6 +324,22 @@ export const passwordResetTokensRelations = relations(passwordResetTokens, ({ on
   }),
 }));
 
+// Flexible per-project settings (key-value)
+export const projectSettings = pgTable(
+  "project_settings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    project: text("project").notNull(),
+    key: text("key").notNull(),
+    value: text("value").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    projectKeyIdx: uniqueIndex("project_key_idx").on(table.project, table.key),
+  })
+);
+
+
 export const insertAdministratorSchema = createInsertSchema(administrators);
 export const selectAdministratorSchema = createSelectSchema(administrators);
 
@@ -419,6 +436,7 @@ export const createPaymentApiPayloadSchema = z.object({
 
 export const createTransactionApiPayloadSchema = z.object({
     paymentId: z.string().uuid("Valid Payment UUID (from created payment event) is required."),
+    project: z.string().min(1, "Project identifier is required."),
     amount: z.number().refine(val => val !== 0, "Amount cannot be zero"),
     type: z.enum(transactionTypeEnum.enumValues),
     accountId: z.string().uuid("Invalid account ID for transaction leg"),

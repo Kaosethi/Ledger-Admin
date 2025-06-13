@@ -146,7 +146,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const renderTabContent = () => {
     switch (activeTab) {
       case "dashboard-tab":
-        return ( <DashboardTab accounts={appData.accounts} merchants={appData.merchants} transactions={appData.transactions} /> );
+        return ( <DashboardTab accounts={appData.accounts} merchants={appData.merchants} transactions={appData.transactions} beneficiaries={[]} /> );
       case "onboarding-tab":
         return ( <OnboardingTab accounts={appData.accounts} onAccountAdd={handleAccountAdd} logAdminActivity={logAdminActivity} /> );
       case "accounts-tab":

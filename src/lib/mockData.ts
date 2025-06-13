@@ -24,6 +24,7 @@ export interface Account {
     status: 'Active' | 'Inactive' | 'Suspended';
     createdAt: string;
     lastActivity: string;
+    accountType: 'CHILD_DISPLAY' | 'MERCHANT_INTERNAL' | 'SYSTEM';
     updatedAt?: string;
     pin?: string;
     guardianDob?: string;
@@ -43,6 +44,7 @@ export type BackendMerchantStatus =
 // This interface reflects fields your backend's /api/merchants GET returns
 export interface Merchant { 
     id: string;
+    displayId: string;
     businessName: string;
     contactEmail?: string | null;
     storeAddress?: string | null;
@@ -63,7 +65,9 @@ export interface Merchant {
 // --- Transaction Interface ---
 export interface Transaction {
     id: string; // Primary key
-    paymentId: string; // User-facing Transaction ID
+    paymentId: string; // Payment UUID (DB PK)
+    displayId?: string; // Transaction Display ID (user-facing)
+    paymentDisplayId?: string; // Payment Display ID (user-facing)
     accountId: string;
     merchantId?: string | null;
     type: "Debit" | "Credit" | "Adjustment";
@@ -148,13 +152,13 @@ const mockDataInstance: AppData = {
         { id: 'ADM-001', email: 'admin@example.com', passwordHash: 'password', name: 'Default Admin', role: 'Admin', isActive: true, createdAt: '2023-01-01T00:00:00Z', },
     ],
     accounts: [
-        { id: 'ACC-001', displayId: 'ACC-001', guardianName: 'Alice Wonderland', childName: 'Caterpillar Jr.', balance: 150.75, status: 'Active', createdAt: '2023-01-15T10:30:00Z', lastActivity: '2024-03-10T14:00:00Z', updatedAt: '2023-01-15T10:30:00Z', pin: '1234', currentQrToken: generateMockQrCodeUrl('ACC-001'), guardianDob: '1985-05-20', guardianContact: '555-1234', address: '123 Rabbit Hole Lane, Wonderland', },
+        { id: 'ACC-001', displayId: 'ACC-001', guardianName: 'Alice Wonderland', childName: 'Caterpillar Jr.', balance: 150.75, status: 'Active', createdAt: '2023-01-15T10:30:00Z', lastActivity: '2024-03-10T14:00:00Z', accountType: 'CHILD_DISPLAY', updatedAt: '2023-01-15T10:30:00Z', pin: '1234', currentQrToken: generateMockQrCodeUrl('ACC-001'), guardianDob: '1985-05-20', guardianContact: '555-1234', address: '123 Rabbit Hole Lane, Wonderland', },
     ],
     // MODIFIED: Ensure merchant objects match the 'Merchant' interface structure
     merchants: [
-        { id: 'MER-001', businessName: 'General Groceries', storeAddress: 'Main Street Plaza', category: 'Groceries', status: 'active', submittedAt: '2022-11-01T00:00:00Z', contactEmail: 'groceries@example.com', updatedAt: '2022-11-01T00:00:00Z', createdAt: '2022-11-01T00:00:00Z' },
-        { id: 'MER-002', businessName: 'School Supply Station', storeAddress: 'Near Central School', category: 'School Supplies', status: 'active', submittedAt: '2023-01-10T00:00:00Z', contactEmail: 'supplies@example.com', updatedAt: '2023-01-10T00:00:00Z', createdAt: '2023-01-10T00:00:00Z' },
-        { id: 'MER-P01', businessName: 'New Book Nook', storeAddress: '12 River Road', category: 'Books', status: 'pending_approval', submittedAt: '2024-03-12T09:30:00Z', contactEmail: 'books@example.net', createdAt: '2024-03-12T09:30:00Z' },
+        { id: 'MER-001', displayId: 'MER-001', businessName: 'General Groceries', storeAddress: 'Main Street Plaza', category: 'Groceries', status: 'active', submittedAt: '2022-11-01T00:00:00Z', contactEmail: 'groceries@example.com', updatedAt: '2022-11-01T00:00:00Z', createdAt: '2022-11-01T00:00:00Z' },
+        { id: 'MER-002', displayId: 'MER-002', businessName: 'School Supply Station', storeAddress: 'Near Central School', category: 'School Supplies', status: 'active', submittedAt: '2023-01-10T00:00:00Z', contactEmail: 'supplies@example.com', updatedAt: '2023-01-10T00:00:00Z', createdAt: '2023-01-10T00:00:00Z' },
+        { id: 'MER-P01', displayId: 'MER-P01', businessName: 'New Book Nook', storeAddress: '12 River Road', category: 'Books', status: 'pending_approval', submittedAt: '2024-03-12T09:30:00Z', contactEmail: 'books@example.net', createdAt: '2024-03-12T09:30:00Z' },
         // ... other merchant objects ...
     ],
     transactions: [

@@ -75,6 +75,7 @@ export default function DashboardPage() {
       accounts={accounts}
       merchants={merchants}
       transactions={transactions}
+      beneficiaries={[]}
       accountsLoading={accountsLoading}
       merchantsLoading={merchantsLoading}
       transactionsLoading={transactionsLoading}

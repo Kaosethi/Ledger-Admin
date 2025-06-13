@@ -638,6 +638,7 @@ const AccountsTab: React.FC<AccountsTabProps> = ({
               createdAt: now,
               updatedAt: now,
               lastActivity: now, // Initialize lastActivity
+              accountType: 'CHILD_DISPLAY', // Added to satisfy Account type
               // Add optional fields from PendingRegistration
               guardianDob: pending.guardianDob,
               guardianContact: pending.guardianContact,

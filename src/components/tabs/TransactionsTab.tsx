@@ -204,16 +204,19 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
       }
 
       return {
-        "Payment ID (User Facing)": tx.paymentId || "N/A",
-        "Transaction DB ID": tx.id,
+        "Payment Display ID": tx.paymentDisplayId || "N/A",
+        "Payment UUID": tx.paymentId || "N/A",
+        "Transaction Display ID": tx.displayId || "N/A",
+        "Transaction UUID": tx.id || "N/A",
         "Date": txDisplayDate,
         "Time": txDisplayTime,
         "Timestamp (ISO)": (tx.timestamp instanceof Date && !isNaN(tx.timestamp.getTime())) ? tx.timestamp.toISOString() : "Invalid Date",
         "Account Display ID": account?.displayId || "N/A",
+        "Account UUID": tx.accountId || "N/A",
         "Account Child Name": account?.childName || "N/A",
-        "Account DB ID": tx.accountId || "",
+        "Merchant Display ID": merchant?.displayId || "N/A",
+        "Merchant UUID": tx.merchantId || "N/A",
         "Merchant Name": merchant?.businessName || (tx.merchantId ? "Unknown/Inactive" : "N/A"),
-        "Merchant DB ID": tx.merchantId || "N/A",
         "Type": tx.type,
         "Amount": signedAmount.toFixed(2),
         "Currency": "THB", 
@@ -337,11 +340,12 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
               <TableHead className="w-[80px]">Time</TableHead>
               <TableHead className="w-[150px]">Account ID</TableHead>
               <TableHead>Account Name</TableHead>
-              <TableHead className="w-[150px]">Merchant ID</TableHead>
+              <TableHead className="w-[150px]">Account Display ID</TableHead>
               <TableHead>Merchant Name</TableHead>
               <TableHead className="text-right w-[120px]">Amount</TableHead>
               <TableHead className="text-center w-[120px]">Status</TableHead>
               <TableHead className="w-[180px]">Payment ID</TableHead>
+              <TableHead className="w-[180px]">Transaction ID</TableHead>
               <TableHead className="text-center w-[100px]">Details</TableHead>
             </TableRow>
           </TableHeader>
@@ -349,6 +353,7 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
             {transactionsLoading ? (
               Array.from({ length: ITEMS_PER_PAGE }).map((_, i) => (
                 <TableRow key={`skeleton-${i}`}>
+                  <TableCell><Skeleton className="h-5 w-full" /></TableCell>
                   <TableCell><Skeleton className="h-5 w-full" /></TableCell>
                   <TableCell><Skeleton className="h-5 w-full" /></TableCell>
                   <TableCell><Skeleton className="h-5 w-full" /></TableCell>
@@ -378,15 +383,26 @@ const TransactionsTab: React.FC<TransactionsTabProps> = ({
                   <TableRow key={tx.id}>
                     <TableCell>{date}</TableCell>
                     <TableCell>{time}</TableCell>
-                    <TableCell title={account?.id || ""}>{account?.displayId || (tx.accountId ? tuncateUUID(tx.accountId) : "N/A")}</TableCell>
-                    <TableCell>{account?.childName || "N/A"}</TableCell>
-                    <TableCell title={merchant?.id || ""}>{tx.merchantId ? tuncateUUID(tx.merchantId) : "N/A"}</TableCell>
-                    <TableCell>{merchant?.businessName || (tx.merchantId ? "Unknown" : "N/A")}</TableCell>
-                    <TableCell className="text-right font-medium">{formatCurrency(Math.abs(amountValue))}</TableCell>
-                    <TableCell className="text-center">{renderStatusBadge(tx.status, "transaction")}</TableCell>
-                    <TableCell className="font-mono text-xs" title={tx.paymentId || undefined}>{tuncateUUID(tx.paymentId)}</TableCell>
+                    <TableCell title={
+  account?.accountType === "MERCHANT_INTERNAL"
+    ? merchant?.displayId || merchant?.id || ""
+    : account?.displayId || account?.id || ""
+}>
+  {
+    account?.accountType === "MERCHANT_INTERNAL"
+      ? merchant?.displayId || (tx.merchantId ? tuncateUUID(tx.merchantId) : "N/A")
+      : account?.displayId || (tx.accountId ? tuncateUUID(tx.accountId) : "N/A")
+  }
+</TableCell>
+                    <TableCell>{account?.childName || "—"}</TableCell>
+                    <TableCell title={account?.displayId || account?.id || "N/A"}>{account?.displayId || account?.id || "N/A"}</TableCell>
+                    <TableCell>{merchant?.businessName || (tx.merchantId ? "Unknown/Inactive" : "N/A")}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(amountValue)}</TableCell>
+                    <TableCell className="text-center">{renderStatusBadge(tx.status)}</TableCell>
+                    <TableCell>{tx.paymentDisplayId || "N/A"}</TableCell>
+                    <TableCell>{tx.displayId || "N/A"}</TableCell>
                     <TableCell className="text-center">
-                      <Button variant="outline" size="sm" onClick={() => handleViewDetailsClick(tx)}>Details</Button>
+                      <Button size="sm" variant="outline" onClick={() => handleViewDetailsClick(tx)}>View</Button>
                     </TableCell>
                   </TableRow>
                 );
